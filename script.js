@@ -1,289 +1,187 @@
-// ==========================================
-// CONFIGURAÇÃO SUPABASE
-// ==========================================
 const SUPABASE_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// Variáveis de Estado
 let currentUserAuth = null;
 let userProfile = null;
 let attemptUsername = "";
 let servicesCache = [];
 
-// ==========================================
-// INICIALIZAÇÃO & VERIFICAÇÃO DE SESSÃO
-// ==========================================
-document.addEventListener('DOMContentLoaded', async () => {
-    // 1. Splash Screen rápida (1 segundo)
+document.addEventListener('DOMContentLoaded', () => {
     setTimeout(async () => {
-        const { data: { session } } = await supabase.auth.getSession();
-        if (session) {
-            currentUserAuth = session.user;
-            await loadUserProfile();
-        } else {
-            document.getElementById('splash-screen').classList.remove('active-flex');
-            document.getElementById('auth-screen').classList.add('active-flex');
+        try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+                currentUserAuth = session.user;
+                await loadProfileAndStartApp();
+            } else {
+                showScreen('screen-auth');
+            }
+        } catch (e) {
+            showScreen('screen-auth');
         }
-    }, 1000);
+    }, 1200);
 
-    // 2. Setup Data Atual nos Inputs
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('agenda-date-picker').value = today;
-    document.getElementById('appt-date').value = today;
+    document.getElementById('btn-verify').addEventListener('click', verifyUserInDB);
+    document.getElementById('btn-create-pass').addEventListener('click', createPassAndLogin);
+    document.getElementById('btn-login').addEventListener('click', doLogin);
+    document.getElementById('btn-save-appt').addEventListener('click', saveAppointment);
+    document.getElementById('search-client').addEventListener('input', (e) => loadClientes(e.target.value));
 
-    // 3. Listeners Globais
-    setupListeners();
-});
-
-function setupListeners() {
-    // Login Flow
-    document.getElementById('btn-check-user').addEventListener('click', checkUser);
-    document.getElementById('btn-create-pass').addEventListener('click', createPasswordAndLogin);
-    document.getElementById('btn-do-login').addEventListener('click', doNormalLogin);
-    document.getElementById('btn-back-1').addEventListener('click', resetLoginUI);
-    document.getElementById('btn-back-2').addEventListener('click', resetLoginUI);
-    document.getElementById('btn-logout').addEventListener('click', async () => {
-        await supabase.auth.signOut();
-        location.reload();
+    document.querySelectorAll('.btn-logout').forEach(btn => {
+        btn.addEventListener('click', async () => {
+            await supabase.auth.signOut();
+            location.reload();
+        });
     });
 
-    // Navegação (Bottom Nav & Menu Links)
     document.querySelectorAll('.nav-item[data-target], .menu-link[data-target]').forEach(el => {
         el.addEventListener('click', (e) => {
             e.preventDefault();
             const target = el.getAttribute('data-target');
-            navigateSpa(target);
-            closeModal('menu-modal'); // Fecha o menu se clicou por lá
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(target).classList.add('active');
+            document.querySelectorAll('.nav-item').forEach(n => {
+                n.classList.remove('active');
+                if(n.getAttribute('data-target') === target) n.classList.add('active');
+            });
+            closeModal('modal-menu');
+            routerLoad(target);
         });
     });
 
-    // Ações de Funcionalidades
-    document.getElementById('agenda-date-picker').addEventListener('change', loadAgenda);
-    document.getElementById('btn-save-appt').addEventListener('click', saveAppointment);
-}
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('input-date-agenda').value = today;
+    document.getElementById('appt-date').value = today;
+});
 
-// ==========================================
-// FLUXO DE LOGIN CUSTOMIZADO (Sem depender de e-mail na UI)
-// ==========================================
-async function checkUser() {
-    const inputUser = document.getElementById('username').value.trim().toLowerCase();
-    const msg = document.getElementById('login-msg');
-    
-    if (!inputUser) { msg.innerText = "Digite o usuário."; return; }
-    
-    msg.innerText = "Buscando...";
-    attemptUsername = inputUser;
-
-    // Busca na tabela profiles do Supabase pelo username (ou email que simula o username)
-    // Nota: Baseado no seu JSON, o email no banco é 'username@estudio.com'
-    const expectedEmail = `${inputUser}@estudio.com`;
-    const { data: profile, error } = await supabase.from('profiles').select('*').eq('email', expectedEmail).single();
-
-    if (error || !profile) {
-        msg.innerText = "Usuário não encontrado no sistema.";
-        return;
-    }
-
-    // Se existe, verifica se é primeiro acesso
-    document.getElementById('step-identify').classList.add('hidden');
-    if (profile.first_login) {
-        document.getElementById('step-create-pass').classList.remove('hidden');
-    } else {
-        document.getElementById('step-login-pass').classList.remove('hidden');
-    }
-}
-
-async function createPasswordAndLogin() {
-    const newPass = document.getElementById('new-password').value;
-    if (newPass.length < 6) { alert("A senha precisa ter no mínimo 6 caracteres."); return; }
-
-    const email = `${attemptUsername}@estudio.com`;
-
-    // No primeiro acesso (como a conta já foi criada pelo Supabase com uma senha padrão), 
-    // fazemos login com a senha padrão (ex: 123456) e depois atualizamos
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: '123456' // Padrão que você inseriu no backend
-    });
-
-    if (authError) {
-        alert("Erro no backend. Verifique a senha padrão do usuário configurado.");
-        return;
-    }
-
-    // Atualiza a senha definitivamente
-    await supabase.auth.updateUser({ password: newPass });
-    // Atualiza o first_login no profile
-    await supabase.from('profiles').update({ first_login: false }).eq('id', authData.user.id);
-    
-    currentUserAuth = authData.user;
-    await loadUserProfile();
-}
-
-async function doNormalLogin() {
-    const pass = document.getElementById('existing-password').value;
-    const msg = document.getElementById('login-msg-2');
-    const email = `${attemptUsername}@estudio.com`;
-
-    const { data, error } = await supabase.auth.signInWithPassword({ email: email, password: pass });
-    
-    if (error) {
-        msg.innerText = "Senha incorreta.";
-        return;
-    }
-
-    currentUserAuth = data.user;
-    await loadUserProfile();
-}
-
-function resetLoginUI() {
-    document.getElementById('step-create-pass').classList.add('hidden');
-    document.getElementById('step-login-pass').classList.add('hidden');
-    document.getElementById('step-identify').classList.remove('hidden');
-    document.getElementById('login-msg').innerText = "";
-    document.getElementById('login-msg-2').innerText = "";
-}
-
-// ==========================================
-// CONTROLE DE PERFIL (Proprietário vs Freelancer)
-// ==========================================
-async function loadUserProfile() {
-    const { data } = await supabase.from('profiles').select('*').eq('id', currentUserAuth.id).single();
-    if (data) {
-        userProfile = data;
-        applyPermissions();
-        
-        // Esconde telas de carregamento/login e mostra o App
-        document.getElementById('splash-screen').classList.remove('active-flex');
-        document.getElementById('auth-screen').classList.remove('active-flex');
-        document.getElementById('app-screen').classList.add('active-flex');
-        
-        loadInitialData(); // Carrega serviços pro modal, dashboard, etc.
-    }
-}
-
-function applyPermissions() {
-    // É proprietário (admin) se o banco diz 'admin' ou 'proprietario'
-    const isAdmin = (userProfile.role === 'admin' || userProfile.role === 'proprietario');
-    
-    document.getElementById('user-role-display').innerText = isAdmin ? "Proprietário" : "Freelancer";
-
-    // Libera itens exclusivos do administrador
-    const adminElements = document.querySelectorAll('.admin-only');
-    adminElements.forEach(el => {
-        el.style.display = isAdmin ? 'block' : 'none';
-    });
-}
-
-// ==========================================
-// NAVEGAÇÃO SPA (Single Page Application)
-// ==========================================
-function navigateSpa(targetView) {
-    // Oculta todas as sections
-    document.querySelectorAll('.page').forEach(page => page.classList.remove('active'));
-    // Ativa a desejada
-    document.getElementById(`view-${targetView}`).classList.add('active');
-
-    // Atualiza estado do Menu Inferior
-    document.querySelectorAll('.nav-item').forEach(nav => {
-        nav.classList.remove('active');
-        if (nav.getAttribute('data-target') === targetView) nav.classList.add('active');
-    });
-
-    // Carrega dados baseados na tela
-    if (targetView === 'home') loadDashboard();
-    if (targetView === 'agenda') loadAgenda();
-    if (targetView === 'comandas') loadComandas();
-    if (targetView === 'clientes') loadClientes();
-    if (targetView === 'mensagens') loadTemplates();
-    if (targetView === 'servicos') loadServices();
-    if (targetView === 'despesas') loadExpenses();
-    if (targetView === 'relatorios') loadReports();
+function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
 }
 
 function openModal(id) { document.getElementById(id).classList.add('active'); }
 function closeModal(id) { document.getElementById(id).classList.remove('active'); }
 
-// ==========================================
-// CARREGAMENTO DE DADOS (Exemplos Práticos)
-// ==========================================
-async function loadInitialData() {
-    // Preenche o Select de Serviços do Modal
-    const { data: servs } = await supabase.from('services').select('*').eq('is_active', true);
-    servicesCache = servs || [];
-    const sel = document.getElementById('appt-service');
-    sel.innerHTML = '<option value="">Selecione...</option>';
-    servicesCache.forEach(s => sel.innerHTML += `<option value="${s.id}">${s.name} - R$ ${s.price}</option>`);
-
-    // Inicia ouvindo o banco em tempo real
-    subscribeToRealtime();
-    
-    // Inicia no Dashboard
-    navigateSpa('home');
+function resetAuth() {
+    document.querySelectorAll('.auth-step').forEach(s => s.classList.remove('active'));
+    document.getElementById('auth-step-1').classList.add('active');
 }
 
-async function loadDashboard() {
-    // Como Freelancer, só vê as próprias comandas/agendas. Admin vê tudo.
-    const today = new Date().toISOString().split('T')[0];
-    
-    // Total Arrecadado Hoje
-    let queryCmds = supabase.from('commands').select('total_amount').eq('status', 'paid').gte('closed_at', `${today}T00:00:00`);
-    if (userProfile.role !== 'admin') queryCmds = queryCmds.eq('employee_id', userProfile.id);
-    const { data: cmds } = await queryCmds;
-    
-    const rev = cmds ? cmds.reduce((acc, curr) => acc + parseFloat(curr.total_amount), 0) : 0;
-    document.getElementById('dash-revenue').innerText = `R$ ${rev.toFixed(2)}`;
+async function verifyUserInDB() {
+    const input = document.getElementById('input-username').value.trim().toLowerCase();
+    const msg = document.getElementById('msg-auth-1');
+    if (!input) { msg.innerText = "Digite o usuário."; return; }
+    attemptUsername = input;
 
-    // Busca Agenda pro Dashboard
-    loadAgendaBase('home-appointments-list', today, 3);
+    const { data, error } = await supabase.from('profiles').select('*').eq('username', input).single();
+    if (error || !data) { msg.innerText = "Usuário não encontrado."; return; }
+
+    document.getElementById('auth-step-1').classList.remove('active');
+    if (data.first_login) {
+        document.getElementById('auth-step-new').classList.add('active');
+    } else {
+        document.getElementById('auth-step-login').classList.add('active');
+    }
+}
+
+async function createPassAndLogin() {
+    const pass = document.getElementById('input-new-pass').value;
+    if (pass.length < 6) { alert("Mínimo 6 caracteres."); return; }
+    const email = `${attemptUsername}@estudio.com`;
+
+    const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password: '123456' });
+    if (error) { alert("Erro na senha padrão."); return; }
+
+    await supabase.auth.updateUser({ password: pass });
+    await supabase.from('profiles').update({ first_login: false }).eq('id', authData.user.id);
+    currentUserAuth = authData.user;
+    await loadProfileAndStartApp();
+}
+
+async function doLogin() {
+    const pass = document.getElementById('input-pass').value;
+    const email = `${attemptUsername}@estudio.com`;
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+    if (error) { document.getElementById('msg-auth-2').innerText = "Senha incorreta."; return; }
+
+    currentUserAuth = data.user;
+    await loadProfileAndStartApp();
+}
+
+async function loadProfileAndStartApp() {
+    const { data } = await supabase.from('profiles').select('*').eq('id', currentUserAuth.id).single();
+    userProfile = data;
+
+    const isOwner = (userProfile.role === 'proprietario' || userProfile.role === 'admin');
+    document.getElementById('badge-role').innerText = isOwner ? "Proprietário" : "Freelancer";
+    if (isOwner) document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
+
+    await loadServicesCache();
+    showScreen('screen-app');
+    loadDashboard();
+}
+
+async function loadServicesCache() {
+    const { data } = await supabase.from('services').select('*').eq('is_active', true);
+    servicesCache = data || [];
+    const sel = document.getElementById('appt-service');
+    sel.innerHTML = '<option value="">Selecione o Serviço...</option>';
+    servicesCache.forEach(s => sel.innerHTML += `<option value="${s.id}">${s.name} (${s.duration_minutes}min) - R$ ${s.price}</option>`);
+}
+
+function routerLoad(target) {
+    if (target === 'view-home') loadDashboard();
+    if (target === 'view-agenda') loadAgenda();
+    if (target === 'view-comandas') loadComandas();
+    if (target === 'view-cobrancas') loadCobrancas();
+    if (target === 'view-clientes') loadClientes();
+    if (target === 'view-mensagens') loadTemplates();
+    if (target === 'view-servicos') loadServicosAdmin();
+    if (target === 'view-produtos') loadProdutos();
+    if (target === 'view-despesas') loadDespesas();
+    if (target === 'view-funcionarios') loadFuncionarios();
+    if (target === 'view-relatorios') loadRelatorios();
+}
+
+// ================= MÓDULOS =================
+async function loadDashboard() {
+    const today = new Date().toISOString().split('T')[0];
+    let q = supabase.from('commands').select('total_amount').eq('status', 'paid').gte('closed_at', `${today}T00:00:00`);
+    if (userProfile.role !== 'admin' && userProfile.role !== 'proprietario') q = q.eq('professional_id', userProfile.id);
+    const { data: cmds } = await q;
+    const rev = cmds ? cmds.reduce((a,b)=> a + parseFloat(b.total_amount), 0) : 0;
+    document.getElementById('dash-rev').innerText = `R$ ${rev.toFixed(2)}`;
+    loadAgendaList('list-home-agenda', today, 3);
 }
 
 async function loadAgenda() {
-    const dateSelected = document.getElementById('agenda-date-picker').value;
-    loadAgendaBase('agenda-list', dateSelected, 50);
+    const date = document.getElementById('input-date-agenda').value;
+    loadAgendaList('list-agenda', date, 50);
 }
 
-async function loadAgendaBase(containerId, dateStr, limit) {
-    const container = document.getElementById(containerId);
-    container.innerHTML = 'Carregando...';
-
-    // RLS fará o filtro automático baseado no SQL enviado, mas reforçamos no frontend
+async function loadAgendaList(elementId, dateStr, limit) {
+    const container = document.getElementById(elementId);
+    container.innerHTML = '<p class="empty-state">Carregando...</p>';
+    
     let query = supabase.from('appointments')
-        .select('*, client:profiles!client_id(full_name), service:services(name)')
-        .gte('appointment_date', `${dateStr}T00:00:00`)
-        .lte('appointment_date', `${dateStr}T23:59:59`)
-        .order('appointment_date', { ascending: true })
-        .limit(limit);
+        .select('*, client:profiles!client_id(full_name, phone), service:services(name)')
+        .gte('appointment_date', `${dateStr}T00:00:00`).lte('appointment_date', `${dateStr}T23:59:59`)
+        .order('appointment_date', {ascending: true}).limit(limit);
 
-    if (userProfile.role !== 'admin') query = query.eq('employee_id', userProfile.id);
-
-    const { data } = await query;
-
-    if (!data || data.length === 0) {
-        container.innerHTML = '<div class="card text-center" style="color:var(--text-light)">Sem horários marcados.</div>';
-        return;
+    if (userProfile.role !== 'admin' && userProfile.role !== 'proprietario') {
+        query = query.eq('professional_id', userProfile.id);
     }
 
+    const { data } = await query;
+    if (!data || data.length === 0) { container.innerHTML = '<p class="empty-state">Nenhum agendamento.</p>'; return; }
+
     container.innerHTML = data.map(a => {
-        const time = new Date(a.appointment_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const clientName = a.client ? a.client.full_name : 'Cliente Indefinido';
-        const serviceName = a.service ? a.service.name : 'Serviço Personalizado';
-        return `<div class="card"><strong>${time}</strong> - ${clientName}<br><small>${serviceName}</small></div>`;
+        const time = new Date(a.appointment_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        return `<div class="card"><strong>${time}</strong> - ${a.client?.full_name || 'Cliente'} <br><small>${a.service?.name || 'Serviço'} | WhatsApp: ${a.client?.phone || '-'}</small></div>`;
     }).join('');
 }
 
-// Exemplos de carregamento de outras telas (Ajuste conforme os campos do seu banco)
-async function loadComandas() { document.getElementById('comandas-list').innerHTML = '<div class="card">Comanda Exemplo</div>'; }
-async function loadClientes() { document.getElementById('clientes-list').innerHTML = '<div class="card">Maria Exemplo - (86) 99999-9999</div>'; }
-async function loadTemplates() { document.getElementById('templates-list').innerHTML = '<div class="card">Confirmação: Olá, seu horário...</div>'; }
-async function loadServices() { document.getElementById('servicos-list').innerHTML = '<div class="card">Corte - R$ 60,00</div>'; }
-async function loadExpenses() { document.getElementById('despesas-list').innerHTML = '<div class="card">Aluguel - R$ 1000,00</div>'; }
-async function loadReports() { /* Lógica de relatório financeiro */ }
-
-// ==========================================
-// AÇÕES (Salvar Agendamento)
-// ==========================================
 async function saveAppointment() {
     const name = document.getElementById('appt-client-name').value;
     const phone = document.getElementById('appt-whatsapp').value;
@@ -291,56 +189,91 @@ async function saveAppointment() {
     const date = document.getElementById('appt-date').value;
     const time = document.getElementById('appt-time').value;
 
-    if (!name || !phone || !servId || !date || !time) {
-        alert("Preencha todos os campos.");
-        return;
-    }
+    if (!name || !phone || !servId || !date || !time) { alert("Preencha todos os campos."); return; }
 
-    // 1. Verifica se o cliente já existe, se não, cadastra (Colaboradores podem fazer isso)
-    let clientId = null;
-    const { data: existClient } = await supabase.from('profiles').select('id').eq('phone', phone).single();
-    
-    if (existClient) {
-        clientId = existClient.id;
+    let clientId;
+    const { data: exist } = await supabase.from('profiles').select('id').eq('phone', phone).single();
+    if (exist) {
+        clientId = exist.id;
     } else {
-        // Como o cliente não acessa o sistema, inserimos ele apenas como um "profile" sem usuário no Auth
-        const { data: newC, error: errC } = await supabase.from('profiles').insert({
-            full_name: name,
-            phone: phone,
-            role: 'client' // ou 'cliente' dependendo do seu enum no SQL
-        }).select().single();
-        
-        if (errC) { alert("Erro ao cadastrar cliente."); return; }
+        const { data: newC, error: errC } = await supabase.from('profiles').insert({ full_name: name, phone, role: 'cliente' }).select().single();
+        if (errC) { alert("Erro ao criar cliente."); return; }
         clientId = newC.id;
     }
 
-    // 2. Insere na Agenda da funcionária que está logada (userProfile.id)
-    const startTimestamp = `${date}T${time}:00`;
-    const { error: apptError } = await supabase.from('appointments').insert({
-        client_id: clientId,
-        employee_id: userProfile.id, 
-        service_id: servId,
-        appointment_date: startTimestamp,
-        status: 'pending'
+    const serv = servicesCache.find(s => s.id === servId);
+    const start = `${date}T${time}:00`;
+    const endDate = new Date(new Date(start).getTime() + (serv?.duration_minutes || 60)*60000).toISOString();
+
+    const { error } = await supabase.from('appointments').insert({
+        client_id: clientId, professional_id: userProfile.id, service_id: servId, appointment_date: start, end_date: endDate, status: 'pending'
     });
 
-    if (apptError) {
-        alert("Erro ao salvar agendamento: " + apptError.message);
-    } else {
-        alert("Agendado com sucesso!");
-        closeModal('agendamento-modal');
-        loadDashboard();
-        loadAgenda();
-    }
+    if (error) alert(error.message);
+    else { alert("Agendado com sucesso!"); closeModal('modal-appt'); loadDashboard(); loadAgenda(); }
 }
 
-// ==========================================
-// TEMPO REAL
-// ==========================================
-function subscribeToRealtime() {
-    supabase.channel('public:appointments')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
-            if (document.getElementById('view-agenda').classList.contains('active')) loadAgenda();
-            if (document.getElementById('view-home').classList.contains('active')) loadDashboard();
-        }).subscribe();
+async function loadComandas() {
+    const { data } = await supabase.from('commands').select('*, client:profiles!client_id(full_name)').eq('status', 'open');
+    document.getElementById('list-comandas').innerHTML = data?.map(c => `<div class="card"><strong>${c.client?.full_name}</strong><br>Total: R$ ${c.total_amount} <button class="btn-primary mt-2" onclick="closeCommand('${c.id}')">Fechar Comanda</button></div>`).join('') || '<p class="empty-state">Nenhuma comanda aberta.</p>';
 }
+
+async function closeCommand(id) {
+    await supabase.from('commands').update({ status: 'paid', closed_at: new Date().toISOString() }).eq('id', id);
+    alert("Comanda fechada com sucesso!");
+    loadComandas();
+}
+
+async function loadCobrancas() {
+    const { data } = await supabase.from('commands').select('*, client:profiles!client_id(full_name)').eq('status', 'debt');
+    document.getElementById('list-cobrancas').innerHTML = data?.map(c => `<div class="card" style="border-left-color:var(--danger)"><strong>${c.client?.full_name}</strong><br>Débito: R$ ${c.total_amount}</div>`).join('') || '<p class="empty-state">Nenhum débito pendente.</p>';
+}
+
+async function loadClientes(filter = '') {
+    let q = supabase.from('profiles').select('*').eq('role', 'cliente').limit(20);
+    if(filter) q = q.ilike('full_name', `%${filter}%`);
+    const { data } = await q;
+    document.getElementById('list-clientes').innerHTML = data?.map(c => `<div class="card"><strong>${c.full_name}</strong><br>Tel: ${c.phone}</div>`).join('') || '<p class="empty-state">Nenhum cliente encontrado.</p>';
+}
+
+async function loadTemplates() {
+    const { data } = await supabase.from('message_templates').select('*');
+    document.getElementById('list-mensagens').innerHTML = data?.map(t => `<div class="card"><strong>${t.name}</strong><p style="font-size:0.85rem; color:var(--text-light); margin-top:5px;">${t.body}</p></div>`).join('') || '<p class="empty-state">Sem templates.</p>';
+}
+
+async function loadServicosAdmin() {
+    const { data } = await supabase.from('services').select('*');
+    document.getElementById('list-servicos').innerHTML = data?.map(s => `<div class="card"><strong>${s.name}</strong> - R$ ${s.price} (${s.duration_minutes} min)</div>`).join('') || '<p class="empty-state">Sem serviços.</p>';
+}
+
+async function loadProdutos() {
+    const { data } = await supabase.from('products').select('*');
+    document.getElementById('list-produtos').innerHTML = data?.map(p => `<div class="card"><strong>${p.name}</strong> - R$ ${p.sale_price} (Estoque: ${p.stock_qty})</div>`).join('') || '<p class="empty-state">Estoque vazio.</p>';
+}
+
+async function loadDespesas() {
+    const { data } = await supabase.from('expenses').select('*');
+    document.getElementById('list-despesas').innerHTML = data?.map(d => `<div class="card"><strong>${d.description}</strong> - R$ ${d.amount}</div>`).join('') || '<p class="empty-state">Sem despesas.</p>';
+}
+
+async function loadFuncionarios() {
+    const { data } = await supabase.from('profiles').select('*').neq('role', 'cliente');
+    document.getElementById('list-funcionarios').innerHTML = data?.map(f => `<div class="card"><strong>${f.full_name}</strong> (${f.role})</div>`).join('') || '<p class="empty-state">Sem equipe.</p>';
+}
+
+async function loadRelatorios() {
+    const { data: rev } = await supabase.from('commands').select('total_amount').eq('status', 'paid');
+    const { data: exp } = await supabase.from('expenses').select('amount').eq('is_paid', true);
+    const tRev = rev?.reduce((a,b)=>a+parseFloat(b.total_amount),0) || 0;
+    const tExp = exp?.reduce((a,b)=>a+parseFloat(b.amount),0) || 0;
+    document.getElementById('rep-rev').innerText = `R$ ${tRev.toFixed(2)}`;
+    document.getElementById('rep-exp').innerText = `R$ ${tExp.toFixed(2)}`;
+    document.getElementById('rep-profit').innerText = `R$ ${(tRev - tExp).toFixed(2)}`;
+
+    // Melhores Clientes
+    const { data: best } = await supabase.rpc('get_top_clients');
+    document.getElementById('list-best-clients').innerHTML = best?.map(b => `<div class="card"><strong>${b.full_name}</strong><br>Total Gasto: R$ ${b.total}</div>`).join('') || '<p class="empty-state">Sem dados de clientes ainda.</p>';
+}
+
+function openNewCommandModal() { alert("Para abrir comanda, selecione um agendamento concluído."); }
+function openServiceModal() { alert("Painel restrito de cadastro de serviços."); }

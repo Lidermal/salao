@@ -1,4 +1,4 @@
-// Configuração do Supabase
+// --- SUPABASE CONFIG ---
 const SUPABASE_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -6,9 +6,9 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 let userProfile = null;
 let services = [];
 
-// Inicialização
+// --- INIT ---
 document.addEventListener('DOMContentLoaded', async () => {
-  setTimeout(() => document.getElementById('splash').style.display = 'none', 1000);
+  setTimeout(() => document.getElementById('splash').style.display = 'none', 1200);
 
   // Eventos
   document.getElementById('btn-login').addEventListener('click', handleLogin);
@@ -43,7 +43,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('appt-date').value = today;
 });
 
-// Utilitários
+// --- UTILS ---
 function debounce(func, wait) {
   let timeout;
   return function executedFunction(...args) {
@@ -66,7 +66,7 @@ function formatCurrency(val) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(val) || 0);
 }
 
-// Login
+// --- LOGIN ---
 async function handleLogin() {
   const username = document.getElementById('username').value.trim().toLowerCase();
   const msgEl = document.getElementById('msg');
@@ -100,7 +100,10 @@ async function handleLogin() {
 function showCreatePasswordScreen(username) {
   document.getElementById('login-screen').innerHTML = `
     <div class="login-card">
-      <h3>Crie sua senha</h3>
+      <div class="login-header">
+        <h2>Crie sua senha</h2>
+        <p>Primeiro acesso ao sistema</p>
+      </div>
       <div class="input-group">
         <label>Nova Senha (mín. 6 caracteres)</label>
         <input type="password" id="new-pass" placeholder="••••••">
@@ -119,13 +122,13 @@ function showCreatePasswordScreen(username) {
     const email = `${username}@estudio.local`;
     const { error: authError } = await supabase.auth.signInWithPassword({ email, password: '123456' });
     if (authError) {
-      document.getElementById('msg2').textContent = "Erro interno. Contate o suporte.";
+      document.getElementById('msg2').textContent = "Erro interno. Tente novamente.";
       document.getElementById('msg2').className = 'error';
       return;
     }
     const { error: updateError } = await supabase.auth.updateUser({ password: pwd });
     if (updateError) {
-      document.getElementById('msg2').textContent = "Erro ao atualizar senha.";
+      document.getElementById('msg2').textContent = "Erro ao salvar senha.";
       document.getElementById('msg2').className = 'error';
       return;
     }
@@ -137,7 +140,10 @@ function showCreatePasswordScreen(username) {
 function showPasswordScreen(username) {
   document.getElementById('login-screen').innerHTML = `
     <div class="login-card">
-      <h3>Digite sua senha</h3>
+      <div class="login-header">
+        <h2>Digite sua senha</h2>
+        <p>Para continuar no Estúdio Amor que Cuida</p>
+      </div>
       <div class="input-group">
         <label>Senha</label>
         <input type="password" id="login-pass" placeholder="••••••">
@@ -172,7 +178,7 @@ async function handleLogout() {
   location.reload();
 }
 
-// Navegação
+// --- NAVIGATION ---
 function switchView(view) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById(view).classList.add('active');
@@ -189,7 +195,7 @@ function switchView(view) {
   if (view === 'home') loadDashboard();
 }
 
-// Carregamento de dados
+// --- DATA LOADING ---
 async function loadDashboard() {
   const today = new Date().toISOString().split('T')[0];
   const { data: cmds } = await supabase.from('commands')
@@ -249,7 +255,7 @@ async function loadAgenda() {
     const start = formatTime(a.appointment_date);
     const end = formatTime(a.end_date);
     const svc = services.find(s => s.id == a.service_id)?.name || a.custom_service_name || 'Serviço';
-    const status = a.status === 'pending' ? '<span class="badge badge-pending">Pendente</span>' : '';
+    const status = a.status === 'pending' ? '<span class="badge" style="background:#E3F2FD; color:#1976D2; padding:4px 8px; border-radius:4px; font-size:0.7rem;">Pendente</span>' : '';
     return `<div class="card">
       <div><strong>${start}–${end}</strong> ${status}</div>
       <div>${a.client_name} | ${a.client_phone}</div>
@@ -323,7 +329,7 @@ async function loadServicos() {
   const { data } = await supabase.from('services').select('*').eq('is_active', true);
   const list = document.getElementById('servicos-list');
   if (!data || data.length === 0) {
-    list.innerHTML = '<div class="card" style="text-align:center">Sem serviços.</div>';
+    list.innerHTML = '<div class="card" style="text-align:center">Nenhum serviço cadastrado.</div>';
     return;
   }
   list.innerHTML = data.map(s => `
@@ -333,7 +339,7 @@ async function loadServicos() {
     </div>`).join('');
 }
 
-// Ações
+// --- ACTIONS ---
 async function saveAppointment() {
   const name = document.getElementById('appt-client-name').value.trim();
   const phone = document.getElementById('appt-phone').value.replace(/\D/g, '');
@@ -377,7 +383,7 @@ async function saveAppointment() {
   }
 }
 
-// Modais
+// --- MODALS ---
 function openModal(id) {
   document.getElementById(id).classList.add('open');
 }

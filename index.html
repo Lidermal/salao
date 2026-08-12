@@ -176,7 +176,7 @@
             <p>by Andressa Vieira</p>
         </div>
         
-        <!-- Passo 1: Identificação -->
+        <!-- Passo 1: Identificação (Apenas Username) -->
         <div class="login-card" id="step-identify">
             <div class="input-group">
                 <label>Usuário (nome.sobrenome)</label>
@@ -186,7 +186,7 @@
             <p id="login-msg"></p>
         </div>
 
-        <!-- Passo 2A: Criar Senha (Primeiro Acesso) -->
+        <!-- Passo 2A: Criar Senha (Primeiro Acesso - first_login = true) -->
         <div class="login-card hidden" id="step-create-pass">
             <h3 style="margin-bottom:15px; font-size:1.1rem;">Olá! Crie sua senha</h3>
             <p style="font-size:0.85rem; color:var(--text-light); margin-bottom:15px;">Primeiro acesso detectado. Defina uma senha segura.</p>
@@ -198,7 +198,7 @@
             <button class="btn-primary btn-secondary" onclick="resetLogin()">Voltar</button>
         </div>
 
-        <!-- Passo 2B: Login (Já tem senha) -->
+        <!-- Passo 2B: Login (Já tem senha - first_login = false) -->
         <div class="login-card hidden" id="step-login-pass">
             <h3 style="margin-bottom:15px; font-size:1.1rem;">Bem-vindo(a) de volta!</h3>
             <div class="input-group">
@@ -333,7 +333,7 @@
             </div>
         </main>
 
-        <!-- NAVEGAÇÃO INFERIOR (Scrollável se necessário) -->
+        <!-- NAVEGAÇÃO INFERIOR -->
         <nav>
             <div class="nav-item active" onclick="router('home', this)">
                 <i class="fas fa-home"></i><span>Início</span>
@@ -347,7 +347,6 @@
             <div class="nav-item" onclick="router('clientes', this)">
                 <i class="fas fa-user-friends"></i><span>Clientes</span>
             </div>
-            <!-- Menu Mais (Simulado com clique longo ou apenas mais itens) -->
             <div class="nav-item" onclick="toggleMoreMenu()">
                 <i class="fas fa-bars"></i><span>Menu</span>
             </div>
@@ -449,7 +448,7 @@
 
         let currentUser = null;
         let userProfile = null;
-        let tempUsername = null; // Para guardar o username durante o fluxo de login
+        let tempUsername = null;
         let servicesCache = [];
         let professionalsCache = [];
 
@@ -462,7 +461,6 @@
                 showApp();
             }
             
-            // Setar datas
             const today = new Date().toISOString().split('T')[0];
             document.getElementById('agenda-date-picker').value = today;
             document.getElementById('appt-date').value = today;
@@ -470,7 +468,7 @@
             document.getElementById('agenda-date-picker').addEventListener('change', loadAgenda);
         });
 
-        // --- FLUXO DE LOGIN INTELIGENTE ---
+        // --- FLUXO DE LOGIN (SEM EMAIL VISÍVEL) ---
         
         async function checkUser() {
             const username = document.getElementById('username').value.trim().toLowerCase();
@@ -480,66 +478,47 @@
             
             msg.innerText = "Verificando..."; msg.style.color = "var(--text-light)";
             tempUsername = username;
-            const email = `${username}@estudio.local`;
 
-            // Tenta buscar o perfil pelo email associado (já que o auth usa email)
-            // Nota: Precisamos verificar se o usuário existe na auth. 
-            // Como não podemos listar users da auth por segurança, tentamos um login falso ou verificamos a tabela profiles se o trigger criar sem auth?
-            // Melhor abordagem: Tentar signIn. Se erro "Invalid login", o usuário não existe.
-            // Mas o Supabase não diferencia "user not found" de "wrong password" por segurança.
-            
-            // SOLUÇÃO: Vamos assumir que o Proprietário cria o usuário no painel do Supabase Auth primeiro.
-            // Se o usuário existir no Auth, mas nunca logou, ele não terá senha? Não, o Auth exige senha.
-            
-            // AJUSTE DE LÓGICA PARA O QUE VOCÊ PEDIU:
-            // "Se não tiver o primeiro acesso... abrir modal para criar senha".
-            // Isso implica que o usuário JÁ EXISTE no banco (talvez criado pelo admin via SQL ou painel) mas não tem credenciais de auth?
-            // No Supabase, Auth e Profiles são separados.
-            
-            // Vamos fazer assim:
-            // 1. Verificamos se existe um registro na tabela `profiles` com phone ou full_name batendo? Não, o login é nome.sobrenome.
-            // Vamos usar o email `nome.sobrenome@estudio.local`.
-            // Se o admin criou o usuário no painel Auth com esse email e uma senha temporária qualquer, o usuário não sabe.
-            
-            // IMPLEMENTAÇÃO PRÁTICA:
-            // Vamos tentar logar com uma senha "dummy". Se falhar, verificamos se o email existe usando uma função específica ou assumimos que se falhar, é primeiro acesso?
-            // Não seguro.
-            
-            // VAMOS SIMPLIFICAR PARA FUNCIONAR NO SEU CENÁRIO:
-            // O Admin cria o usuário no Supabase Auth com email `nome.sobrenome@estudio.local` e SEM senha? Não dá.
-            // O Admin cria com senha `123456` (padrão).
-            // O usuário digita o nome. O sistema tenta logar com `123456`.
-            // Se funcionar -> É primeiro acesso -> Pede pra mudar senha.
-            // Se falhar -> Pede a senha real.
-            
-            const { data, error } = await supabase.auth.signInWithPassword({ email: email, password: '123456' });
-            
-            if (data && data.user) {
-                // Login com senha padrão funcionou -> Primeiro Acesso
-                currentUser = data.user;
-                await supabase.auth.signOut(); // Sai para poder criar a nova senha limpo? Não, melhor manter a sessão e atualizar.
-                // Na verdade, se logou, já temos a sessão. Vamos direto para tela de criar senha.
-                currentUser = data.user; // Mantém a sessão
-                document.getElementById('step-identify').classList.add('hidden');
-                document.getElementById('step-create-pass').classList.remove('hidden');
-            } else {
-                // Falhou. Ou não existe, ou a senha não é 123456.
-                // Vamos assumir que se não existe no Auth, o erro é específico.
-                if (error.message.includes("Invalid login credentials")) {
-                    // Pode ser que não exista OU senha errada.
-                    // Para distinguir, precisaríamos de uma Edge Function. 
-                    // Como queremos simples: Vamos assumir que o Admin SEMPRE cria o usuário no painel Auth antes.
-                    // Se falhou aqui, pedimos a senha. Se a senha estiver errada, o próximo passo falha.
-                    
-                    // MAS, se o usuário NÃO EXISTE no Auth,我们不能 criar senha sem ele existir.
-                    // O Admin precisa criar o usuário no painel Auth primeiro.
-                    
+            // 1. Buscar o perfil pelo username na tabela profiles
+            const { data: profile, error: profError } = await supabase
+                .from('profiles')
+                .select('*')
+                .eq('username', username)
+                .single();
+
+            if (profError || !profile) {
+                msg.innerText = "Usuário não encontrado.";
+                msg.style.color = "var(--danger)";
+                return;
+            }
+
+            // Usuário existe. Verificar first_login
+            if (profile.first_login) {
+                // Primeiro acesso: Precisa criar senha
+                // Mas para criar senha no Supabase Auth, precisamos logar primeiro.
+                // Vamos tentar logar com uma senha padrão temporária "temp123456" que o admin deve ter colocado?
+                // Ou melhor: O Admin cria o usuário no Auth com email fake e senha aleatória.
+                // Aqui vamos assumir que o Auth já existe.
+                
+                // Estratégia: Tentar logar com senha padrão "123456".
+                const email = `${username}@estudio.local`;
+                const { data, error } = await supabase.auth.signInWithPassword({ email, password: '123456' });
+                
+                if (data && data.user) {
+                    currentUser = data.user;
+                    userProfile = profile; // Já temos o perfil
                     document.getElementById('step-identify').classList.add('hidden');
-                    document.getElementById('step-login-pass').classList.remove('hidden');
+                    document.getElementById('step-create-pass').classList.remove('hidden');
                 } else {
-                    msg.innerText = "Erro: " + error.message;
+                    // Se falhou, talvez a senha padrão não seja 123456.
+                    // Nesse caso, o admin precisa resetar a senha no painel para 123456 para permitir o first_login.
+                    msg.innerText = "Erro no primeiro acesso. Contate o admin.";
                     msg.style.color = "var(--danger)";
                 }
+            } else {
+                // Já tem senha: Pedir senha
+                document.getElementById('step-identify').classList.add('hidden');
+                document.getElementById('step-login-pass').classList.remove('hidden');
             }
         }
 
@@ -547,13 +526,16 @@
             const newPass = document.getElementById('new-password').value;
             if (newPass.length < 6) { alert("Senha muito curta"); return; }
             
-            // Atualiza a senha do usuário atual (que logou com 123456)
+            // Atualiza senha no Auth
             const { error } = await supabase.auth.updateUser({ password: newPass });
             
             if (error) {
                 alert("Erro ao salvar senha: " + error.message);
             } else {
-                // Senha salva. Agora carregamos o perfil e entramos.
+                // Atualiza first_login para false no banco
+                await supabase.from('profiles').update({ first_login: false }).eq('id', currentUser.id);
+                
+                // Recarrega perfil e entra
                 await loadUserProfile();
                 showApp();
             }
@@ -583,6 +565,7 @@
         }
 
         async function loadUserProfile() {
+            // Busca o perfil completo baseado no ID do auth
             const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
             if (data) {
                 userProfile = data;
@@ -627,7 +610,6 @@
                 navEl.classList.add('active');
             }
 
-            // Carregar dados específicos
             if (viewName === 'agenda') loadAgenda();
             if (viewName === 'comandas') loadComandas();
             if (viewName === 'cobrancas') loadCobrancas();
@@ -652,7 +634,6 @@
         // --- DADOS ---
 
         async function loadInitialData() {
-            // Carregar Serviços
             const { data: servs } = await supabase.from('services').select('*').eq('is_active', true);
             servicesCache = servs || [];
             const selServ = document.getElementById('appt-service');
@@ -661,7 +642,6 @@
                 selServ.innerHTML += `<option value="${s.id}" data-duration="${s.duration_minutes}">${s.name} - R$ ${s.price}</option>`;
             });
 
-            // Carregar Profissionais (Para o Admin escolher)
             const { data: profs } = await supabase.from('profiles').select('*').neq('role', 'cliente');
             professionalsCache = profs || [];
             const selProf = document.getElementById('appt-professional');
@@ -670,7 +650,6 @@
                 selProf.innerHTML += `<option value="${p.id}">${p.full_name}</option>`;
             });
             
-            // Se não for admin, trava no próprio ID
             if (userProfile.role !== 'admin') {
                 selProf.value = currentUser.id;
             } else {
@@ -683,16 +662,13 @@
         async function loadDashboard() {
             const today = new Date().toISOString().split('T')[0];
             
-            // Receita Hoje
             const { data: cmds } = await supabase.from('commands').select('total_amount').eq('status', 'paid').gte('closed_at', `${today}T00:00:00`);
             const rev = cmds ? cmds.reduce((a, b) => a + parseFloat(b.total_amount), 0) : 0;
             document.getElementById('dash-revenue').innerText = `R$ ${rev.toFixed(0)}`;
 
-            // Agendamentos Hoje
             const { data: appts } = await supabase.from('appointments').select('id').gte('appointment_date', `${today}T00:00:00`).lte('appointment_date', `${today}T23:59:59`);
             document.getElementById('dash-appts').innerText = appts ? appts.length : 0;
 
-            // Pendentes
             const pending = appts ? appts.filter(a => a.status === 'pending').length : 0;
             document.getElementById('dash-pending').innerText = pending;
 
@@ -716,7 +692,7 @@
                 .order('appointment_date', { ascending: true })
                 .limit(limit);
 
-            // AGENDA EXCLUSIVA
+            // AGENDA EXCLUSIVA (employee_id)
             if (userProfile.role !== 'admin') {
                 query = query.eq('employee_id', currentUser.id);
             }
@@ -762,7 +738,6 @@
 
         async function loadCobrancas() {
             const container = document.getElementById('cobrancas-list');
-            // Comandas com status 'debt' ou 'open' antigas? Vamos pegar 'debt'
             const { data } = await supabase.from('commands').select('*, client:profiles(full_name, phone)').eq('status', 'debt');
             
             if (!data || data.length === 0) { container.innerHTML = '<div class="card">Nenhum débito pendente.</div>'; return; }
@@ -888,7 +863,6 @@
             const duration = service ? service.duration_minutes : 60;
             const endDate = new Date(new Date(startDateTime).getTime() + duration * 60000).toISOString();
 
-            // Cliente
             let clientId = null;
             const { data: existing } = await supabase.from('profiles').select('id').eq('phone', clientPhone).single();
             if (existing) { clientId = existing.id; } 
@@ -897,7 +871,6 @@
                 clientId = newC.id;
             }
 
-            // Agendamento (Usando employee_id e appointment_date conforme seu schema)
             const { error } = await supabase.from('appointments').insert({
                 client_id: clientId,
                 employee_id: profId,

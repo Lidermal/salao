@@ -5,203 +5,231 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Estúdio Amor que Cuida</title>
     
-    <!-- Supabase SDK -->
+    <!-- Supabase SDK e Ícones -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
-    <!-- Ícones e Fontes -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
-    
-    <!-- O PONTO CHAVE PARA NÃO QUEBRAR NO GITHUB PAGES -->
-    <link rel="stylesheet" href="./style.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- 1. SPLASH SCREEN -->
-    <div id="splash-screen" class="view active-flex">
-        <div class="logo-area">
-            <h1>Amor que Cuida</h1>
-            <p>by Andressa Vieira</p>
-            <div class="spinner"></div>
-        </div>
-    </div>
+    <!-- CONTAINER QUE SIMULA O CELULAR NO DESKTOP -->
+    <div class="mobile-wrapper">
 
-    <!-- 2. TELA DE LOGIN INTELIGENTE -->
-    <div id="auth-screen" class="view">
-        <div class="logo-area">
-            <h1>Estúdio<br>Amor que Cuida</h1>
-            <p>by Andressa Vieira</p>
-        </div>
-        
-        <!-- Passo 1: Identificação -->
-        <div class="login-card" id="step-identify">
-            <div class="input-group">
-                <label>Usuário (nome.sobrenome)</label>
-                <input type="text" id="username" placeholder="ex: andressa.vieira" autocomplete="off">
+        <!-- ================= TELA 1: SPLASH ================= -->
+        <div id="screen-splash" class="screen active">
+            <div class="logo-area">
+                <h1>Amor que Cuida</h1>
+                <p>by Andressa Vieira</p>
+                <div class="spinner"></div>
             </div>
-            <button class="btn-primary" id="btn-check-user">Continuar</button>
-            <p id="login-msg" class="msg-text"></p>
         </div>
 
-        <!-- Passo 2A: Criar Senha (Primeiro Acesso) -->
-        <div class="login-card hidden" id="step-create-pass">
-            <h3>Olá! Crie sua senha</h3>
-            <p class="subtitle">Primeiro acesso detectado.</p>
-            <div class="input-group">
-                <label>Nova Senha (Mínimo 6)</label>
-                <input type="password" id="new-password" placeholder="••••••••">
-            </div>
-            <button class="btn-primary" id="btn-create-pass">Salvar e Entrar</button>
-            <button class="btn-secondary" id="btn-back-1">Voltar</button>
-        </div>
-
-        <!-- Passo 2B: Login Normal -->
-        <div class="login-card hidden" id="step-login-pass">
-            <h3>Bem-vindo(a) de volta!</h3>
-            <div class="input-group">
-                <label>Sua Senha</label>
-                <input type="password" id="existing-password" placeholder="••••••••">
-            </div>
-            <button class="btn-primary" id="btn-do-login">Entrar</button>
-            <button class="btn-secondary" id="btn-back-2">Voltar</button>
-            <p id="login-msg-2" class="msg-text text-danger"></p>
-        </div>
-    </div>
-
-    <!-- 3. ESTRUTURA DO APP (SPA) -->
-    <div id="app-screen" class="view app-layout">
-        <header class="top-header">
-            <div class="header-title">Estúdio A.Q. Cuida</div>
-            <div class="user-badge" id="user-role-display">...</div>
-        </header>
-
-        <main id="main-content">
-            <!-- DASHBOARD -->
-            <section id="view-home" class="page active">
-                <div class="grid-3 mb-2">
-                    <div class="stat-box"><div class="stat-val" id="dash-revenue">R$ 0</div><div class="stat-lbl">Hoje</div></div>
-                    <div class="stat-box"><div class="stat-val" id="dash-appts">0</div><div class="stat-lbl">Agendas</div></div>
-                    <div class="stat-box"><div class="stat-val" id="dash-pending">0</div><div class="stat-lbl">Pendentes</div></div>
+        <!-- ================= TELA 2: LOGIN ================= -->
+        <div id="screen-auth" class="screen">
+            <div class="auth-container">
+                <div class="logo-area">
+                    <h1>Estúdio<br>Amor que Cuida</h1>
                 </div>
-                <h3 class="section-title">Próximos Horários</h3>
-                <div id="home-appointments-list"></div>
-            </section>
-
-            <!-- AGENDA -->
-            <section id="view-agenda" class="page">
-                <div class="flex-between mb-2">
-                    <h2>Agenda</h2>
-                    <input type="date" id="agenda-date-picker" class="input-styled">
-                </div>
-                <div id="agenda-list"></div>
-            </section>
-
-            <!-- COMANDAS -->
-            <section id="view-comandas" class="page">
-                <h2>Comandas Abertas</h2>
-                <div id="comandas-list" class="mt-2"></div>
-            </section>
-
-            <!-- CLIENTES & ANAMNESE -->
-            <section id="view-clientes" class="page">
-                <input type="text" id="search-client" class="input-styled mb-2" placeholder="Buscar cliente por nome ou celular...">
-                <div id="clientes-list"></div>
-            </section>
-
-            <!-- MENSAGENS -->
-            <section id="view-mensagens" class="page">
-                <h2>Templates WhatsApp</h2>
-                <div id="templates-list" class="mt-2"></div>
-            </section>
-
-            <!-- SERVIÇOS -->
-            <section id="view-servicos" class="page">
-                <h2>Serviços e Preços</h2>
-                <div id="servicos-list" class="mt-2"></div>
-            </section>
-
-            <!-- DESPESAS -->
-            <section id="view-despesas" class="page">
-                <h2>Controle de Despesas</h2>
-                <div id="despesas-list" class="mt-2"></div>
-            </section>
-
-            <!-- RELATÓRIOS -->
-            <section id="view-relatorios" class="page">
-                <h2>Performance Financeira</h2>
-                <div class="card mt-2 text-center">
-                    <div class="grid-2">
-                        <div><small>Receita</small><h3 class="text-success" id="rep-revenue">R$ 0</h3></div>
-                        <div><small>Despesas</small><h3 class="text-danger" id="rep-expenses">R$ 0</h3></div>
-                    </div>
-                    <hr class="dashed-line">
-                    <small>LUCRO LÍQUIDO</small>
-                    <h2 class="text-primary" id="rep-profit">R$ 0</h2>
-                </div>
-            </section>
-        </main>
-
-        <!-- BOTTOM NAVIGATION (Estilo Instagram) -->
-        <nav class="bottom-nav">
-            <div class="nav-item active" data-target="home"><i class="fas fa-home"></i><span>Início</span></div>
-            <div class="nav-item" data-target="agenda"><i class="fas fa-calendar-alt"></i><span>Agenda</span></div>
-            <div class="nav-item" data-target="comandas"><i class="fas fa-receipt"></i><span>Comandas</span></div>
-            <div class="nav-item" data-target="clientes"><i class="fas fa-users"></i><span>Clientes</span></div>
-            <div class="nav-item" onclick="openModal('menu-modal')"><i class="fas fa-bars"></i><span>Menu</span></div>
-        </nav>
-
-        <!-- FAB (Novo Agendamento) -->
-        <button class="fab-btn" onclick="openModal('agendamento-modal')"><i class="fas fa-plus"></i></button>
-    </div>
-
-    <!-- MODAL NOVO AGENDAMENTO -->
-    <div id="agendamento-modal" class="modal-overlay">
-        <div class="modal-sheet">
-            <div class="modal-header">
-                <h3>Novo Agendamento</h3>
-                <button class="close-btn" onclick="closeModal('agendamento-modal')"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="modal-body">
-                <label>Cliente (Nome Completo)</label>
-                <input type="text" id="appt-client-name" class="input-styled" placeholder="Ex: Maria Silva">
-                <label>WhatsApp</label>
-                <input type="tel" id="appt-whatsapp" class="input-styled" placeholder="(86) 99999-9999">
-                <label>Serviço</label>
-                <select id="appt-service" class="input-styled"></select>
-                <div class="grid-2 mt-2">
-                    <div><label>Data</label><input type="date" id="appt-date" class="input-styled"></div>
-                    <div><label>Hora</label><input type="time" id="appt-time" class="input-styled"></div>
-                </div>
-                <button class="btn-primary mt-3" id="btn-save-appt">Confirmar Agendamento</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- MODAL MENU COMPLETO -->
-    <div id="menu-modal" class="modal-overlay">
-        <div class="modal-sheet">
-            <div class="modal-header">
-                <h3>Menu Principal</h3>
-                <button class="close-btn" onclick="closeModal('menu-modal')"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="modal-body menu-grid">
-                <!-- Links visíveis para todos -->
-                <a href="#" class="menu-link" data-target="mensagens"><i class="fab fa-whatsapp"></i> Mensagens PRÉ</a>
                 
-                <!-- Links exclusivos do Proprietário (classe admin-only) -->
-                <div class="admin-only w-100">
-                    <div class="menu-category mt-2">Gestão do Estúdio</div>
-                    <a href="#" class="menu-link" data-target="servicos"><i class="fas fa-cut"></i> Serviços & Valores</a>
-                    <a href="#" class="menu-link" data-target="despesas"><i class="fas fa-file-invoice-dollar"></i> Despesas</a>
-                    <a href="#" class="menu-link" data-target="relatorios"><i class="fas fa-chart-pie"></i> Relatórios</a>
+                <!-- Passo 1: Digitar Usuário -->
+                <div id="auth-step-1" class="auth-step active">
+                    <label>Usuário (nome.sobrenome)</label>
+                    <input type="text" id="input-username" placeholder="ex: andressa.vieira" autocomplete="off">
+                    <button class="btn-primary" id="btn-verify">Continuar</button>
+                    <p id="msg-auth-1" class="error-msg"></p>
                 </div>
 
-                <div class="menu-category mt-2">Sistema</div>
-                <a href="#" class="menu-link text-danger" id="btn-logout"><i class="fas fa-sign-out-alt"></i> Sair da Conta</a>
+                <!-- Passo 2A: Criar Senha -->
+                <div id="auth-step-new" class="auth-step">
+                    <h3>Primeiro Acesso</h3>
+                    <p class="subtitle">Crie sua senha definitiva</p>
+                    <label>Nova Senha (Mínimo 6)</label>
+                    <input type="password" id="input-new-pass" placeholder="••••••••">
+                    <button class="btn-primary" id="btn-create-pass">Salvar e Entrar</button>
+                    <button class="btn-text" onclick="resetAuth()">Voltar</button>
+                </div>
+
+                <!-- Passo 2B: Digitar Senha Normal -->
+                <div id="auth-step-login" class="auth-step">
+                    <h3>Bem-vindo(a) de volta!</h3>
+                    <label>Sua Senha</label>
+                    <input type="password" id="input-pass" placeholder="••••••••">
+                    <button class="btn-primary" id="btn-login">Entrar</button>
+                    <button class="btn-text" onclick="resetAuth()">Voltar</button>
+                    <p id="msg-auth-2" class="error-msg"></p>
+                </div>
             </div>
         </div>
-    </div>
 
-    <script src="./script.js"></script>
+        <!-- ================= TELA 3: APLICATIVO ================= -->
+        <div id="screen-app" class="screen">
+            <!-- Header -->
+            <header class="app-header">
+                <h2>Estúdio A.Q. Cuida</h2>
+                <span id="badge-role" class="badge">...</span>
+            </header>
+
+            <!-- Área de Conteúdo Scrollável -->
+            <main class="app-main">
+                
+                <!-- TELA 5: DASHBOARD -->
+                <div id="view-home" class="view active">
+                    <div class="stats-grid">
+                        <div class="stat-card"><h3>R$ 0</h3><span>Hoje</span></div>
+                        <div class="stat-card"><h3>0</h3><span>Agendas</span></div>
+                    </div>
+                    <h3 class="section-title">Próximos Horários</h3>
+                    <div id="list-home-agenda" class="list-container">
+                        <p class="empty-state">Carregando...</p>
+                    </div>
+                </div>
+
+                <!-- TELA 6: AGENDA -->
+                <div id="view-agenda" class="view">
+                    <div class="flex-between">
+                        <h2>Sua Agenda</h2>
+                        <input type="date" id="input-date-agenda" class="input-styled w-auto">
+                    </div>
+                    <div id="list-agenda" class="list-container mt-2"></div>
+                </div>
+
+                <!-- TELA 7: COMANDAS -->
+                <div id="view-comandas" class="view">
+                    <h2>Comandas Abertas</h2>
+                    <div id="list-comandas" class="list-container mt-2"></div>
+                </div>
+
+                <!-- TELA EXTRA: COBRANÇAS -->
+                <div id="view-cobrancas" class="view">
+                    <h2>Cobranças Pendentes</h2>
+                    <div id="list-cobrancas" class="list-container mt-2"></div>
+                </div>
+
+                <!-- TELA 8: CLIENTES & ANAMNESE -->
+                <div id="view-clientes" class="view">
+                    <h2>Clientes</h2>
+                    <input type="text" class="input-styled mt-2" placeholder="Buscar por nome ou WhatsApp...">
+                    <div id="list-clientes" class="list-container mt-2"></div>
+                </div>
+
+                <!-- TELA 9: MENSAGENS -->
+                <div id="view-mensagens" class="view">
+                    <h2>Mensagens Pré-definidas</h2>
+                    <div id="list-mensagens" class="list-container mt-2"></div>
+                </div>
+
+                <!-- TELA 10: SERVIÇOS -->
+                <div id="view-servicos" class="view">
+                    <h2>Serviços e Valores</h2>
+                    <div id="list-servicos" class="list-container mt-2"></div>
+                </div>
+
+                <!-- TELA 11: PRODUTOS & ESTOQUE -->
+                <div id="view-produtos" class="view">
+                    <h2>Estoque de Produtos</h2>
+                    <div id="list-produtos" class="list-container mt-2"></div>
+                </div>
+
+                <!-- TELA 12: DESPESAS -->
+                <div id="view-despesas" class="view">
+                    <h2>Controle de Despesas</h2>
+                    <div id="list-despesas" class="list-container mt-2"></div>
+                </div>
+
+                <!-- TELA 13: FUNCIONÁRIOS & COMISSÃO -->
+                <div id="view-funcionarios" class="view">
+                    <h2>Equipe & Comissões</h2>
+                    <div id="list-funcionarios" class="list-container mt-2"></div>
+                </div>
+
+                <!-- TELA 14: RELATÓRIOS -->
+                <div id="view-relatorios" class="view">
+                    <h2>Performance Financeira</h2>
+                    <div class="card mt-2 text-center">
+                        <div class="stats-grid" style="grid-template-columns: 1fr 1fr; gap: 0;">
+                            <div><small>Receita</small><h3 class="text-success" id="rep-rev">R$ 0</h3></div>
+                            <div><small>Despesas</small><h3 class="text-danger" id="rep-exp">R$ 0</h3></div>
+                        </div>
+                        <hr style="margin:15px 0; border:0; border-top:1px dashed var(--secondary);">
+                        <small>LUCRO LÍQUIDO</small>
+                        <h2 class="text-primary" id="rep-profit">R$ 0</h2>
+                    </div>
+                </div>
+
+                <!-- TELA 15: CONFIGURAÇÕES -->
+                <div id="view-config" class="view">
+                    <h2>Configurações</h2>
+                    <button class="btn-danger w-100 mt-3" id="btn-logout"><i class="fas fa-sign-out-alt"></i> Sair do Sistema</button>
+                </div>
+
+            </main>
+
+            <!-- TELA 17: BOTTOM NAVIGATION -->
+            <nav class="bottom-nav">
+                <div class="nav-item active" data-target="view-home"><i class="fas fa-home"></i><span>Início</span></div>
+                <div class="nav-item" data-target="view-agenda"><i class="fas fa-calendar-alt"></i><span>Agenda</span></div>
+                <div class="nav-item" data-target="view-comandas"><i class="fas fa-receipt"></i><span>Comandas</span></div>
+                <div class="nav-item" data-target="view-clientes"><i class="fas fa-users"></i><span>Clientes</span></div>
+                <div class="nav-item" onclick="document.getElementById('modal-menu').classList.add('active')"><i class="fas fa-bars"></i><span>Menu</span></div>
+            </nav>
+
+            <!-- Botão Flutuante (FAB) -->
+            <button class="fab-btn" onclick="document.getElementById('modal-appt').classList.add('active')"><i class="fas fa-plus"></i></button>
+        </div>
+
+        <!-- ================= TELA 16: MODAL NOVO AGENDAMENTO ================= -->
+        <div id="modal-appt" class="modal-overlay">
+            <div class="modal-sheet">
+                <div class="modal-header">
+                    <h3>Novo Agendamento</h3>
+                    <button class="close-btn" onclick="document.getElementById('modal-appt').classList.remove('active')"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body" style="display:flex; flex-direction:column; gap:10px;">
+                    <label>Cliente (Nome Completo)</label>
+                    <input type="text" id="appt-client" class="input-styled" placeholder="Ex: Maria Silva">
+                    <label>WhatsApp</label>
+                    <input type="tel" id="appt-phone" class="input-styled" placeholder="(86) 99999-9999">
+                    <label>Serviço</label>
+                    <select id="appt-service" class="input-styled"><option>Carregando...</option></select>
+                    <div class="stats-grid">
+                        <div><label>Data</label><input type="date" id="appt-date" class="input-styled"></div>
+                        <div><label>Hora</label><input type="time" id="appt-time" class="input-styled"></div>
+                    </div>
+                    <button class="btn-primary mt-2" id="btn-save-appt">Confirmar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= MODAL MENU EXPANDIDO ================= -->
+        <div id="modal-menu" class="modal-overlay">
+            <div class="modal-sheet">
+                <div class="modal-header">
+                    <h3>Menu</h3>
+                    <button class="close-btn" onclick="document.getElementById('modal-menu').classList.remove('active')"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    
+                    <p class="menu-category">Operacional</p>
+                    <a href="#" class="menu-link" data-target="view-cobrancas"><i class="fas fa-money-bill-wave"></i> Cobranças</a>
+                    <a href="#" class="menu-link" data-target="view-mensagens"><i class="fab fa-whatsapp" style="color:#27AE60;"></i> Mensagens</a>
+                    
+                    <div class="admin-only">
+                        <p class="menu-category mt-2">Gestão (Proprietário)</p>
+                        <a href="#" class="menu-link" data-target="view-servicos"><i class="fas fa-cut"></i> Serviços</a>
+                        <a href="#" class="menu-link" data-target="view-produtos"><i class="fas fa-box"></i> Estoque</a>
+                        <a href="#" class="menu-link" data-target="view-despesas"><i class="fas fa-file-invoice-dollar" style="color:var(--danger);"></i> Despesas</a>
+                        <a href="#" class="menu-link" data-target="view-funcionarios"><i class="fas fa-users"></i> Equipe</a>
+                        <a href="#" class="menu-link" data-target="view-relatorios"><i class="fas fa-chart-pie"></i> Relatórios</a>
+                        <a href="#" class="menu-link" data-target="view-config"><i class="fas fa-cog"></i> Configurações</a>
+                    </div>
+                    
+                </div>
+            </div>
+        </div>
+
+    </div> <!-- Fim mobile-wrapper -->
+
+    <script src="script.js"></script>
 </body>
 </html>

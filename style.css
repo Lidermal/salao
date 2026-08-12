@@ -1,104 +1,180 @@
-:root {
-    --cream: #FDF8F5;
-    --text-dark: #4A2E2B;
-    --rose-gold: #B97A76;
-    --blush: #D89B98;
-    --white: #FFFFFF;
-    --error: #D9534F;
-    --gray: #F0F0F0;
+// Credenciais integradas
+const SUPABASE_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let currentUserAttempt = null;
+let loggedUser = null;
+
+// Elementos Principais
+const splashScreen = document.getElementById('splash-screen');
+const loginScreen = document.getElementById('login-screen');
+const appScreen = document.getElementById('app-screen');
+
+// Login Elements
+const step1 = document.getElementById('login-step-1');
+const step2 = document.getElementById('login-step-2');
+const inputUsername = document.getElementById('username');
+const inputPassword = document.getElementById('password');
+const btnVerify = document.getElementById('btn-verify-user');
+const btnLogin = document.getElementById('btn-login');
+const btnBack = document.getElementById('btn-back');
+const errorMsg = document.getElementById('login-error');
+
+// SPLASH & INICIALIZAÇÃO
+window.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        splashScreen.classList.remove('active');
+        const sessionUser = sessionStorage.getItem('estudioUser');
+        if (sessionUser) {
+            loggedUser = JSON.parse(sessionUser);
+            initApp();
+        } else {
+            loginScreen.classList.add('active');
+        }
+    }, 1200);
+});
+
+function showError(msg) {
+    errorMsg.textContent = msg;
+    setTimeout(() => errorMsg.textContent = '', 3000);
 }
 
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-    font-family: 'Poppins', sans-serif;
+// LÓGICA DE LOGIN (PASSO 1)
+btnVerify.addEventListener('click', async () => {
+    const username = inputUsername.value.trim().toLowerCase();
+    if (!username) return showError('Digite seu nome de usuário.');
+
+    try {
+        btnVerify.disabled = true;
+        btnVerify.textContent = 'Verificando...';
+        const { data: user, error } = await supabase.from('usuarios').select('*').eq('username', username).single();
+
+        if (error || !user) throw new Error('Usuário não encontrado.');
+        if (!user.ativo) throw new Error('Usuário desativado.');
+
+        currentUserAttempt = user;
+        step1.classList.remove('active');
+        step2.classList.add('active');
+
+        document.getElementById('welcome-message').textContent = user.senha ? `Bem-vindo de volta!` : `Primeiro acesso.`;
+        document.getElementById('password-label').textContent = user.senha ? 'Digite sua senha' : 'Crie sua senha (mín. 6)';
+        btnLogin.textContent = user.senha ? 'Entrar' : 'Salvar e Entrar';
+
+    } catch (err) {
+        showError(err.message || 'Erro ao conectar.');
+    } finally {
+        btnVerify.disabled = false;
+        btnVerify.textContent = 'Continuar';
+    }
+});
+
+// LÓGICA DE LOGIN (PASSO 2)
+btnLogin.addEventListener('click', async () => {
+    const password = inputPassword.value.trim();
+    if (password.length < 6) return showError('Mínimo 6 caracteres.');
+
+    try {
+        btnLogin.disabled = true;
+        btnLogin.textContent = 'Aguarde...';
+
+        if (!currentUserAttempt.senha) {
+            const { error: updateError } = await supabase.from('usuarios').update({ senha: password }).eq('id', currentUserAttempt.id);
+            if (updateError) throw updateError;
+            currentUserAttempt.senha = password;
+        } else if (password !== currentUserAttempt.senha) {
+            throw new Error('Senha incorreta.');
+        }
+
+        sessionStorage.setItem('estudioUser', JSON.stringify(currentUserAttempt));
+        loggedUser = currentUserAttempt;
+        loginScreen.classList.remove('active');
+        initApp();
+
+    } catch (err) {
+        showError(err.message || 'Erro no login.');
+        btnLogin.disabled = false;
+        btnLogin.textContent = currentUserAttempt.senha ? 'Entrar' : 'Salvar e Entrar';
+    }
+});
+
+btnBack.addEventListener('click', () => {
+    step2.classList.remove('active');
+    step1.classList.add('active');
+    inputPassword.value = '';
+});
+
+// INICIALIZAÇÃO DO APP (Após Login)
+function initApp() {
+    appScreen.classList.add('active');
+    document.getElementById('logged-user-name').textContent = loggedUser.username.split('.')[0];
+    
+    // Controle de Permissões (Proprietário vs Freelancer)
+    const propElements = document.querySelectorAll('.prop-only');
+    propElements.forEach(el => {
+        if (loggedUser.perfil === 'proprietario') {
+            el.style.display = el.tagName === 'A' ? 'flex' : 'block';
+        } else {
+            el.style.display = 'none';
+        }
+    });
+
+    navigateTo('page-dashboard', 'Dashboard');
 }
 
-body {
-    background-color: var(--cream);
-    color: var(--text-dark);
-    -webkit-font-smoothing: antialiased;
-    overflow-x: hidden;
+// LOGOUT
+document.getElementById('btn-logout').addEventListener('click', () => {
+    sessionStorage.removeItem('estudioUser');
+    window.location.reload();
+});
+
+// ---------------- LÓGICA SPA (NAVEGAÇÃO) ----------------
+const pages = document.querySelectorAll('.page');
+const navItems = document.querySelectorAll('.nav-item');
+const menuLinks = document.querySelectorAll('.menu-link');
+const headerTitle = document.getElementById('header-title');
+
+function navigateTo(pageId, title) {
+    // Esconde todas as páginas
+    pages.forEach(p => p.classList.remove('active'));
+    // Mostra a página alvo
+    document.getElementById(pageId).classList.add('active');
+    // Atualiza título do Header
+    if(title) headerTitle.textContent = title;
+    // Fecha o modal de menu se estiver aberto
+    closeModal('menu-modal');
+
+    // Atualiza o estado do Bottom Nav
+    navItems.forEach(nav => {
+        nav.classList.remove('active');
+        if(nav.getAttribute('data-target') === pageId) {
+            nav.classList.add('active');
+        }
+    });
 }
 
-/* Telas Globais */
-.screen { display: none; min-height: 100vh; width: 100vw; }
-.screen.active { display: flex; animation: fadeIn 0.4s ease-in-out; }
+// Event Listeners para o Menu Inferior
+navItems.forEach(nav => {
+    if(nav.hasAttribute('data-target')){
+        nav.addEventListener('click', (e) => {
+            e.preventDefault();
+            navigateTo(nav.getAttribute('data-target'), nav.querySelector('span').textContent);
+        });
+    }
+});
 
-@keyframes fadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
+// Event Listeners para o Menu Expandido
+menuLinks.forEach(link => {
+    link.addEventListener('click', (e) => {
+        e.preventDefault();
+        navigateTo(link.getAttribute('data-target'), link.textContent.trim());
+    });
+});
+
+// ---------------- CONTROLE DE MODAIS ----------------
+function openModal(modalId) {
+    document.getElementById(modalId).classList.add('active');
 }
-
-/* Splash & Login (Estilos da Etapa 1 mantidos) */
-#splash-screen, #login-screen { flex-direction: column; align-items: center; justify-content: center; }
-.brand-title { color: var(--text-dark); font-size: 1.8rem; font-weight: 500; text-align: center; line-height: 1.2; margin-bottom: 0.2rem; }
-.brand-subtitle { color: var(--rose-gold); font-size: 1rem; font-weight: 300; text-align: center; margin-bottom: 2rem; font-style: italic; }
-.spinner { width: 40px; height: 40px; margin: 20px auto 0; border: 4px solid var(--blush); border-top: 4px solid var(--rose-gold); border-radius: 50%; animation: spin 1s linear infinite; }
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-.login-container { background-color: var(--white); padding: 2.5rem 2rem; border-radius: 24px; box-shadow: 0 10px 30px rgba(74, 46, 43, 0.08); width: 90%; max-width: 400px; }
-.login-step { display: none; flex-direction: column; gap: 1rem; }
-.login-step.active { display: flex; animation: fadeIn 0.3s ease; }
-label { font-size: 0.9rem; color: var(--text-dark); font-weight: 500; margin-bottom: -5px; display: block;}
-input, .form-select { width: 100%; padding: 14px 16px; border: 1px solid var(--blush); border-radius: 12px; outline: none; font-size: 1rem; color: var(--text-dark); background-color: var(--white); transition: border-color 0.3s; }
-input:focus, .form-select:focus { border-color: var(--rose-gold); }
-
-.btn-primary { background-color: var(--rose-gold); color: var(--white); border: none; padding: 14px; border-radius: 12px; font-size: 1rem; font-weight: 500; cursor: pointer; transition: transform 0.1s; width: 100%; }
-.btn-primary:active { transform: scale(0.98); }
-.btn-text { background: none; border: none; color: var(--rose-gold); font-size: 0.9rem; cursor: pointer; font-weight: 500; }
-.error-msg { color: var(--error); font-size: 0.85rem; text-align: center; margin-top: 1rem; min-height: 20px; }
-.welcome-msg { font-size: 0.95rem; text-align: center; color: var(--rose-gold); font-weight: 500; margin-bottom: 0.5rem; }
-
-/* ---------------- SPA LAYOUT ---------------- */
-.spa-layout { flex-direction: column; height: 100vh; overflow: hidden; }
-
-/* Header */
-.top-header { background: var(--white); padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); z-index: 10; }
-.top-header h2 { font-size: 1.2rem; color: var(--text-dark); font-weight: 600; }
-.user-badge { background: var(--blush); color: var(--white); padding: 5px 12px; border-radius: 20px; font-size: 0.8rem; font-weight: 500; }
-
-/* Área de Conteúdo */
-#content-area { flex: 1; overflow-y: auto; padding: 1.5rem; padding-bottom: 80px; /* Espaço pro menu */ }
-.page { display: none; animation: fadeIn 0.3s ease; }
-.page.active { display: block; }
-.section-title { font-size: 1.1rem; margin: 1.5rem 0 1rem; color: var(--text-dark); }
-
-/* Grid e Cards Genéricos */
-.stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-.stat-card { background: var(--white); padding: 1.2rem; border-radius: 16px; box-shadow: 0 4px 15px rgba(0,0,0,0.03); border-left: 4px solid var(--rose-gold); }
-.stat-card small { color: var(--rose-gold); font-weight: 500; }
-.stat-card h3 { font-size: 1.5rem; margin-top: 5px; }
-
-.card-item { background: var(--white); padding: 1rem; border-radius: 12px; margin-bottom: 1rem; box-shadow: 0 2px 8px rgba(0,0,0,0.04); display: flex; justify-content: space-between; align-items: center; }
-.empty-state { text-align: center; color: var(--blush); font-style: italic; margin-top: 2rem; }
-.search-bar, .date-selector { margin-bottom: 1rem; }
-
-/* Floating Action Button (FAB) */
-.fab-btn { position: fixed; bottom: 80px; right: 20px; width: 56px; height: 56px; background-color: var(--rose-gold); color: white; border: none; border-radius: 50%; font-size: 1.5rem; box-shadow: 0 4px 15px rgba(185, 122, 118, 0.4); cursor: pointer; z-index: 20; display: flex; align-items: center; justify-content: center; }
-
-/* Bottom Navigation (Instagram Style) */
-.bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; background: var(--white); display: flex; justify-content: space-around; padding: 0.8rem 0; box-shadow: 0 -2px 20px rgba(0,0,0,0.05); z-index: 100; border-top-left-radius: 20px; border-top-right-radius: 20px; }
-.nav-item { display: flex; flex-direction: column; align-items: center; text-decoration: none; color: var(--blush); font-size: 1.2rem; transition: color 0.3s; }
-.nav-item span { font-size: 0.7rem; margin-top: 4px; font-weight: 500; }
-.nav-item.active { color: var(--rose-gold); }
-
-/* Modais (Bottom Sheet) */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(74, 46, 43, 0.4); display: flex; flex-direction: column; justify-content: flex-end; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 200; }
-.modal-overlay.active { opacity: 1; pointer-events: auto; }
-.modal-sheet { background: var(--cream); width: 100%; border-top-left-radius: 24px; border-top-right-radius: 24px; padding: 1.5rem; transform: translateY(100%); transition: transform 0.3s ease-out; max-height: 90vh; overflow-y: auto; }
-.modal-sheet.full-height { min-height: 70vh; }
-.modal-overlay.active .modal-sheet { transform: translateY(0); }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; border-bottom: 1px solid var(--gray); padding-bottom: 1rem; }
-.close-btn { background: none; border: none; font-size: 1.5rem; color: var(--text-dark); cursor: pointer; }
-.modal-body { display: flex; flex-direction: column; gap: 1rem; }
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-
-/* Menu Expansível Links */
-.menu-category { font-weight: 600; color: var(--rose-gold); margin-top: 1rem; margin-bottom: 0.5rem; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 1px; }
-.menu-link { display: flex; align-items: center; gap: 15px; padding: 12px; background: var(--white); border-radius: 12px; text-decoration: none; color: var(--text-dark); font-weight: 500; transition: background 0.2s; box-shadow: 0 2px 5px rgba(0,0,0,0.02); }
-.menu-link i { color: var(--blush); font-size: 1.2rem; width: 25px; text-align: center; }
-
-/* Controle de Permissão */
-.prop-only { display: none !important; }
+function closeModal(modalId) {
+    document.getElementById(modalId).classList.remove('active');
+}

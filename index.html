@@ -1,160 +1,222 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>Estúdio Amor que Cuida</title>
-  <link rel="stylesheet" href="style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Estúdio Amor Que Cuida</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Ícones para o Bottom Nav -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
-  <!-- SPLASH -->
-  <div id="splash">
-    <div class="logo-splash">
-      <h1>Estúdio Amor que Cuida</h1>
-      <p>by Andressa Vieira</p>
-    </div>
-    <div class="spinner"></div>
-    <div style="color: var(--text-light); font-size: 0.95rem;">Carregando...</div>
-  </div>
 
-  <!-- LOGIN -->
-  <div id="login-screen">
-    <div class="login-card">
-      <div class="login-header">
-        <h2>Entrar no Estúdio</h2>
-        <p>Use seu usuário (nome.sobrenome)</p>
-      </div>
-      <div class="input-group">
-        <label>Usuário</label>
-        <input type="text" id="username" placeholder="ex: andressa.vieira" autocomplete="off" />
-      </div>
-      <button class="btn btn-primary" id="btn-login">Continuar</button>
-      <p id="msg"></p>
-    </div>
-  </div>
-
-  <!-- APP -->
-  <div id="app">
-    <header>
-      <div class="header-title">
-        <i class="fas fa-heart"></i> Amor que Cuida
-      </div>
-      <div class="user-role" id="role-display">Proprietário</div>
-    </header>
-
-    <main>
-      <!-- HOME -->
-      <div id="home" class="view active">
-        <div class="grid-3">
-          <div class="stat-box"><div class="stat-val" id="rev-today">R$ 0</div><div class="stat-lbl">Hoje</div></div>
-          <div class="stat-box"><div class="stat-val" id="appts-today">0</div><div class="stat-lbl">Agendas</div></div>
-          <div class="stat-box"><div class="stat-val" id="pending">0</div><div class="stat-lbl">Pendentes</div></div>
+    <!-- 1. TELA DE SPLASH -->
+    <main id="splash-screen" class="screen active">
+        <div class="splash-content">
+            <h1 class="brand-title">Amor que Cuida</h1>
+            <p class="brand-subtitle">by Andressa Vieira</p>
+            <div class="spinner"></div>
         </div>
-        <h3>Próximos Horários</h3>
-        <div id="home-appts"></div>
-      </div>
-
-      <!-- AGENDA -->
-      <div id="agenda" class="view">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
-          <h2>Minha Agenda</h2>
-          <input type="date" id="date-picker" />
-        </div>
-        <div id="agenda-list"></div>
-      </div>
-
-      <!-- COMANDAS -->
-      <div id="comandas" class="view">
-        <h2>Comandas Abertas</h2>
-        <div id="comandas-list"></div>
-      </div>
-
-      <!-- CLIENTES -->
-      <div id="clientes" class="view">
-        <input type="text" id="search-client" placeholder="Buscar cliente..." />
-        <div id="clientes-list"></div>
-      </div>
-
-      <!-- MENSAGENS -->
-      <div id="mensagens" class="view">
-        <h2>Mensagens Pré-definidas</h2>
-        <div id="templates-list"></div>
-      </div>
-
-      <!-- SERVIÇOS -->
-      <div id="servicos" class="view">
-        <h2>Serviços</h2>
-        <div id="servicos-list"></div>
-      </div>
-
-      <!-- CONFIG -->
-      <div id="config" class="view">
-        <h2>Configurações</h2>
-        <div class="card" id="btn-logout">
-          <i class="fas fa-sign-out-alt"></i> Sair
-        </div>
-      </div>
     </main>
 
-    <!-- NAV BOTTOM -->
-    <nav>
-      <div class="nav-item active" data-view="home"><i class="fas fa-home"></i><span>Início</span></div>
-      <div class="nav-item" data-view="agenda"><i class="fas fa-calendar-alt"></i><span>Agenda</span></div>
-      <div class="nav-item" data-view="comandas"><i class="fas fa-file-invoice-dollar"></i><span>Comandas</span></div>
-      <div class="nav-item" data-view="clientes"><i class="fas fa-user-friends"></i><span>Clientes</span></div>
-      <div class="nav-item" id="more-btn"><i class="fas fa-bars"></i><span>Menu</span></div>
-    </nav>
+    <!-- 2, 3 e 4. TELA DE LOGIN -->
+    <main id="login-screen" class="screen">
+        <div class="login-container">
+            <h1 class="brand-title">Estúdio<br>Amor que Cuida</h1>
+            <p class="brand-subtitle">by Andressa Vieira</p>
+            
+            <div id="login-step-1" class="login-step active">
+                <label for="username">Usuário</label>
+                <input type="text" id="username" placeholder="nome.sobrenome" autocomplete="off">
+                <button id="btn-verify-user" class="btn-primary">Continuar</button>
+            </div>
 
-    <!-- FAB -->
-    <button class="fab" id="fab-new-appt">
-      <i class="fas fa-plus"></i>
-    </button>
-  </div>
+            <div id="login-step-2" class="login-step">
+                <p id="welcome-message" class="welcome-msg"></p>
+                <label for="password" id="password-label">Senha</label>
+                <input type="password" id="password" placeholder="Sua senha">
+                <button id="btn-login" class="btn-primary">Entrar</button>
+                <button id="btn-back" class="btn-text">Voltar</button>
+            </div>
+            <p id="login-error" class="error-msg"></p>
+        </div>
+    </main>
 
-  <!-- MODAL NOVO AGENDAMENTO -->
-  <div id="modal-appt" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Novo Agendamento</h3>
-        <i class="fas fa-times" id="close-appt"></i>
-      </div>
-      <div class="input-group">
-        <label>Cliente (Nome)</label>
-        <input type="text" id="appt-client-name" placeholder="Ex: Maria Silva" />
-      </div>
-      <div class="input-group">
-        <label>WhatsApp</label>
-        <input type="tel" id="appt-phone" placeholder="11999999999" />
-      </div>
-      <div class="input-group">
-        <label>Serviço</label>
-        <select id="appt-service"><option value="">Selecione...</option></select>
-      </div>
-      <div class="grid-2">
-        <div class="input-group"><label>Data</label><input type="date" id="appt-date" /></div>
-        <div class="input-group"><label>Hora</label><input type="time" id="appt-time" /></div>
-      </div>
-      <button class="btn btn-primary" id="save-appt">Agendar</button>
+    <!-- ESTRUTURA SPA PRINCIPAL (TELAS 5 A 15) -->
+    <main id="app-screen" class="screen spa-layout">
+        
+        <!-- Header Fixo -->
+        <header class="top-header">
+            <h2 id="header-title">Dashboard</h2>
+            <div class="user-badge" id="logged-user-name">User</div>
+        </header>
+
+        <!-- Área de Conteúdo (Subpáginas) -->
+        <div id="content-area">
+            
+            <!-- 5. DASHBOARD -->
+            <section id="page-dashboard" class="page active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <small>Receita Hoje</small>
+                        <h3>R$ 0,00</h3>
+                    </div>
+                    <div class="stat-card">
+                        <small>Agendas Hoje</small>
+                        <h3>0</h3>
+                    </div>
+                </div>
+                <h3 class="section-title">Próximos Horários</h3>
+                <div class="list-container" id="dashboard-agenda-list">
+                    <p class="empty-state">Nenhum agendamento próximo.</p>
+                </div>
+            </section>
+
+            <!-- 6. AGENDA -->
+            <section id="page-agenda" class="page">
+                <input type="date" class="date-selector" id="agenda-date">
+                <div class="list-container" id="agenda-full-list">
+                    <p class="empty-state">Selecione uma data.</p>
+                </div>
+                <!-- Botão Flutuante (FAB) -->
+                <button class="fab-btn" onclick="openModal('agendamento-modal')"><i class="fas fa-plus"></i></button>
+            </section>
+
+            <!-- 7. COMANDAS -->
+            <section id="page-comandas" class="page">
+                <h3 class="section-title">Comandas Abertas</h3>
+                <div class="list-container" id="comandas-list">
+                    <p class="empty-state">Nenhuma comanda aberta.</p>
+                </div>
+                <button class="fab-btn"><i class="fas fa-plus"></i></button>
+            </section>
+
+            <!-- 8. CLIENTES & ANAMNESE -->
+            <section id="page-clientes" class="page">
+                <input type="search" placeholder="Buscar cliente por nome ou WhatsApp..." class="search-bar">
+                <div class="list-container" id="clientes-list">
+                    <p class="empty-state">Use a busca acima.</p>
+                </div>
+            </section>
+
+            <!-- 9. MENSAGENS PRE-DEFINIDAS -->
+            <section id="page-mensagens" class="page">
+                <div class="card-item">Confirmação de Agendamento <i class="fab fa-whatsapp"></i></div>
+                <div class="card-item">Lembrete 24h <i class="fab fa-whatsapp"></i></div>
+                <div class="card-item">Feliz Aniversário <i class="fab fa-whatsapp"></i></div>
+            </section>
+
+            <!-- 10. SERVIÇOS -->
+            <section id="page-servicos" class="page">
+                <div class="list-container" id="servicos-list">
+                    <p class="empty-state">Nenhum serviço cadastrado.</p>
+                </div>
+                <button class="fab-btn prop-only"><i class="fas fa-plus"></i></button>
+            </section>
+
+            <!-- 11. PRODUTOS & ESTOQUE -->
+            <section id="page-produtos" class="page">
+                <div class="list-container" id="produtos-list">
+                    <p class="empty-state">Estoque vazio.</p>
+                </div>
+                <button class="fab-btn prop-only"><i class="fas fa-plus"></i></button>
+            </section>
+
+            <!-- 12. DESPESAS -->
+            <section id="page-despesas" class="page">
+                <div class="list-container" id="despesas-list">
+                    <p class="empty-state">Nenhuma despesa registrada.</p>
+                </div>
+                <button class="fab-btn prop-only"><i class="fas fa-plus"></i></button>
+            </section>
+
+            <!-- 13. FUNCIONÁRIOS -->
+            <section id="page-funcionarios" class="page">
+                <div class="list-container" id="funcionarios-list">
+                    <p class="empty-state">Nenhum funcionário cadastrado.</p>
+                </div>
+            </section>
+
+            <!-- 14. RELATÓRIOS -->
+            <section id="page-relatorios" class="page">
+                <div class="card-item" onclick="alert('Gerando Relatório de Performance...')">Performance</div>
+                <div class="card-item" onclick="alert('Gerando Resumo Financeiro...')">Resumo Financeiro</div>
+                <div class="card-item" onclick="alert('Gerando Melhores Clientes...')">Melhores Clientes</div>
+            </section>
+
+            <!-- 15. CONFIGURAÇÕES -->
+            <section id="page-configuracoes" class="page">
+                <button id="btn-logout" class="btn-primary" style="margin-top: 2rem;">Sair do Sistema</button>
+            </section>
+        </div>
+
+        <!-- BOTTOM NAVIGATION (Estilo Instagram) -->
+        <nav id="bottom-nav" class="bottom-nav">
+            <a href="#" class="nav-item active" data-target="page-dashboard"><i class="fas fa-home"></i><span>Início</span></a>
+            <a href="#" class="nav-item" data-target="page-agenda"><i class="far fa-calendar-alt"></i><span>Agenda</span></a>
+            <a href="#" class="nav-item" data-target="page-comandas"><i class="fas fa-receipt"></i><span>Comandas</span></a>
+            <a href="#" class="nav-item" onclick="openModal('menu-modal')"><i class="fas fa-bars"></i><span>Menu</span></a>
+        </nav>
+    </main>
+
+    <!-- 16. MODAL NOVO AGENDAMENTO -->
+    <div id="agendamento-modal" class="modal-overlay">
+        <div class="modal-sheet">
+            <div class="modal-header">
+                <h3>Novo Agendamento</h3>
+                <button class="close-btn" onclick="closeModal('agendamento-modal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <label>Cliente</label>
+                <input type="text" placeholder="Nome completo">
+                <label>WhatsApp</label>
+                <input type="tel" placeholder="(11) 99999-9999">
+                <label>Serviço</label>
+                <select class="form-select">
+                    <option>Selecione...</option>
+                </select>
+                <div class="grid-2">
+                    <div>
+                        <label>Data</label>
+                        <input type="date">
+                    </div>
+                    <div>
+                        <label>Hora</label>
+                        <input type="time">
+                    </div>
+                </div>
+                <button class="btn-primary" style="margin-top: 1rem;" onclick="closeModal('agendamento-modal')">Salvar Agendamento</button>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <!-- MODAL MENU -->
-  <div id="modal-menu" class="modal">
-    <div class="modal-content" style="height: 40vh;">
-      <div class="modal-header"><h3>Menu</h3><i class="fas fa-times" id="close-menu"></i></div>
-      <div class="grid-2" style="gap:14px;">
-        <div class="card menu-link" data-view="comandas"><i class="fas fa-file-invoice-dollar"></i> Comandas</div>
-        <div class="card menu-link" data-view="clientes"><i class="fas fa-user-friends"></i> Clientes</div>
-        <div class="card menu-link" data-view="mensagens"><i class="fab fa-whatsapp"></i> Mensagens</div>
-        <div class="card menu-link" data-view="servicos"><i class="fas fa-cut"></i> Serviços</div>
-        <div class="card menu-link" data-view="config"><i class="fas fa-cog"></i> Config</div>
-      </div>
+    <!-- 17. MODAL MENU EXPANDIDO -->
+    <div id="menu-modal" class="modal-overlay">
+        <div class="modal-sheet full-height">
+            <div class="modal-header">
+                <h3>Menu Principal</h3>
+                <button class="close-btn" onclick="closeModal('menu-modal')"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body menu-grid">
+                <div class="menu-category">Operacional</div>
+                <a href="#" class="menu-link" data-target="page-clientes"><i class="fas fa-users"></i> Clientes & Anamnese</a>
+                <a href="#" class="menu-link prop-only" data-target="page-servicos"><i class="fas fa-spa"></i> Serviços & Pacotes</a>
+                <a href="#" class="menu-link prop-only" data-target="page-produtos"><i class="fas fa-box"></i> Produtos & Estoque</a>
+                
+                <div class="menu-category">Financeiro</div>
+                <a href="#" class="menu-link prop-only" data-target="page-despesas"><i class="fas fa-file-invoice-dollar"></i> Despesas</a>
+                <a href="#" class="menu-link prop-only" data-target="page-relatorios"><i class="fas fa-chart-line"></i> Relatórios</a>
+                
+                <div class="menu-category">Administrativo</div>
+                <a href="#" class="menu-link prop-only" data-target="page-funcionarios"><i class="fas fa-id-badge"></i> Funcionários & Comissão</a>
+                <a href="#" class="menu-link" data-target="page-mensagens"><i class="fas fa-comment-dots"></i> Mensagens WhatsApp</a>
+                <a href="#" class="menu-link" data-target="page-configuracoes"><i class="fas fa-cog"></i> Configurações</a>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <script src="script.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>

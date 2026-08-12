@@ -40,108 +40,111 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      position: relative;
     }
 
     h1, h2, h3 { font-family: 'Playfair Display', serif; color: var(--primary); }
     button { cursor: pointer; border: none; outline: none; font-family: inherit; }
     input, select, textarea { font-family: inherit; }
 
-    /* --- SPLASH / LOGO SCREEN --- */
-    #splash-screen {
+    /* --- SPLASH --- */
+    #splash {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: linear-gradient(135deg, var(--bg-color) 0%, var(--secondary) 100%);
-      z-index: 9999; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; padding: 20px;
+      background: linear-gradient(135deg, var(--bg-color), var(--secondary));
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 999;
       text-align: center;
+      padding: 20px;
     }
-    .logo-splash {
-      max-width: 300px;
-      margin-bottom: 30px;
-    }
-    .logo-splash img { width: 100%; height: auto; }
     .logo-splash h1 {
-      font-size: 2.2rem; margin: 10px 0 5px;
-      background: linear-gradient(to right, var(--primary), #965A64);
-      -webkit-background-clip: text;
-      background-clip: text;
-      color: transparent;
+      font-size: 2.4rem; margin: 10px 0; background: linear-gradient(to right, var(--primary), #965A64);
+      -webkit-background-clip: text; color: transparent;
     }
-    .logo-splash p { color: var(--text-light); font-style: italic; font-size: 0.9rem; }
+    .logo-splash p { color: var(--text-light); font-style: italic; }
 
-    /* --- LOGIN SCREEN --- */
-    #auth-screen {
+    /* --- LOGIN --- */
+    #login-screen {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: linear-gradient(135deg, var(--bg-color) 0%, var(--secondary) 100%);
-      z-index: 9999; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; padding: 20px;
+      background: linear-gradient(135deg, var(--bg-color), var(--secondary));
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      z-index: 999;
+      padding: 20px;
     }
-    .logo-area { text-align: center; margin-bottom: 30px; }
-    .logo-area h1 { font-size: 2.2rem; margin-bottom: 5px; }
-    .logo-area p { color: var(--text-light); font-style: italic; font-size: 0.9rem; }
-    
     .login-card {
-      background: var(--white); padding: 30px; border-radius: var(--radius);
-      width: 100%; max-width: 400px; box-shadow: var(--shadow);
+      background: white; padding: 30px; border-radius: var(--radius);
+      width: 100%; max-width: 380px; box-shadow: var(--shadow);
       transition: all 0.3s ease;
     }
-    .input-group { margin-bottom: 15px; }
-    .input-group label { display: block; margin-bottom: 5px; font-size: 0.85rem; color: var(--text-light); font-weight: 500; }
+    .input-group { margin-bottom: 18px; }
+    .input-group label { display: block; margin-bottom: 6px; font-size: 0.85rem; color: var(--text-light); }
     .input-group input {
-      width: 100%; padding: 12px; border: 1px solid var(--secondary);
-      border-radius: 8px; font-size: 1rem; outline: none; transition: 0.3s;
+      width: 100%; padding: 13px; border: 1px solid var(--secondary);
+      border-radius: 8px; font-size: 1rem; outline: none;
     }
     .input-group input:focus { border-color: var(--primary); }
-    
+    .btn {
+      width: 100%; padding: 14px; border-radius: 8px; font-size: 1rem; font-weight: 600;
+      transition: 0.3s;
+    }
     .btn-primary {
-      width: 100%; padding: 14px; background: var(--primary); color: white;
-      border-radius: 8px; font-size: 1rem; font-weight: 600; transition: 0.3s;
+      background: var(--primary); color: white;
     }
     .btn-primary:active { transform: scale(0.98); background: var(--primary-dark); }
-    .btn-secondary { background: var(--secondary); color: var(--primary-dark); margin-top: 10px; }
+    .btn-secondary {
+      background: var(--secondary); color: var(--primary-dark); margin-top: 10px;
+    }
+    #msg { margin-top: 15px; font-size: 0.85rem; min-height: 20px; text-align: center; }
+    .error { color: var(--danger); }
+    .success { color: var(--success); }
 
-    #login-msg { margin-top:15px; font-size:0.85rem; text-align:center; min-height: 20px; }
-    .hidden { display: none !important; }
+    /* --- APP --- */
+    #app {
+      display: none; flex-direction: column; height: 100%;
+    }
 
-    /* --- APP STRUCTURE --- */
-    #app-screen { display: none; flex-direction: column; height: 100%; }
-    
     header {
-      background: var(--white); padding: 12px 20px;
+      background: white; padding: 12px 20px;
       display: flex; justify-content: space-between; align-items: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.05); z-index: 10;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
     }
     .header-title { font-size: 1.1rem; font-weight: 600; color: var(--primary); }
-    .user-badge { font-size: 0.75rem; background: var(--bg-color); padding: 4px 10px; border-radius: 20px; color: var(--text-light); border: 1px solid var(--secondary); }
+    .user-role { font-size: 0.75rem; background: var(--bg-color); padding: 4px 10px; border-radius: 20px; color: var(--text-light); border: 1px solid var(--secondary); }
 
     main {
-      flex: 1; overflow-y: auto; padding: 15px; padding-bottom: calc(var(--nav-height) + 20px);
+      flex: 1; overflow-y: auto; padding: 15px;
+      padding-bottom: calc(var(--nav-height) + 20px);
       scroll-behavior: smooth;
     }
 
-    /* --- MOBILE NAV --- */
+    /* Nav bottom */
     nav {
       position: fixed; bottom: 0; left: 0; width: 100%; height: var(--nav-height);
-      background: var(--white); border-top: 1px solid var(--secondary);
+      background: white; border-top: 1px solid var(--secondary);
       display: flex; justify-content: space-around; align-items: center;
       z-index: 100; padding-bottom: var(--safe-bottom);
     }
     .nav-item {
       display: flex; flex-direction: column; align-items: center;
-      color: var(--text-light); font-size: 0.65rem; cursor: pointer; transition: 0.3s; flex: 1;
+      color: var(--text-light); font-size: 0.65rem; cursor: pointer; transition: 0.3s;
     }
     .nav-item i { font-size: 1.3rem; margin-bottom: 3px; }
     .nav-item.active { color: var(--primary); transform: translateY(-2px); }
 
-    /* --- COMPONENTS --- */
+    /* Views */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* Cards */
     .card {
-      background: var(--white); border-radius: 12px; padding: 15px;
+      background: white; border-radius: 12px; padding: 15px;
       margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
     }
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-    
-    .stat-box { text-align: center; padding: 15px 5px; background: var(--white); border-radius: 12px; border: 1px solid var(--secondary); }
+
+    .stat-box {
+      text-align: center; padding: 15px 5px; background: white; border-radius: 12px;
+      border: 1px solid var(--secondary);
+    }
     .stat-val { font-size: 1.2rem; font-weight: 700; color: var(--primary); }
     .stat-lbl { font-size: 0.7rem; color: var(--text-light); margin-top: 4px; }
 
@@ -150,12 +153,13 @@
       padding: 12px 0; border-bottom: 1px solid #f0f0f0;
     }
     .list-item:last-child { border-bottom: none; }
-    
-    .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
-    .badge-open { background: #FFF3CD; color: #856404; }
+
+    .badge {
+      padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;
+    }
+    .badge-pending { background: #E3F2FD; color: #1976D2; }
     .badge-paid { background: #D4EDDA; color: #155724; }
     .badge-debt { background: #F8D7DA; color: #721C24; }
-    .badge-pending { background: #E3F2FD; color: #1976D2; }
 
     .fab {
       position: fixed; bottom: calc(var(--nav-height) + 20px); right: 20px;
@@ -165,11 +169,7 @@
       z-index: 90;
     }
 
-    .view { display: none; animation: fadeIn 0.3s ease; }
-    .view.active { display: block; }
-    @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-
-    /* Modal Bottom Sheet */
+    /* Modals */
     .modal {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background: rgba(0,0,0,0.5); z-index: 200; display: none;
@@ -177,64 +177,17 @@
     }
     .modal.open { display: flex; }
     .modal-content {
-      background: var(--white); width: 100%; border-radius: 20px 20px 0 0;
+      background: white; width: 100%; border-radius: 20px 20px 0 0;
       padding: 20px; max-height: 90vh; overflow-y: auto;
-      animation: slideUp 0.3s ease;
     }
-    @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
-    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-bottom: 20px; border-bottom: 1px solid #eee;
+      padding-bottom: 10px;
+    }
 
-    /* Loading spinner */
-    .spinner {
-      width: 24px; height: 24px; border: 3px solid var(--secondary); border-top: 3px solid var(--primary);
-      border-radius: 50%; animation: spin 1s linear infinite;
-      margin: 20px auto;
-    }
-    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-    /* Client detail view */
-    .client-detail {
-      background: var(--white); border-radius: 12px; padding: 20px; margin-bottom: 15px;
-      box-shadow: var(--shadow);
-    }
-    .client-detail h3 { margin-bottom: 12px; color: var(--primary); }
-    .client-info { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 15px; }
-    .client-info div { font-size: 0.9rem; }
-    .client-info strong { color: var(--text-dark); }
-
-    /* Agenda item */
-    .appt-item {
-      padding: 12px; border-left: 4px solid var(--primary); border-radius: 0 8px 8px 0;
-      background: #fff9f9;
-      margin-bottom: 8px;
-    }
-    .appt-time { font-weight: 600; color: var(--primary); }
-    .appt-client { font-size: 0.95rem; margin: 4px 0; }
-    .appt-service { font-size: 0.85rem; color: var(--text-light); }
-
-    /* Command item */
-    .cmd-item {
-      display: flex; justify-content: space-between; padding: 8px 0;
-      border-bottom: 1px dashed #eee;
-    }
-    .cmd-item:last-child { border-bottom: none; }
-
-    /* WhatsApp modal */
-    .whatsapp-actions {
-      display: flex; gap: 10px; margin-top: 15px;
-    }
-    .whatsapp-btn {
-      flex: 1; padding: 10px; border-radius: 8px; font-weight: 500;
-      display: flex; align-items: center; justify-content: center;
-      gap: 6px;
-    }
-    .btn-whats { background: #25D366; color: white; }
-    .btn-edit { background: var(--secondary); color: var(--primary-dark); }
-    .btn-delete { background: var(--danger); color: white; }
-
-    /* Responsive tweaks */
+    /* Responsive */
     @media (max-width: 480px) {
-      .grid-3 { grid-template-columns: 1fr; }
       .nav-item span { display: none; }
       .nav-item i { font-size: 1.5rem; }
       .header-title { font-size: 1rem; }
@@ -243,167 +196,82 @@
 </head>
 <body>
 
-  <!-- SPLASH SCREEN -->
-  <div id="splash-screen">
+  <!-- SPLASH -->
+  <div id="splash">
     <div class="logo-splash">
       <h1>Estúdio Amor que Cuida</h1>
       <p>by Andressa Vieira</p>
     </div>
-    <p style="color: var(--text-light); font-size: 0.9rem;">Carregando...</p>
-    <div class="spinner"></div>
+    <div style="margin-top: 20px; color: var(--text-light);">Carregando...</div>
   </div>
 
-  <!-- TELA DE LOGIN INTELIGENTE -->
-  <div id="auth-screen">
-    <div class="logo-area">
-      <h1>Amor que Cuida</h1>
-      <p>by Andressa Vieira</p>
-    </div>
-    
-    <!-- Passo 1: Identificação -->
-    <div class="login-card" id="step-identify">
+  <!-- LOGIN SCREEN -->
+  <div id="login-screen">
+    <div class="login-card">
+      <h2 style="text-align:center; margin-bottom:20px; color:var(--primary);">Entrar</h2>
       <div class="input-group">
         <label>Usuário (nome.sobrenome)</label>
         <input type="text" id="username" placeholder="ex: andressa.vieira" autocomplete="off">
       </div>
-      <button class="btn-primary" id="btn-check-user">Continuar</button>
-      <p id="login-msg"></p>
-    </div>
-
-    <!-- Passo 2A: Criar Senha -->
-    <div class="login-card hidden" id="step-create-pass">
-      <h3 style="margin-bottom:15px; font-size:1.1rem;">Olá! Crie sua senha</h3>
-      <p style="font-size:0.85rem; color:var(--text-light); margin-bottom:15px;">Primeiro acesso detectado.</p>
-      <div class="input-group">
-        <label>Nova Senha</label>
-        <input type="password" id="new-password" placeholder="Mínimo 6 caracteres">
-      </div>
-      <button class="btn-primary" id="btn-create-pass">Salvar e Entrar</button>
-      <button class="btn-primary btn-secondary" id="btn-back-1">Voltar</button>
-    </div>
-
-    <!-- Passo 2B: Login -->
-    <div class="login-card hidden" id="step-login-pass">
-      <h3 style="margin-bottom:15px; font-size:1.1rem;">Bem-vindo(a)!</h3>
-      <div class="input-group">
-        <label>Sua Senha</label>
-        <input type="password" id="existing-password" placeholder="••••••••">
-      </div>
-      <button class="btn-primary" id="btn-do-login">Entrar</button>
-      <button class="btn-primary btn-secondary" id="btn-back-2">Voltar</button>
-      <p id="login-msg-2" style="margin-top:10px; font-size:0.8rem; color:var(--danger); text-align:center;"></p>
+      <button class="btn btn-primary" id="btn-login">Continuar</button>
+      <p id="msg"></p>
     </div>
   </div>
 
-  <!-- TELA DO APP -->
-  <div id="app-screen">
+  <!-- APP -->
+  <div id="app">
     <header>
-      <div class="header-title">Estúdio AQ Cuida</div>
-      <div class="user-badge" id="user-role-display">...</div>
+      <div class="header-title">Amor que Cuida</div>
+      <div class="user-role" id="role-display">...</div>
     </header>
 
     <main>
       <!-- HOME -->
-      <div id="view-home" class="view active">
-        <div class="grid-3 mb-2">
-          <div class="stat-box"><div class="stat-val" id="dash-revenue">R$ 0</div><div class="stat-lbl">Hoje</div></div>
-          <div class="stat-box"><div class="stat-val" id="dash-appts">0</div><div class="stat-lbl">Agendas</div></div>
-          <div class="stat-box"><div class="stat-val" id="dash-pending">0</div><div class="stat-lbl">Pendentes</div></div>
+      <div id="home" class="view active">
+        <div class="grid-3">
+          <div class="stat-box"><div class="stat-val" id="rev-today">R$ 0</div><div class="stat-lbl">Hoje</div></div>
+          <div class="stat-box"><div class="stat-val" id="appts-today">0</div><div class="stat-lbl">Agendas</div></div>
+          <div class="stat-box"><div class="stat-val" id="pending">0</div><div class="stat-lbl">Pendentes</div></div>
         </div>
-        <h3 style="margin: 15px 0 10px; font-size:1.1rem;">Próximos Horários</h3>
-        <div id="home-appointments-list"></div>
+        <h3 style="margin: 20px 0 10px;">Próximos Horários</h3>
+        <div id="home-appts"></div>
       </div>
 
       <!-- AGENDA -->
-      <div id="view-agenda" class="view">
+      <div id="agenda" class="view">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
           <h2>Minha Agenda</h2>
-          <input type="date" id="agenda-date-picker" style="padding:6px; border-radius:8px; border:1px solid var(--secondary); color:var(--primary);">
+          <input type="date" id="date-picker" style="padding:6px; border-radius:8px; border:1px solid var(--secondary);">
         </div>
         <div id="agenda-list"></div>
       </div>
 
       <!-- COMANDAS -->
-      <div id="view-comandas" class="view">
+      <div id="comandas" class="view">
         <h2>Comandas Abertas</h2>
-        <div id="comandas-list" class="mt-2"></div>
-      </div>
-
-      <!-- COBRANÇAS -->
-      <div id="view-cobrancas" class="view">
-        <h2>Cobranças Pendentes</h2>
-        <div id="cobrancas-list"></div>
+        <div id="comandas-list"></div>
       </div>
 
       <!-- CLIENTES -->
-      <div id="view-clientes" class="view">
+      <div id="clientes" class="view">
         <input type="text" id="search-client" placeholder="Buscar cliente..." style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--secondary); margin-bottom:15px;">
         <div id="clientes-list"></div>
       </div>
 
       <!-- MENSAGENS -->
-      <div id="view-mensagens" class="view">
+      <div id="mensagens" class="view">
         <h2>Mensagens Pré-definidas</h2>
-        <div id="templates-list" class="mt-2"></div>
+        <div id="templates-list"></div>
       </div>
 
       <!-- SERVIÇOS -->
-      <div id="view-servicos" class="view">
-        <h2>Serviços & Pacotes</h2>
-        <div id="servicos-list" class="mt-2"></div>
-      </div>
-
-      <!-- PRODUTOS -->
-      <div id="view-produtos" class="view">
-        <h2>Produtos & Estoque</h2>
-        <div id="produtos-list" class="mt-2"></div>
-      </div>
-
-      <!-- DESPESAS -->
-      <div id="view-despesas" class="view">
-        <h2>Despesas</h2>
-        <div id="despesas-list" class="mt-2"></div>
-      </div>
-
-      <!-- FUNCIONÁRIOS -->
-      <div id="view-funcionarios" class="view">
-        <h2>Profissionais & Comissão</h2>
-        <div id="funcionarios-list" class="mt-2"></div>
-      </div>
-
-      <!-- RELATÓRIOS -->
-      <div id="view-relatorios" class="view">
-        <h2>Performance</h2>
-        <div class="card">
-          <div class="grid-2">
-            <div><small>Receita</small><h3 id="rep-revenue" style="color:var(--success)">R$ 0</h3></div>
-            <div><small>Despesas</small><h3 id="rep-expenses" style="color:var(--danger)">R$ 0</h3></div>
-          </div>
-          <hr style="margin:10px 0; border:0; border-top:1px dashed #eee;">
-          <div style="text-align:center"><small>LUCRO</small><h2 id="rep-profit" style="color:var(--primary)">R$ 0</h2></div>
-        </div>
-
-        <h3 style="margin: 20px 0 10px; font-size:1.1rem;">Melhores Clientes</h3>
-        <div id="top-clients-list"></div>
-      </div>
-      
-      <!-- CLIENTE DETALHE -->
-      <div id="view-client-detail" class="view">
-        <div class="client-detail">
-          <h3 id="client-detail-name">Nome do Cliente</h3>
-          <div class="client-info">
-            <div><strong>Telefone:</strong> <span id="client-detail-phone"></span></div>
-            <div><strong>Aniversário:</strong> <span id="client-detail-birth"></span></div>
-            <div><strong>Último Atendimento:</strong> <span id="client-detail-last"></span></div>
-            <div><strong>Total Gasto:</strong> <span id="client-detail-total">R$ 0</span></div>
-          </div>
-        </div>
-        <h3>Histórico de Atendimentos</h3>
-        <div id="client-history-list"></div>
+      <div id="servicos" class="view">
+        <h2>Serviços</h2>
+        <div id="servicos-list"></div>
       </div>
 
       <!-- CONFIG -->
-      <div id="view-config" class="view">
+      <div id="config" class="view">
         <h2>Configurações</h2>
         <div class="card" id="btn-logout" style="cursor:pointer; color:var(--danger); text-align:center; font-weight:600;">
           <i class="fas fa-sign-out-alt"></i> Sair
@@ -417,124 +285,93 @@
       <div class="nav-item" data-view="agenda"><i class="fas fa-calendar-alt"></i><span>Agenda</span></div>
       <div class="nav-item" data-view="comandas"><i class="fas fa-file-invoice-dollar"></i><span>Comandas</span></div>
       <div class="nav-item" data-view="clientes"><i class="fas fa-user-friends"></i><span>Clientes</span></div>
-      <div class="nav-item" id="btn-menu-more"><i class="fas fa-bars"></i><span>Menu</span></div>
+      <div class="nav-item" id="more-btn"><i class="fas fa-bars"></i><span>Menu</span></div>
     </nav>
 
-    <button class="fab" id="btn-fab-appt"><i class="fas fa-plus"></i></button>
+    <button class="fab" id="fab-new-appt"><i class="fas fa-plus"></i></button>
   </div>
 
-  <!-- MODAL AGENDAMENTO -->
+  <!-- MODAL NOVO AGENDAMENTO -->
   <div id="modal-appt" class="modal">
     <div class="modal-content">
       <div class="modal-header">
         <h3>Novo Agendamento</h3>
-        <i class="fas fa-times" id="close-modal-appt" style="cursor:pointer; font-size:1.2rem;"></i>
+        <i class="fas fa-times" id="close-appt" style="cursor:pointer;"></i>
       </div>
-      <div class="input-group"><label>Cliente (Nome)</label><input type="text" id="appt-client-name"></div>
-      <div class="input-group"><label>WhatsApp</label><input type="tel" id="appt-whatsapp" placeholder="Ex: 11999999999"></div>
-      <div class="input-group"><label>Serviço</label><select id="appt-service" style="width:100%; padding:10px;"></select></div>
+      <div class="input-group">
+        <label>Cliente (Nome)</label>
+        <input type="text" id="appt-client-name" placeholder="Ex: Maria Silva">
+      </div>
+      <div class="input-group">
+        <label>WhatsApp</label>
+        <input type="tel" id="appt-phone" placeholder="11999999999">
+      </div>
+      <div class="input-group">
+        <label>Serviço</label>
+        <select id="appt-service"><option value="">Selecione...</option></select>
+      </div>
       <div class="grid-2">
         <div class="input-group"><label>Data</label><input type="date" id="appt-date"></div>
         <div class="input-group"><label>Hora</label><input type="time" id="appt-time"></div>
       </div>
-      <div class="input-group"><label>Profissional</label><select id="appt-professional" style="width:100%; padding:10px;" disabled></select></div>
-      <button class="btn-primary" id="btn-save-appt">Confirmar</button>
+      <button class="btn btn-primary" id="save-appt">Agendar</button>
     </div>
   </div>
 
   <!-- MODAL MENU -->
   <div id="modal-menu" class="modal">
-    <div class="modal-content" style="height: 50vh;">
-      <div class="modal-header"><h3>Menu</h3><i class="fas fa-times" id="close-modal-menu" style="cursor:pointer;"></i></div>
-      <div class="grid-2" style="gap:15px;">
-        <div class="card menu-link" data-view="cobrancas" style="text-align:center"><i class="fas fa-money-bill-wave" style="font-size:1.5rem; color:var(--primary)"></i><div>Cobranças</div></div>
-        <div class="card menu-link" data-view="mensagens" style="text-align:center"><i class="fab fa-whatsapp" style="font-size:1.5rem; color:var(--success)"></i><div>Mensagens</div></div>
-        <div class="card menu-link" data-view="servicos" style="text-align:center"><i class="fas fa-cut" style="font-size:1.5rem; color:var(--primary)"></i><div>Serviços</div></div>
-        <div class="card menu-link" data-view="produtos" style="text-align:center"><i class="fas fa-box" style="font-size:1.5rem; color:var(--warning)"></i><div>Estoque</div></div>
-        <div class="card menu-link" data-view="despesas" style="text-align:center"><i class="fas fa-receipt" style="font-size:1.5rem; color:var(--danger)"></i><div>Despesas</div></div>
-        <div class="card menu-link" data-view="funcionarios" style="text-align:center"><i class="fas fa-users" style="font-size:1.5rem; color:var(--text-light)"></i><div>Equipe</div></div>
-        <div class="card menu-link admin-only hidden" data-view="relatorios" style="text-align:center"><i class="fas fa-chart-pie" style="font-size:1.5rem; color:var(--primary)"></i><div>Relatórios</div></div>
-        <div class="card menu-link" data-view="config" style="text-align:center"><i class="fas fa-cog" style="font-size:1.5rem; color:var(--text-light)"></i><div>Config</div></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- MODAL WHATSAPP -->
-  <div id="modal-whats" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h3>Enviar Mensagem</h3>
-        <i class="fas fa-times" id="close-modal-whats" style="cursor:pointer;"></i>
-      </div>
-      <div id="whats-preview" style="background:#f8f9fa; padding:15px; border-radius:8px; margin-bottom:15px; font-size:0.9rem;"></div>
-      <div class="whatsapp-actions">
-        <button class="whatsapp-btn btn-whats" id="btn-send-whats"><i class="fab fa-whatsapp"></i> Enviar</button>
-        <button class="whatsapp-btn btn-edit" id="btn-edit-whats"><i class="fas fa-edit"></i> Editar</button>
-        <button class="whatsapp-btn btn-delete" id="btn-cancel-whats"><i class="fas fa-times"></i> Cancelar</button>
+    <div class="modal-content" style="height: 40vh;">
+      <div class="modal-header"><h3>Menu</h3><i class="fas fa-times" id="close-menu" style="cursor:pointer;"></i></div>
+      <div class="grid-2" style="gap:12px;">
+        <div class="card" onclick="switchView('comandas')">Comandas</div>
+        <div class="card" onclick="switchView('clientes')">Clientes</div>
+        <div class="card" onclick="switchView('mensagens')">Mensagens</div>
+        <div class="card" onclick="switchView('servicos')">Serviços</div>
+        <div class="card" onclick="switchView('config')">Config</div>
       </div>
     </div>
   </div>
 
   <script>
-    // --- CONFIG ---
+    // --- SUPABASE CONFIG ---
     const SUPABASE_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
     const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     let currentUser = null;
     let userProfile = null;
-    let tempUsername = null;
-    let servicesCache = [];
-    let clientsCache = [];
+    let services = [];
 
     // --- INIT ---
     document.addEventListener('DOMContentLoaded', async () => {
       // Hide splash after 1s
-      setTimeout(() => document.getElementById('splash-screen').style.display = 'none', 1200);
+      setTimeout(() => document.getElementById('splash').style.display = 'none', 1000);
 
-      // Event Listeners
-      document.getElementById('btn-check-user').addEventListener('click', checkUser);
-      document.getElementById('btn-create-pass').addEventListener('click', createPassword);
-      document.getElementById('btn-do-login').addEventListener('click', doLogin);
-      document.getElementById('btn-back-1').addEventListener('click', resetLogin);
-      document.getElementById('btn-back-2').addEventListener('click', resetLogin);
-      document.getElementById('btn-logout').addEventListener('click', handleLogout);
-      document.getElementById('btn-fab-appt').addEventListener('click', () => openModal('modal-appt'));
-      document.getElementById('close-modal-appt').addEventListener('click', () => closeModal('modal-appt'));
-      document.getElementById('btn-save-appt').addEventListener('click', saveAppointment);
-      document.getElementById('btn-menu-more').addEventListener('click', () => openModal('modal-menu'));
-      document.getElementById('close-modal-menu').addEventListener('click', () => closeModal('modal-menu'));
-      document.getElementById('agenda-date-picker').addEventListener('change', loadAgenda);
+      // Event listeners
+      document.getElementById('btn-login').addEventListener('click', handleLogin);
+      document.getElementById('date-picker').addEventListener('change', loadAgenda);
       document.getElementById('search-client').addEventListener('input', debounce(searchClients, 300));
+      document.getElementById('fab-new-appt').addEventListener('click', () => openModal('modal-appt'));
+      document.getElementById('close-appt').addEventListener('click', () => closeModal('modal-appt'));
+      document.getElementById('save-appt').addEventListener('click', saveAppointment);
+      document.getElementById('more-btn').addEventListener('click', () => openModal('modal-menu'));
+      document.getElementById('close-menu').addEventListener('click', () => closeModal('modal-menu'));
+      document.getElementById('btn-logout').addEventListener('click', handleLogout);
 
-      // Nav Links
+      // Nav
       document.querySelectorAll('.nav-item[data-view]').forEach(el => {
-        el.addEventListener('click', (e) => router(e.currentTarget.dataset.view, e.currentTarget));
-      });
-      document.querySelectorAll('.menu-link').forEach(el => {
-        el.addEventListener('click', (e) => {
-          router(e.currentTarget.dataset.view, null);
-          closeModal('modal-menu');
-        });
+        el.addEventListener('click', () => switchView(el.dataset.view));
       });
 
-      // WhatsApp modal
-      document.getElementById('btn-send-whats').addEventListener('click', sendWhatsMessage);
-      document.getElementById('btn-edit-whats').addEventListener('click', () => {
-        alert('Editar mensagem não implementado ainda — será feito com editor simples.');
-      });
-      document.getElementById('btn-cancel-whats').addEventListener('click', () => closeModal('modal-whats'));
+      // Load services
+      const { data } = await supabase.from('services').select('*').eq('is_active', true);
+      services = data || [];
+      const sel = document.getElementById('appt-service');
+      services.forEach(s => sel.innerHTML += `<option value="${s.id}">${s.name} (${s.duration_minutes}min)</option>`);
 
-      // Check Session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        currentUser = session.user;
-        await loadUserProfile();
-        showApp();
-      }
-
+      // Set today
       const today = new Date().toISOString().split('T')[0];
-      document.getElementById('agenda-date-picker').value = today;
+      document.getElementById('date-picker').value = today;
       document.getElementById('appt-date').value = today;
     });
 
@@ -542,12 +379,8 @@
     function debounce(func, wait) {
       let timeout;
       return function executedFunction(...args) {
-        const later = () => {
-          clearTimeout(timeout);
-          func(...args);
-        };
         clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
+        timeout = setTimeout(() => func(...args), wait);
       };
     }
 
@@ -565,113 +398,108 @@
       return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(val) || 0);
     }
 
-    // --- AUTH LOGIC ---
-    async function checkUser() {
+    // --- LOGIN LOGIC ---
+    async function handleLogin() {
       const username = document.getElementById('username').value.trim().toLowerCase();
-      const msg = document.getElementById('login-msg');
+      const msgEl = document.getElementById('msg');
       
-      if (!username) { msg.innerText = "Digite usuário."; msg.style.color = "var(--danger)"; return; }
-      msg.innerText = "Verificando..."; msg.style.color = "var(--text-light)";
-      tempUsername = username;
-
-      // 1. Checar se existe na tabela profiles
-      const { data: profile, error } = await supabase.from('profiles').select('*').eq('username', username).single();
-
-      if (error || !profile) {
-        msg.innerText = "Usuário não encontrado.";
-        msg.style.color = "var(--danger)";
+      if (!username) {
+        msgEl.textContent = "Digite seu usuário (nome.sobrenome)";
+        msgEl.className = 'error';
         return;
       }
 
-      // 2. Verificar first_login
-      if (profile.first_login) {
-        // Tenta logar com senha padrão 123456
-        const email = `${username}@estudio.local`;
-        const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password: '123456' });
-        
-        if (data && data.user) {
-          currentUser = data.user;
-          userProfile = profile;
-          document.getElementById('step-identify').classList.add('hidden');
-          document.getElementById('step-create-pass').classList.remove('hidden');
-        } else {
-          msg.innerText = "Erro: Senha padrão incorreta no sistema.";
-          msg.style.color = "var(--danger)";
-        }
+      msgEl.textContent = "Verificando...";
+      msgEl.className = '';
+
+      // Busca pelo username
+      const { data, error } = await supabase.from('profiles').select('*').eq('username', username).single();
+
+      if (error || !data) {
+        msgEl.textContent = "Usuário não encontrado ou desativado.";
+        msgEl.className = 'error';
+        return;
+      }
+
+      if (!data.is_active) {
+        msgEl.textContent = "Conta desativada.";
+        msgEl.className = 'error';
+        return;
+      }
+
+      currentUser = data;
+      userProfile = data;
+
+      if (data.first_login) {
+        // Primeiro acesso: pede nova senha
+        document.getElementById('login-screen').innerHTML = `
+          <div class="login-card">
+            <h3 style="text-align:center; margin-bottom:20px; color:var(--primary);">Crie sua senha</h3>
+            <div class="input-group">
+              <label>Nova Senha (mín. 6 caracteres)</label>
+              <input type="password" id="new-pass" placeholder="••••••">
+            </div>
+            <button class="btn btn-primary" id="btn-set-pass">Salvar e Entrar</button>
+            <p id="msg2" style="margin-top:15px;"></p>
+          </div>
+        `;
+        document.getElementById('btn-set-pass').addEventListener('click', async () => {
+          const pwd = document.getElementById('new-pass').value;
+          if (pwd.length < 6) {
+            document.getElementById('msg2').textContent = "Senha muito curta";
+            document.getElementById('msg2').className = 'error';
+            return;
+          }
+          const { error } = await supabase.auth.updateUser({ password: pwd });
+          if (error) {
+            document.getElementById('msg2').textContent = "Erro: " + error.message;
+            document.getElementById('msg2').className = 'error';
+            return;
+          }
+          // Atualiza first_login
+          await supabase.from('profiles').update({ first_login: false }).eq('id', data.id);
+          showApp();
+        });
       } else {
-        document.getElementById('step-identify').classList.add('hidden');
-        document.getElementById('step-login-pass').classList.remove('hidden');
+        // Já tem senha → pede login
+        document.getElementById('login-screen').innerHTML = `
+          <div class="login-card">
+            <h3 style="text-align:center; margin-bottom:20px; color:var(--primary);">Digite sua senha</h3>
+            <div class="input-group">
+              <label>Senha</label>
+              <input type="password" id="login-pass" placeholder="••••••">
+            </div>
+            <button class="btn btn-primary" id="btn-do-login">Entrar</button>
+            <p id="msg2" style="margin-top:15px;"></p>
+          </div>
+        `;
+        document.getElementById('btn-do-login').addEventListener('click', async () => {
+          const pwd = document.getElementById('login-pass').value;
+          const email = `${username}@estudio.local`; // fake email para auth
+          const { data: session, error } = await supabase.auth.signInWithPassword({ email, password: pwd });
+          if (error) {
+            document.getElementById('msg2').textContent = "Senha incorreta";
+            document.getElementById('msg2').className = 'error';
+            return;
+          }
+          currentUser = session.user;
+          await loadUserProfile();
+          showApp();
+        });
       }
-    }
-
-    async function createPassword() {
-      const newPass = document.getElementById('new-password').value;
-      if (newPass.length < 6) { 
-        alert("Senha deve ter pelo menos 6 caracteres"); 
-        return; 
-      }
-      
-      const { error } = await supabase.auth.updateUser({ password: newPass });
-      if (error) { 
-        alert("Erro ao atualizar senha: " + error.message); 
-        return; 
-      }
-
-      await supabase.from('profiles').update({ first_login: false }).eq('id', currentUser.id);
-      await loadUserProfile();
-      showApp();
-    }
-
-    async function doLogin() {
-      const pass = document.getElementById('existing-password').value;
-      const email = `${tempUsername}@estudio.local`;
-      const msg = document.getElementById('login-msg-2');
-
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
-      if (error) { 
-        msg.innerText = "Senha incorreta."; 
-        msg.style.color = "var(--danger)";
-        return; 
-      }
-      
-      currentUser = data.user;
-      await loadUserProfile();
-      showApp();
-    }
-
-    function resetLogin() {
-      document.querySelectorAll('.login-card').forEach(el => el.classList.add('hidden'));
-      document.getElementById('step-identify').classList.remove('hidden');
-      document.getElementById('login-msg').innerText = "";
-      document.getElementById('login-msg-2').innerText = "";
     }
 
     async function loadUserProfile() {
       const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
-      if (data) {
-        userProfile = data;
-        setupUI();
-        loadInitialData();
-      }
-    }
-
-    function setupUI() {
-      const roleDisplay = document.getElementById('user-role-display');
-      const adminItems = document.querySelectorAll('.admin-only');
-      
-      if (userProfile.role === 'proprietario') {
-        roleDisplay.innerText = "Proprietário";
-        adminItems.forEach(el => el.classList.remove('hidden'));
-      } else {
-        roleDisplay.innerText = "Freelancer";
-        adminItems.forEach(el => el.classList.add('hidden'));
-      }
-      subscribeToRealtime();
+      if (data) userProfile = data;
+      document.getElementById('role-display').textContent = 
+        userProfile.role === 'proprietario' ? 'Proprietário' : 'Freelancer';
     }
 
     function showApp() {
-      document.getElementById('auth-screen').style.display = 'none';
-      document.getElementById('app-screen').style.display = 'flex';
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app').style.display = 'flex';
+      loadDashboard();
     }
 
     async function handleLogout() {
@@ -680,391 +508,203 @@
     }
 
     // --- NAVIGATION ---
-    function router(viewName, navEl) {
-      document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
-      document.getElementById(`view-${viewName}`).classList.add('active');
-      
-      if (navEl) {
-        document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
-        navEl.classList.add('active');
-      }
+    function switchView(view) {
+      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+      document.getElementById(view).classList.add('active');
 
-      if (viewName === 'agenda') loadAgenda();
-      if (viewName === 'comandas') loadComandas();
-      if (viewName === 'cobrancas') loadCobrancas();
-      if (viewName === 'clientes') loadClientes();
-      if (viewName === 'mensagens') loadTemplates();
-      if (viewName === 'servicos') loadServices();
-      if (viewName === 'produtos') loadProducts();
-      if (viewName === 'despesas') loadExpenses();
-      if (viewName === 'funcionarios') loadProfessionals();
-      if (viewName === 'relatorios') loadReports();
-      if (viewName === 'home') loadDashboard();
-      if (viewName === 'client-detail') loadClientDetail();
+      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+      const activeNav = Array.from(document.querySelectorAll('.nav-item')).find(n => n.dataset.view === view);
+      if (activeNav) activeNav.classList.add('active');
+
+      if (view === 'agenda') loadAgenda();
+      if (view === 'comandas') loadComandas();
+      if (view === 'clientes') loadClientes();
+      if (view === 'mensagens') loadTemplates();
+      if (view === 'servicos') loadServicos();
+      if (view === 'home') loadDashboard();
     }
-
-    function openModal(id) { document.getElementById(id).classList.add('open'); }
-    function closeModal(id) { document.getElementById(id).classList.remove('open'); }
 
     // --- DATA LOADING ---
-    async function loadInitialData() {
-      const { data: servs } = await supabase.from('services').select('*').eq('is_active', true);
-      servicesCache = servs || [];
-      const sel = document.getElementById('appt-service');
-      sel.innerHTML = '<option value="">Selecione...</option>';
-      servicesCache.forEach(s => sel.innerHTML += `<option value="${s.id}">${s.name}</option>`);
-
-      const { data: profs } = await supabase.from('profiles').select('*').neq('role', 'cliente');
-      const selProf = document.getElementById('appt-professional');
-      selProf.innerHTML = '';
-      profs.forEach(p => selProf.innerHTML += `<option value="${p.id}">${p.full_name}</option>`);
-      
-      if (userProfile.role !== 'proprietario') selProf.value = currentUser.id;
-      else selProf.disabled = false;
-
-      loadDashboard();
-    }
-
     async function loadDashboard() {
       const today = new Date().toISOString().split('T')[0];
-      const { data: cmds } = await supabase.from('commands').select('total_amount').eq('status', 'paid').gte('closed_at', `${today}T00:00:00`);
-      const rev = cmds ? cmds.reduce((a, b) => a + parseFloat(b.total_amount), 0) : 0;
-      document.getElementById('dash-revenue').innerText = formatCurrency(rev);
+      const { data: cmds } = await supabase.from('commands')
+        .select('total_amount')
+        .eq('status', 'paid')
+        .gte('closed_at', `${today}T00:00:00`);
+      const rev = cmds?.reduce((a,b)=>a+parseFloat(b.total_amount),0) || 0;
+      document.getElementById('rev-today').textContent = formatCurrency(rev);
 
-      const { data: appts } = await supabase.from('appointments').select('id').gte('appointment_date', `${today}T00:00:00`).lte('appointment_date', `${today}T23:59:59`);
-      document.getElementById('dash-appts').innerText = appts ? appts.length : 0;
-      document.getElementById('dash-pending').innerText = appts ? appts.filter(a => a.status === 'pending').length : 0;
+      const { data: appts } = await supabase.from('appointments')
+        .select('id')
+        .gte('appointment_date', `${today}T00:00:00`)
+        .lte('appointment_date', `${today}T23:59:59`)
+        .eq('professional_id', userProfile.id);
+      document.getElementById('appts-today').textContent = appts?.length || 0;
 
-      loadAgendaList('home-appointments-list', 3);
+      const pending = appts?.filter(a => a.status === 'pending').length || 0;
+      document.getElementById('pending').textContent = pending;
+
+      // Próximos horários
+      const { data: nextAppts } = await supabase.from('appointments')
+        .select('client_name, client_phone, appointment_date, service_id, custom_service_name')
+        .gte('appointment_date', new Date().toISOString())
+        .eq('professional_id', userProfile.id)
+        .order('appointment_date', { ascending: true })
+        .limit(3);
+      
+      const list = document.getElementById('home-appts');
+      if (!nextAppts || nextAppts.length === 0) {
+        list.innerHTML = '<div class="card" style="text-align:center">Nenhum horário.</div>';
+        return;
+      }
+
+      list.innerHTML = nextAppts.map(a => {
+        const time = formatTime(a.appointment_date);
+        const svc = services.find(s => s.id == a.service_id)?.name || a.custom_service_name || 'Serviço';
+        return `<div class="card" style="border-left:4px solid var(--primary)">
+          <div><strong>${time}</strong> - ${a.client_name}</div>
+          <div style="font-size:0.85rem; color:var(--text-light);">${svc}</div>
+        </div>`;
+      }).join('');
     }
 
     async function loadAgenda() {
-      loadAgendaList('agenda-list', 50, document.getElementById('agenda-date-picker').value);
-    }
+      const date = document.getElementById('date-picker').value;
+      const { data } = await supabase.from('appointments')
+        .select('client_name, client_phone, appointment_date, end_date, service_id, custom_service_name, status')
+        .gte('appointment_date', `${date}T00:00:00`)
+        .lte('appointment_date', `${date}T23:59:59`)
+        .eq('professional_id', userProfile.id)
+        .order('appointment_date', { ascending: true });
 
-    async function loadAgendaList(elId, limit, dateStr) {
-      const container = document.getElementById(elId);
-      let query = supabase.from('appointments')
-        .select('*, client:profiles(full_name, phone), service:services(name)')
-        .gte('appointment_date', `${dateStr}T00:00:00`).lte('appointment_date', `${dateStr}T23:59:59`)
-        .order('appointment_date', { ascending: true }).limit(limit);
-
-      if (userProfile.role !== 'proprietario') query = query.eq('professional_id', currentUser.id);
-
-      const { data } = await query;
-      if (!data || data.length === 0) { 
-        container.innerHTML = '<div class="card" style="text-align:center">Sem horários.</div>'; 
-        return; 
+      const list = document.getElementById('agenda-list');
+      if (!data || data.length === 0) {
+        list.innerHTML = '<div class="card" style="text-align:center">Nenhum horário.</div>';
+        return;
       }
 
-      container.innerHTML = data.map(a => {
-        const time = formatTime(a.appointment_date);
-        const statusBadge = a.status === 'pending' ? '<span class="badge badge-pending">Pendente</span>' : '';
-        return `
-          <div class="appt-item">
-            <div class="appt-time">${time}</div>
-            <div class="appt-client">${a.client?.full_name || 'Cliente'} ${statusBadge}</div>
-            <div class="appt-service">${a.service?.name || 'Serviço personalizado'}</div>
-          </div>`;
+      list.innerHTML = data.map(a => {
+        const start = formatTime(a.appointment_date);
+        const end = formatTime(a.end_date);
+        const svc = services.find(s => s.id == a.service_id)?.name || a.custom_service_name || 'Serviço';
+        const status = a.status === 'pending' ? '<span class="badge badge-pending">Pendente</span>' : '';
+        return `<div class="card">
+          <div><strong>${start}–${end}</strong> ${status}</div>
+          <div>${a.client_name} | ${a.client_phone}</div>
+          <div style="font-size:0.85rem; color:var(--text-light);">${svc}</div>
+        </div>`;
       }).join('');
     }
 
     async function loadComandas() {
-      const query = supabase.from('commands')
-        .select('*, client:profiles(full_name, phone)')
+      const { data } = await supabase.from('commands')
+        .select('client_name, client_phone, total_amount, status, opened_at')
+        .eq('professional_id', userProfile.id)
         .eq('status', 'open');
-      
-      if (userProfile.role !== 'proprietario') {
-        query.eq('professional_id', currentUser.id);
-      }
 
-      const { data } = await query;
-      const container = document.getElementById('comandas-list');
+      const list = document.getElementById('comandas-list');
       if (!data || data.length === 0) {
-        container.innerHTML = '<div class="card" style="text-align:center">Nenhuma comanda aberta.</div>';
+        list.innerHTML = '<div class="card" style="text-align:center">Nenhuma comanda aberta.</div>';
         return;
       }
 
-      container.innerHTML = data.map(c => `
+      list.innerHTML = data.map(c => `
         <div class="card">
-          <strong>${c.client?.full_name}</strong> | ${c.client?.phone}
-          <div>R$ ${c.total_amount}</div>
-          <button class="btn-primary mt-2" onclick="closeCommand('${c.id}')">Fechar</button>
-          <button class="btn-primary mt-2" style="background:#4A90E2;" onclick="openWhatsModal('${c.client?.phone}', '${c.client?.full_name}', 'reminder')">Lembrete</button>
-        </div>`).join('');
-    }
-
-    async function loadCobrancas() {
-      const query = supabase.from('commands')
-        .select('*, client:profiles(full_name, phone)')
-        .eq('status', 'debt');
-      
-      if (userProfile.role !== 'proprietario') {
-        query.eq('professional_id', currentUser.id);
-      }
-
-      const { data } = await query;
-      const container = document.getElementById('cobrancas-list');
-      if (!data || data.length === 0) {
-        container.innerHTML = '<div class="card" style="text-align:center">Sem débitos.</div>';
-        return;
-      }
-
-      container.innerHTML = data.map(c => `
-        <div class="card" style="border-left:4px solid var(--danger)">
-          <strong>${c.client?.full_name}</strong> | ${c.client?.phone}
-          <div>R$ ${c.total_amount}</div>
-          <button class="btn-primary mt-2" onclick="openWhatsModal('${c.client?.phone}', '${c.client?.full_name}', 'confirmation')">Confirmar</button>
+          <div><strong>${c.client_name}</strong> | ${c.client_phone}</div>
+          <div>${formatCurrency(c.total_amount)}</div>
+          <div style="font-size:0.8rem; color:var(--text-light);">${formatDate(c.opened_at)}</div>
         </div>`).join('');
     }
 
     async function loadClientes() {
-      const q = supabase.from('profiles').select('*').eq('role', 'cliente').limit(20);
-      const { data } = await q;
-      clientsCache = data || [];
-      const container = document.getElementById('clientes-list');
-      if (!data || data.length === 0) {
-        container.innerHTML = '<div class="card" style="text-align:center">Sem clientes.</div>';
+      const term = document.getElementById('search-client').value.toLowerCase();
+      let query = supabase.from('appointments')
+        .select('client_name, client_phone', { count: 'exact' })
+        .eq('professional_id', userProfile.id)
+        .neq('client_name', '');
+
+      if (term) {
+        query = query.or(`client_name.ilike.%${term}%,client_phone.ilike.%${term}%`);
+      }
+
+      const { data } = await query;
+      const unique = Array.from(new Map(data.map(item => [item.client_phone, item])).values());
+
+      const list = document.getElementById('clientes-list');
+      if (!unique || unique.length === 0) {
+        list.innerHTML = '<div class="card" style="text-align:center">Nenhum cliente.</div>';
         return;
       }
 
-      container.innerHTML = data.map(c => `
-        <div class="card" onclick="showClientDetail('${c.id}')">
-          <strong>${c.full_name}</strong><br>
-          <small>${c.phone}</small>
-        </div>`).join('');
-    }
-
-    function searchClients(e) {
-      const term = e.target.value.toLowerCase();
-      const filtered = clientsCache.filter(c => 
-        c.full_name.toLowerCase().includes(term) || c.phone.includes(term)
-      );
-      const container = document.getElementById('clientes-list');
-      if (filtered.length === 0) {
-        container.innerHTML = '<div class="card" style="text-align:center">Nenhum cliente encontrado.</div>';
-        return;
-      }
-      container.innerHTML = filtered.map(c => `
-        <div class="card" onclick="showClientDetail('${c.id}')">
-          <strong>${c.full_name}</strong><br>
-          <small>${c.phone}</small>
+      list.innerHTML = unique.map(c => `
+        <div class="card">
+          <strong>${c.client_name}</strong><br>
+          <small>${c.client_phone}</small>
         </div>`).join('');
     }
 
     async function loadTemplates() {
-      const { data } = await supabase.from('message_templates').select('*');
-      const container = document.getElementById('templates-list');
+      const { data } = await supabase.from('message_templates').select('*').eq('is_active', true);
+      const list = document.getElementById('templates-list');
       if (!data || data.length === 0) {
-        container.innerHTML = '<div class="card" style="text-align:center">Sem templates.</div>';
+        list.innerHTML = '<div class="card" style="text-align:center">Sem templates.</div>';
         return;
       }
-
-      container.innerHTML = data.map(t => `
+      list.innerHTML = data.map(t => `
         <div class="card">
           <strong>${t.name}</strong>
-          <p style="font-size:0.85rem; margin:6px 0;">${t.body.substring(0, 80)}${t.body.length > 80 ? '...' : ''}</p>
-          <button class="btn-primary mt-2" onclick="openWhatsModal(null, null, '${t.type}', '${t.id}')">Usar</button>
+          <p style="font-size:0.85rem; margin:6px 0;">${t.body.substring(0, 70)}${t.body.length > 70 ? '...' : ''}</p>
         </div>`).join('');
     }
 
-    async function loadServices() {
-      const { data } = await supabase.from('services').select('*');
-      const container = document.getElementById('servicos-list');
+    async function loadServicos() {
+      const { data } = await supabase.from('services').select('*').eq('is_active', true);
+      const list = document.getElementById('servicos-list');
       if (!data || data.length === 0) {
-        container.innerHTML = '<div class="card" style="text-align:center">Sem serviços.</div>';
+        list.innerHTML = '<div class="card" style="text-align:center">Sem serviços.</div>';
         return;
       }
-
-      container.innerHTML = data.map(s => `
+      list.innerHTML = data.map(s => `
         <div class="card">
-          <strong>${s.name}</strong> - ${s.duration_minutes}min<br>
-          ${formatCurrency(s.price)} | Custo: ${formatCurrency(s.cost_price || 0)}
+          <strong>${s.name}</strong> (${s.duration_minutes}min)
+          <div>${formatCurrency(s.price)} | Custo: ${formatCurrency(s.cost_price)}</div>
         </div>`).join('');
-    }
-
-    async function loadProducts() {
-      const { data } = await supabase.from('products').select('*');
-      const container = document.getElementById('produtos-list');
-      if (!data || data.length === 0) {
-        container.innerHTML = '<div class="card" style="text-align:center">Sem produtos.</div>';
-        return;
-      }
-
-      container.innerHTML = data.map(p => `
-        <div class="card">
-          <strong>${p.name}</strong><br>
-          ${formatCurrency(p.sale_price)} | Estoque: ${p.stock_qty}
-        </div>`).join('');
-    }
-
-    async function loadExpenses() {
-      const { data } = await supabase.from('expenses').select('*').limit(10);
-      const container = document.getElementById('despesas-list');
-      if (!data || data.length === 0) {
-        container.innerHTML = '<div class="card" style="text-align:center">Sem despesas.</div>';
-        return;
-      }
-
-      container.innerHTML = data.map(e => `
-        <div class="card">
-          <strong>${e.description}</strong> - ${e.category}<br>
-          ${formatCurrency(e.amount)} | ${e.date}
-        </div>`).join('');
-    }
-
-    async function loadProfessionals() {
-      const { data } = await supabase.from('profiles').select('*').neq('role', 'cliente');
-      const container = document.getElementById('funcionarios-list');
-      if (!data || data.length === 0) {
-        container.innerHTML = '<div class="card" style="text-align:center">Sem equipe.</div>';
-        return;
-      }
-
-      container.innerHTML = data.map(p => `
-        <div class="card">
-          <strong>${p.full_name}</strong> (${p.commission_rate}%)
-        </div>`).join('');
-    }
-
-    async function loadReports() {
-      if (userProfile.role !== 'proprietario') return;
-      
-      const { data: rev } = await supabase.from('commands').select('total_amount').eq('status', 'paid');
-      const { data: exp } = await supabase.from('expenses').select('amount');
-      const tRev = rev?.reduce((a,b)=>a+parseFloat(b.total_amount),0)||0;
-      const tExp = exp?.reduce((a,b)=>a+parseFloat(b.amount),0)||0;
-      document.getElementById('rep-revenue').innerText = formatCurrency(tRev);
-      document.getElementById('rep-expenses').innerText = formatCurrency(tExp);
-      document.getElementById('rep-profit').innerText = formatCurrency(tRev - tExp);
-
-      // Top clients
-      const { data: topClients } = await supabase.rpc('get_top_clients', { limit_count: 8 });
-      const list = document.getElementById('top-clients-list');
-      if (!topClients || topClients.length === 0) {
-        list.innerHTML = '<div class="card" style="text-align:center">Nenhum cliente ainda.</div>';
-        return;
-      }
-      list.innerHTML = topClients.map(c => `
-        <div class="card">
-          <strong>${c.full_name}</strong>
-          <div style="text-align:right">${formatCurrency(c.total)}</div>
-        </div>`).join('');
-    }
-
-    async function loadClientDetail() {
-      const url = new URL(window.location);
-      const clientId = url.searchParams.get('client_id');
-      if (!clientId) {
-        router('clientes');
-        return;
-      }
-
-      const { data: client } = await supabase.from('profiles').select('*').eq('id', clientId).single();
-      if (!client) {
-        alert('Cliente não encontrado');
-        router('clientes');
-        return;
-      }
-
-      document.getElementById('client-detail-name').innerText = client.full_name;
-      document.getElementById('client-detail-phone').innerText = client.phone;
-      document.getElementById('client-detail-birth').innerText = client.birth_date ? new Date(client.birth_date).toLocaleDateString('pt-BR') : '-';
-      
-      // Last appointment
-      const { data: lastAppt } = await supabase.from('appointments')
-        .select('appointment_date')
-        .eq('client_id', clientId)
-        .order('appointment_date', { ascending: false })
-        .limit(1);
-      document.getElementById('client-detail-last').innerText = lastAppt?.[0]?.appointment_date 
-        ? new Date(lastAppt[0].appointment_date).toLocaleDateString('pt-BR') 
-        : '-';
-
-      // Total spent
-      const { data: total } = await supabase.from('commands')
-        .select('total_amount')
-        .eq('client_id', clientId)
-        .eq('status', 'paid');
-      const sum = total?.reduce((a,b)=>a+parseFloat(b.total_amount),0) || 0;
-      document.getElementById('client-detail-total').innerText = formatCurrency(sum);
-
-      // History
-      const { data: history } = await supabase.from('client_history')
-        .select('*, command:commands(total_amount), appointment:appointments(service_id, professional_id)')
-        .eq('client_id', clientId)
-        .order('performed_at', { ascending: false });
-      
-      const histEl = document.getElementById('client-history-list');
-      if (!history || history.length === 0) {
-        histEl.innerHTML = '<div class="card" style="text-align:center">Nenhum histórico.</div>';
-        return;
-      }
-
-      histEl.innerHTML = history.map(h => {
-        const svcName = servicesCache.find(s => s.id == h.appointment?.service_id)?.name || 'Serviço';
-        const profName = (h.appointment?.professional_id && 
-          clientsCache.find(p => p.id == h.appointment.professional_id)?.full_name) || '—';
-        return `
-          <div class="card">
-            <div><strong>${svcName}</strong> | ${profName}</div>
-            <div>${h.details || '—'}</div>
-            <div style="font-size:0.8rem; color:var(--text-light);">
-              ${formatCurrency(h.command?.total_amount || 0)} | ${formatDate(h.performed_at)}
-            </div>
-          </div>`;
-      }).join('');
     }
 
     // --- ACTIONS ---
     async function saveAppointment() {
       const name = document.getElementById('appt-client-name').value.trim();
-      const phone = document.getElementById('appt-whatsapp').value.replace(/\D/g, '');
+      const phone = document.getElementById('appt-phone').value.replace(/\D/g, '');
       const servId = document.getElementById('appt-service').value;
       const date = document.getElementById('appt-date').value;
       const time = document.getElementById('appt-time').value;
-      const profId = document.getElementById('appt-professional').value;
 
-      if(!name || !phone || !servId || !date || !time) { 
-        alert("Preencha todos os campos obrigatórios."); 
-        return; 
+      if (!name || !phone || !servId || !date || !time) {
+        alert("Preencha todos os campos.");
+        return;
       }
 
-      // Validate phone length
       if (phone.length < 10) {
         alert("Número de WhatsApp inválido.");
         return;
       }
 
       const start = `${date}T${time}:00`;
-      const serv = servicesCache.find(s=>s.id==servId);
+      const serv = services.find(s => s.id == servId);
       const duration = serv?.duration_minutes || 60;
       const end = new Date(new Date(start).getTime() + duration*60000).toISOString();
 
-      let clientId = null;
-      const { data: exist } = await supabase.from('profiles').select('id').eq('phone', phone).single();
-      if(exist) {
-        clientId = exist.id;
-      } else {
-        const { data: newC } = await supabase.from('profiles').insert({
-          full_name: name,
-          phone,
-          role: 'cliente',
-          username: `cliente_${phone}`
-        }).select().single();
-        clientId = newC.id;
-      }
-
       const { error } = await supabase.from('appointments').insert({
-        client_id: clientId,
-        professional_id: profId,
+        client_name: name,
+        client_phone: phone,
+        professional_id: userProfile.id,
         service_id: servId,
         appointment_date: start,
         end_date: end,
         status: 'pending'
       });
 
-      if(error) {
+      if (error) {
         console.error(error);
         alert("Erro ao agendar: " + error.message);
       } else {
@@ -1075,82 +715,12 @@
       }
     }
 
-    async function closeCommand(id) {
-      const { error } = await supabase.from('commands')
-        .update({ status: 'paid', closed_at: new Date().toISOString() })
-        .eq('id', id);
-      if (error) {
-        alert("Erro ao fechar comanda: " + error.message);
-      } else {
-        loadComandas();
-        loadDashboard();
-      }
+    // --- MODALS ---
+    function openModal(id) {
+      document.getElementById(id).classList.add('open');
     }
-
-    function openWhatsModal(phone, name, type, templateId = null) {
-      let body = '';
-      let title = '';
-
-      if (templateId) {
-        const tmpl = (supabase?.rpc?.templates || []).find(t => t.id == templateId) || 
-                    servicesCache.find(t => t.id == templateId) ||
-                    { body: 'Mensagem pré-definida não encontrada.' };
-        body = tmpl.body || '';
-        title = tmpl.name || 'Mensagem';
-      } else {
-        const now = new Date();
-        const dateStr = now.toLocaleDateString('pt-BR');
-        const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-        switch(type) {
-          case 'reminder':
-            body = `Olá ${name || 'Cliente'}! 🌸 Lembrete: seu horário é hoje, ${dateStr} às ${timeStr}. Até breve! 💕`;
-            title = 'Lembrete';
-            break;
-          case 'confirmation':
-            body = `Olá ${name || 'Cliente'}! 🌸 Confirmamos seu horário para ${dateStr} às ${timeStr}. Até breve! 💕`;
-            title = 'Confirmação';
-            break;
-          default:
-            body = `Olá ${name || 'Cliente'}! 🌸 Estúdio Amor que Cuida.`;
-            title = 'Mensagem';
-        }
-      }
-
-      document.getElementById('whats-preview').innerHTML = body.replace(/{nome}/g, name || 'Cliente')
-        .replace(/{data}/g, formatDate(new Date()))
-        .replace(/{hora}/g, formatTime(new Date()));
-      document.getElementById('modal-whats').dataset.phone = phone;
-      document.getElementById('modal-whats').dataset.name = name;
-      document.getElementById('modal-whats').dataset.type = type;
-      openModal('modal-whats');
-    }
-
-    async function sendWhatsMessage() {
-      const phone = document.getElementById('modal-whats').dataset.phone;
-      const name = document.getElementById('modal-whats').dataset.name;
-      const type = document.getElementById('modal-whats').dataset.type;
-      const msg = document.getElementById('whats-preview').innerText;
-
-      // Simula envio (real integração via webhook futuramente)
-      alert(`✅ Mensagem enviada para ${phone}\n\n${msg}`);
-      closeModal('modal-whats');
-    }
-
-    function showClientDetail(clientId) {
-      window.history.pushState({}, '', `?client_id=${clientId}`);
-      router('client-detail');
-    }
-
-    function subscribeToRealtime() {
-      supabase.channel('public:appointments').on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
-        if(document.getElementById('view-agenda').classList.contains('active')) loadAgenda();
-        if(document.getElementById('view-home').classList.contains('active')) loadDashboard();
-      }).subscribe();
-
-      supabase.channel('public:commands').on('postgres_changes', { event: '*', schema: 'public', table: 'commands' }, () => {
-        if(document.getElementById('view-comandas').classList.contains('active')) loadComandas();
-        if(document.getElementById('view-home').classList.contains('active')) loadDashboard();
-      }).subscribe();
+    function closeModal(id) {
+      document.getElementById(id).classList.remove('open');
     }
   </script>
 </body>

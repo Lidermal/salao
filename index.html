@@ -1,201 +1,21 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Estúdio Amor que Cuida</title>
 
   <!-- Supabase SDK -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
   <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
 
-  <style>
-    :root {
-      --primary: #B76E79;      /* Rose Gold */
-      --primary-dark: #965A64;
-      --secondary: #F4C2C2;    /* Blush */
-      --bg-color: #FDF6F0;     /* Cream */
-      --text-dark: #4A3B3B;
-      --text-light: #8C7B7B;
-      --white: #FFFFFF;
-      --danger: #E74C3C;
-      --success: #27AE60;
-      --warning: #F39C12;
-      --shadow: 0 4px 15px rgba(183, 110, 121, 0.15);
-      --radius: 16px;
-      --nav-height: 65px;
-      --safe-bottom: env(safe-area-inset-bottom, 20px);
-    }
-
-    * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-    
-    body {
-      font-family: 'Poppins', sans-serif;
-      background-color: var(--bg-color);
-      color: var(--text-dark);
-      height: 100vh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-
-    h1, h2, h3 { font-family: 'Playfair Display', serif; color: var(--primary); }
-    button { cursor: pointer; border: none; outline: none; font-family: inherit; }
-    input, select, textarea { font-family: inherit; }
-
-    /* --- SPLASH --- */
-    #splash {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: linear-gradient(135deg, var(--bg-color), var(--secondary));
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      z-index: 999;
-      text-align: center;
-      padding: 20px;
-    }
-    .logo-splash h1 {
-      font-size: 2.4rem; margin: 10px 0; background: linear-gradient(to right, var(--primary), #965A64);
-      -webkit-background-clip: text; color: transparent;
-    }
-    .logo-splash p { color: var(--text-light); font-style: italic; }
-
-    /* --- LOGIN --- */
-    #login-screen {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: linear-gradient(135deg, var(--bg-color), var(--secondary));
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      z-index: 999;
-      padding: 20px;
-    }
-    .login-card {
-      background: white; padding: 30px; border-radius: var(--radius);
-      width: 100%; max-width: 380px; box-shadow: var(--shadow);
-      transition: all 0.3s ease;
-    }
-    .input-group { margin-bottom: 18px; }
-    .input-group label { display: block; margin-bottom: 6px; font-size: 0.85rem; color: var(--text-light); }
-    .input-group input {
-      width: 100%; padding: 13px; border: 1px solid var(--secondary);
-      border-radius: 8px; font-size: 1rem; outline: none;
-    }
-    .input-group input:focus { border-color: var(--primary); }
-    .btn {
-      width: 100%; padding: 14px; border-radius: 8px; font-size: 1rem; font-weight: 600;
-      transition: 0.3s;
-    }
-    .btn-primary {
-      background: var(--primary); color: white;
-    }
-    .btn-primary:active { transform: scale(0.98); background: var(--primary-dark); }
-    .btn-secondary {
-      background: var(--secondary); color: var(--primary-dark); margin-top: 10px;
-    }
-    #msg { margin-top: 15px; font-size: 0.85rem; min-height: 20px; text-align: center; }
-    .error { color: var(--danger); }
-    .success { color: var(--success); }
-
-    /* --- APP --- */
-    #app {
-      display: none; flex-direction: column; height: 100%;
-    }
-
-    header {
-      background: white; padding: 12px 20px;
-      display: flex; justify-content: space-between; align-items: center;
-      box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    }
-    .header-title { font-size: 1.1rem; font-weight: 600; color: var(--primary); }
-    .user-role { font-size: 0.75rem; background: var(--bg-color); padding: 4px 10px; border-radius: 20px; color: var(--text-light); border: 1px solid var(--secondary); }
-
-    main {
-      flex: 1; overflow-y: auto; padding: 15px;
-      padding-bottom: calc(var(--nav-height) + 20px);
-      scroll-behavior: smooth;
-    }
-
-    /* Nav bottom */
-    nav {
-      position: fixed; bottom: 0; left: 0; width: 100%; height: var(--nav-height);
-      background: white; border-top: 1px solid var(--secondary);
-      display: flex; justify-content: space-around; align-items: center;
-      z-index: 100; padding-bottom: var(--safe-bottom);
-    }
-    .nav-item {
-      display: flex; flex-direction: column; align-items: center;
-      color: var(--text-light); font-size: 0.65rem; cursor: pointer; transition: 0.3s;
-    }
-    .nav-item i { font-size: 1.3rem; margin-bottom: 3px; }
-    .nav-item.active { color: var(--primary); transform: translateY(-2px); }
-
-    /* Views */
-    .view { display: none; }
-    .view.active { display: block; }
-
-    /* Cards */
-    .card {
-      background: white; border-radius: 12px; padding: 15px;
-      margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
-    }
-    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
-
-    .stat-box {
-      text-align: center; padding: 15px 5px; background: white; border-radius: 12px;
-      border: 1px solid var(--secondary);
-    }
-    .stat-val { font-size: 1.2rem; font-weight: 700; color: var(--primary); }
-    .stat-lbl { font-size: 0.7rem; color: var(--text-light); margin-top: 4px; }
-
-    .list-item {
-      display: flex; justify-content: space-between; align-items: center;
-      padding: 12px 0; border-bottom: 1px solid #f0f0f0;
-    }
-    .list-item:last-child { border-bottom: none; }
-
-    .badge {
-      padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600;
-    }
-    .badge-pending { background: #E3F2FD; color: #1976D2; }
-    .badge-paid { background: #D4EDDA; color: #155724; }
-    .badge-debt { background: #F8D7DA; color: #721C24; }
-
-    .fab {
-      position: fixed; bottom: calc(var(--nav-height) + 20px); right: 20px;
-      width: 56px; height: 56px; background: var(--primary); color: white;
-      border-radius: 50%; display: flex; align-items: center; justify-content: center;
-      font-size: 1.5rem; box-shadow: 0 4px 15px rgba(183, 110, 121, 0.4);
-      z-index: 90;
-    }
-
-    /* Modals */
-    .modal {
-      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-      background: rgba(0,0,0,0.5); z-index: 200; display: none;
-      align-items: flex-end;
-    }
-    .modal.open { display: flex; }
-    .modal-content {
-      background: white; width: 100%; border-radius: 20px 20px 0 0;
-      padding: 20px; max-height: 90vh; overflow-y: auto;
-    }
-    .modal-header {
-      display: flex; justify-content: space-between; align-items: center;
-      margin-bottom: 20px; border-bottom: 1px solid #eee;
-      padding-bottom: 10px;
-    }
-
-    /* Responsive */
-    @media (max-width: 480px) {
-      .nav-item span { display: none; }
-      .nav-item i { font-size: 1.5rem; }
-      .header-title { font-size: 1rem; }
-    }
-  </style>
+  <!-- CSS -->
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
   <!-- SPLASH -->
   <div id="splash">
     <div class="logo-splash">
@@ -205,13 +25,13 @@
     <div style="margin-top: 20px; color: var(--text-light);">Carregando...</div>
   </div>
 
-  <!-- LOGIN SCREEN -->
+  <!-- LOGIN -->
   <div id="login-screen">
     <div class="login-card">
-      <h2 style="text-align:center; margin-bottom:20px; color:var(--primary);">Entrar</h2>
+      <h2>Entrar</h2>
       <div class="input-group">
         <label>Usuário (nome.sobrenome)</label>
-        <input type="text" id="username" placeholder="ex: andressa.vieira" autocomplete="off">
+        <input type="text" id="username" placeholder="ex: andressa.vieira" autocomplete="off" />
       </div>
       <button class="btn btn-primary" id="btn-login">Continuar</button>
       <p id="msg"></p>
@@ -233,7 +53,7 @@
           <div class="stat-box"><div class="stat-val" id="appts-today">0</div><div class="stat-lbl">Agendas</div></div>
           <div class="stat-box"><div class="stat-val" id="pending">0</div><div class="stat-lbl">Pendentes</div></div>
         </div>
-        <h3 style="margin: 20px 0 10px;">Próximos Horários</h3>
+        <h3>Próximos Horários</h3>
         <div id="home-appts"></div>
       </div>
 
@@ -241,7 +61,7 @@
       <div id="agenda" class="view">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
           <h2>Minha Agenda</h2>
-          <input type="date" id="date-picker" style="padding:6px; border-radius:8px; border:1px solid var(--secondary);">
+          <input type="date" id="date-picker" />
         </div>
         <div id="agenda-list"></div>
       </div>
@@ -254,7 +74,7 @@
 
       <!-- CLIENTES -->
       <div id="clientes" class="view">
-        <input type="text" id="search-client" placeholder="Buscar cliente..." style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--secondary); margin-bottom:15px;">
+        <input type="text" id="search-client" placeholder="Buscar cliente..." />
         <div id="clientes-list"></div>
       </div>
 
@@ -291,437 +111,47 @@
     <button class="fab" id="fab-new-appt"><i class="fas fa-plus"></i></button>
   </div>
 
-  <!-- MODAL NOVO AGENDAMENTO -->
+  <!-- MODALS -->
   <div id="modal-appt" class="modal">
     <div class="modal-content">
       <div class="modal-header">
         <h3>Novo Agendamento</h3>
-        <i class="fas fa-times" id="close-appt" style="cursor:pointer;"></i>
+        <i class="fas fa-times" id="close-appt"></i>
       </div>
       <div class="input-group">
         <label>Cliente (Nome)</label>
-        <input type="text" id="appt-client-name" placeholder="Ex: Maria Silva">
+        <input type="text" id="appt-client-name" placeholder="Ex: Maria Silva" />
       </div>
       <div class="input-group">
         <label>WhatsApp</label>
-        <input type="tel" id="appt-phone" placeholder="11999999999">
+        <input type="tel" id="appt-phone" placeholder="11999999999" />
       </div>
       <div class="input-group">
         <label>Serviço</label>
         <select id="appt-service"><option value="">Selecione...</option></select>
       </div>
       <div class="grid-2">
-        <div class="input-group"><label>Data</label><input type="date" id="appt-date"></div>
-        <div class="input-group"><label>Hora</label><input type="time" id="appt-time"></div>
+        <div class="input-group"><label>Data</label><input type="date" id="appt-date" /></div>
+        <div class="input-group"><label>Hora</label><input type="time" id="appt-time" /></div>
       </div>
       <button class="btn btn-primary" id="save-appt">Agendar</button>
     </div>
   </div>
 
-  <!-- MODAL MENU -->
   <div id="modal-menu" class="modal">
     <div class="modal-content" style="height: 40vh;">
-      <div class="modal-header"><h3>Menu</h3><i class="fas fa-times" id="close-menu" style="cursor:pointer;"></i></div>
+      <div class="modal-header"><h3>Menu</h3><i class="fas fa-times" id="close-menu"></i></div>
       <div class="grid-2" style="gap:12px;">
-        <div class="card" onclick="switchView('comandas')">Comandas</div>
-        <div class="card" onclick="switchView('clientes')">Clientes</div>
-        <div class="card" onclick="switchView('mensagens')">Mensagens</div>
-        <div class="card" onclick="switchView('servicos')">Serviços</div>
-        <div class="card" onclick="switchView('config')">Config</div>
+        <div class="card menu-link" data-view="comandas">Comandas</div>
+        <div class="card menu-link" data-view="clientes">Clientes</div>
+        <div class="card menu-link" data-view="mensagens">Mensagens</div>
+        <div class="card menu-link" data-view="servicos">Serviços</div>
+        <div class="card menu-link" data-view="config">Config</div>
       </div>
     </div>
   </div>
 
-  <script>
-    // --- SUPABASE CONFIG ---
-    const SUPABASE_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
-    const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-    let currentUser = null;
-    let userProfile = null;
-    let services = [];
-
-    // --- INIT ---
-    document.addEventListener('DOMContentLoaded', async () => {
-      // Hide splash after 1s
-      setTimeout(() => document.getElementById('splash').style.display = 'none', 1000);
-
-      // Event listeners
-      document.getElementById('btn-login').addEventListener('click', handleLogin);
-      document.getElementById('date-picker').addEventListener('change', loadAgenda);
-      document.getElementById('search-client').addEventListener('input', debounce(searchClients, 300));
-      document.getElementById('fab-new-appt').addEventListener('click', () => openModal('modal-appt'));
-      document.getElementById('close-appt').addEventListener('click', () => closeModal('modal-appt'));
-      document.getElementById('save-appt').addEventListener('click', saveAppointment);
-      document.getElementById('more-btn').addEventListener('click', () => openModal('modal-menu'));
-      document.getElementById('close-menu').addEventListener('click', () => closeModal('modal-menu'));
-      document.getElementById('btn-logout').addEventListener('click', handleLogout);
-
-      // Nav
-      document.querySelectorAll('.nav-item[data-view]').forEach(el => {
-        el.addEventListener('click', () => switchView(el.dataset.view));
-      });
-
-      // Load services
-      const { data } = await supabase.from('services').select('*').eq('is_active', true);
-      services = data || [];
-      const sel = document.getElementById('appt-service');
-      services.forEach(s => sel.innerHTML += `<option value="${s.id}">${s.name} (${s.duration_minutes}min)</option>`);
-
-      // Set today
-      const today = new Date().toISOString().split('T')[0];
-      document.getElementById('date-picker').value = today;
-      document.getElementById('appt-date').value = today;
-    });
-
-    // --- UTILS ---
-    function debounce(func, wait) {
-      let timeout;
-      return function executedFunction(...args) {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => func(...args), wait);
-      };
-    }
-
-    function formatDate(dateStr) {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-    }
-
-    function formatTime(dateStr) {
-      const d = new Date(dateStr);
-      return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    }
-
-    function formatCurrency(val) {
-      return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseFloat(val) || 0);
-    }
-
-    // --- LOGIN LOGIC ---
-    async function handleLogin() {
-      const username = document.getElementById('username').value.trim().toLowerCase();
-      const msgEl = document.getElementById('msg');
-      
-      if (!username) {
-        msgEl.textContent = "Digite seu usuário (nome.sobrenome)";
-        msgEl.className = 'error';
-        return;
-      }
-
-      msgEl.textContent = "Verificando...";
-      msgEl.className = '';
-
-      // Busca pelo username
-      const { data, error } = await supabase.from('profiles').select('*').eq('username', username).single();
-
-      if (error || !data) {
-        msgEl.textContent = "Usuário não encontrado ou desativado.";
-        msgEl.className = 'error';
-        return;
-      }
-
-      if (!data.is_active) {
-        msgEl.textContent = "Conta desativada.";
-        msgEl.className = 'error';
-        return;
-      }
-
-      currentUser = data;
-      userProfile = data;
-
-      if (data.first_login) {
-        // Primeiro acesso: pede nova senha
-        document.getElementById('login-screen').innerHTML = `
-          <div class="login-card">
-            <h3 style="text-align:center; margin-bottom:20px; color:var(--primary);">Crie sua senha</h3>
-            <div class="input-group">
-              <label>Nova Senha (mín. 6 caracteres)</label>
-              <input type="password" id="new-pass" placeholder="••••••">
-            </div>
-            <button class="btn btn-primary" id="btn-set-pass">Salvar e Entrar</button>
-            <p id="msg2" style="margin-top:15px;"></p>
-          </div>
-        `;
-        document.getElementById('btn-set-pass').addEventListener('click', async () => {
-          const pwd = document.getElementById('new-pass').value;
-          if (pwd.length < 6) {
-            document.getElementById('msg2').textContent = "Senha muito curta";
-            document.getElementById('msg2').className = 'error';
-            return;
-          }
-          const { error } = await supabase.auth.updateUser({ password: pwd });
-          if (error) {
-            document.getElementById('msg2').textContent = "Erro: " + error.message;
-            document.getElementById('msg2').className = 'error';
-            return;
-          }
-          // Atualiza first_login
-          await supabase.from('profiles').update({ first_login: false }).eq('id', data.id);
-          showApp();
-        });
-      } else {
-        // Já tem senha → pede login
-        document.getElementById('login-screen').innerHTML = `
-          <div class="login-card">
-            <h3 style="text-align:center; margin-bottom:20px; color:var(--primary);">Digite sua senha</h3>
-            <div class="input-group">
-              <label>Senha</label>
-              <input type="password" id="login-pass" placeholder="••••••">
-            </div>
-            <button class="btn btn-primary" id="btn-do-login">Entrar</button>
-            <p id="msg2" style="margin-top:15px;"></p>
-          </div>
-        `;
-        document.getElementById('btn-do-login').addEventListener('click', async () => {
-          const pwd = document.getElementById('login-pass').value;
-          const email = `${username}@estudio.local`; // fake email para auth
-          const { data: session, error } = await supabase.auth.signInWithPassword({ email, password: pwd });
-          if (error) {
-            document.getElementById('msg2').textContent = "Senha incorreta";
-            document.getElementById('msg2').className = 'error';
-            return;
-          }
-          currentUser = session.user;
-          await loadUserProfile();
-          showApp();
-        });
-      }
-    }
-
-    async function loadUserProfile() {
-      const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
-      if (data) userProfile = data;
-      document.getElementById('role-display').textContent = 
-        userProfile.role === 'proprietario' ? 'Proprietário' : 'Freelancer';
-    }
-
-    function showApp() {
-      document.getElementById('login-screen').style.display = 'none';
-      document.getElementById('app').style.display = 'flex';
-      loadDashboard();
-    }
-
-    async function handleLogout() {
-      await supabase.auth.signOut();
-      location.reload();
-    }
-
-    // --- NAVIGATION ---
-    function switchView(view) {
-      document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-      document.getElementById(view).classList.add('active');
-
-      document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-      const activeNav = Array.from(document.querySelectorAll('.nav-item')).find(n => n.dataset.view === view);
-      if (activeNav) activeNav.classList.add('active');
-
-      if (view === 'agenda') loadAgenda();
-      if (view === 'comandas') loadComandas();
-      if (view === 'clientes') loadClientes();
-      if (view === 'mensagens') loadTemplates();
-      if (view === 'servicos') loadServicos();
-      if (view === 'home') loadDashboard();
-    }
-
-    // --- DATA LOADING ---
-    async function loadDashboard() {
-      const today = new Date().toISOString().split('T')[0];
-      const { data: cmds } = await supabase.from('commands')
-        .select('total_amount')
-        .eq('status', 'paid')
-        .gte('closed_at', `${today}T00:00:00`);
-      const rev = cmds?.reduce((a,b)=>a+parseFloat(b.total_amount),0) || 0;
-      document.getElementById('rev-today').textContent = formatCurrency(rev);
-
-      const { data: appts } = await supabase.from('appointments')
-        .select('id')
-        .gte('appointment_date', `${today}T00:00:00`)
-        .lte('appointment_date', `${today}T23:59:59`)
-        .eq('professional_id', userProfile.id);
-      document.getElementById('appts-today').textContent = appts?.length || 0;
-
-      const pending = appts?.filter(a => a.status === 'pending').length || 0;
-      document.getElementById('pending').textContent = pending;
-
-      // Próximos horários
-      const { data: nextAppts } = await supabase.from('appointments')
-        .select('client_name, client_phone, appointment_date, service_id, custom_service_name')
-        .gte('appointment_date', new Date().toISOString())
-        .eq('professional_id', userProfile.id)
-        .order('appointment_date', { ascending: true })
-        .limit(3);
-      
-      const list = document.getElementById('home-appts');
-      if (!nextAppts || nextAppts.length === 0) {
-        list.innerHTML = '<div class="card" style="text-align:center">Nenhum horário.</div>';
-        return;
-      }
-
-      list.innerHTML = nextAppts.map(a => {
-        const time = formatTime(a.appointment_date);
-        const svc = services.find(s => s.id == a.service_id)?.name || a.custom_service_name || 'Serviço';
-        return `<div class="card" style="border-left:4px solid var(--primary)">
-          <div><strong>${time}</strong> - ${a.client_name}</div>
-          <div style="font-size:0.85rem; color:var(--text-light);">${svc}</div>
-        </div>`;
-      }).join('');
-    }
-
-    async function loadAgenda() {
-      const date = document.getElementById('date-picker').value;
-      const { data } = await supabase.from('appointments')
-        .select('client_name, client_phone, appointment_date, end_date, service_id, custom_service_name, status')
-        .gte('appointment_date', `${date}T00:00:00`)
-        .lte('appointment_date', `${date}T23:59:59`)
-        .eq('professional_id', userProfile.id)
-        .order('appointment_date', { ascending: true });
-
-      const list = document.getElementById('agenda-list');
-      if (!data || data.length === 0) {
-        list.innerHTML = '<div class="card" style="text-align:center">Nenhum horário.</div>';
-        return;
-      }
-
-      list.innerHTML = data.map(a => {
-        const start = formatTime(a.appointment_date);
-        const end = formatTime(a.end_date);
-        const svc = services.find(s => s.id == a.service_id)?.name || a.custom_service_name || 'Serviço';
-        const status = a.status === 'pending' ? '<span class="badge badge-pending">Pendente</span>' : '';
-        return `<div class="card">
-          <div><strong>${start}–${end}</strong> ${status}</div>
-          <div>${a.client_name} | ${a.client_phone}</div>
-          <div style="font-size:0.85rem; color:var(--text-light);">${svc}</div>
-        </div>`;
-      }).join('');
-    }
-
-    async function loadComandas() {
-      const { data } = await supabase.from('commands')
-        .select('client_name, client_phone, total_amount, status, opened_at')
-        .eq('professional_id', userProfile.id)
-        .eq('status', 'open');
-
-      const list = document.getElementById('comandas-list');
-      if (!data || data.length === 0) {
-        list.innerHTML = '<div class="card" style="text-align:center">Nenhuma comanda aberta.</div>';
-        return;
-      }
-
-      list.innerHTML = data.map(c => `
-        <div class="card">
-          <div><strong>${c.client_name}</strong> | ${c.client_phone}</div>
-          <div>${formatCurrency(c.total_amount)}</div>
-          <div style="font-size:0.8rem; color:var(--text-light);">${formatDate(c.opened_at)}</div>
-        </div>`).join('');
-    }
-
-    async function loadClientes() {
-      const term = document.getElementById('search-client').value.toLowerCase();
-      let query = supabase.from('appointments')
-        .select('client_name, client_phone', { count: 'exact' })
-        .eq('professional_id', userProfile.id)
-        .neq('client_name', '');
-
-      if (term) {
-        query = query.or(`client_name.ilike.%${term}%,client_phone.ilike.%${term}%`);
-      }
-
-      const { data } = await query;
-      const unique = Array.from(new Map(data.map(item => [item.client_phone, item])).values());
-
-      const list = document.getElementById('clientes-list');
-      if (!unique || unique.length === 0) {
-        list.innerHTML = '<div class="card" style="text-align:center">Nenhum cliente.</div>';
-        return;
-      }
-
-      list.innerHTML = unique.map(c => `
-        <div class="card">
-          <strong>${c.client_name}</strong><br>
-          <small>${c.client_phone}</small>
-        </div>`).join('');
-    }
-
-    async function loadTemplates() {
-      const { data } = await supabase.from('message_templates').select('*').eq('is_active', true);
-      const list = document.getElementById('templates-list');
-      if (!data || data.length === 0) {
-        list.innerHTML = '<div class="card" style="text-align:center">Sem templates.</div>';
-        return;
-      }
-      list.innerHTML = data.map(t => `
-        <div class="card">
-          <strong>${t.name}</strong>
-          <p style="font-size:0.85rem; margin:6px 0;">${t.body.substring(0, 70)}${t.body.length > 70 ? '...' : ''}</p>
-        </div>`).join('');
-    }
-
-    async function loadServicos() {
-      const { data } = await supabase.from('services').select('*').eq('is_active', true);
-      const list = document.getElementById('servicos-list');
-      if (!data || data.length === 0) {
-        list.innerHTML = '<div class="card" style="text-align:center">Sem serviços.</div>';
-        return;
-      }
-      list.innerHTML = data.map(s => `
-        <div class="card">
-          <strong>${s.name}</strong> (${s.duration_minutes}min)
-          <div>${formatCurrency(s.price)} | Custo: ${formatCurrency(s.cost_price)}</div>
-        </div>`).join('');
-    }
-
-    // --- ACTIONS ---
-    async function saveAppointment() {
-      const name = document.getElementById('appt-client-name').value.trim();
-      const phone = document.getElementById('appt-phone').value.replace(/\D/g, '');
-      const servId = document.getElementById('appt-service').value;
-      const date = document.getElementById('appt-date').value;
-      const time = document.getElementById('appt-time').value;
-
-      if (!name || !phone || !servId || !date || !time) {
-        alert("Preencha todos os campos.");
-        return;
-      }
-
-      if (phone.length < 10) {
-        alert("Número de WhatsApp inválido.");
-        return;
-      }
-
-      const start = `${date}T${time}:00`;
-      const serv = services.find(s => s.id == servId);
-      const duration = serv?.duration_minutes || 60;
-      const end = new Date(new Date(start).getTime() + duration*60000).toISOString();
-
-      const { error } = await supabase.from('appointments').insert({
-        client_name: name,
-        client_phone: phone,
-        professional_id: userProfile.id,
-        service_id: servId,
-        appointment_date: start,
-        end_date: end,
-        status: 'pending'
-      });
-
-      if (error) {
-        console.error(error);
-        alert("Erro ao agendar: " + error.message);
-      } else {
-        alert("Agendado com sucesso!");
-        closeModal('modal-appt');
-        loadAgenda();
-        loadDashboard();
-      }
-    }
-
-    // --- MODALS ---
-    function openModal(id) {
-      document.getElementById(id).classList.add('open');
-    }
-    function closeModal(id) {
-      document.getElementById(id).classList.remove('open');
-    }
-  </script>
+  <!-- JS -->
+  <script src="script.js"></script>
 </body>
 </html>

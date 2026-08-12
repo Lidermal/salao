@@ -5,333 +5,932 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Estúdio Amor que Cuida</title>
     
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        nude: '#Fdf8f5',
-                        rose: '#D5A193',
-                        roseDark: '#B87A6B',
-                        brown: '#4A362D'
-                    }
-                }
-            }
-        }
-    </script>
-
-    <!-- Supabase JS -->
+    <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
-    <!-- Ícones -->
+    <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
 
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #Fdf8f5; color: #4A362D; }
-        .hidden-screen { display: none !important; }
-        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        :root {
+            --primary: #B76E79;       /* Rose Gold */
+            --primary-dark: #965A64;
+            --secondary: #F4C2C2;     /* Blush */
+            --bg-color: #FDF6F0;      /* Cream */
+            --text-dark: #4A3B3B;
+            --text-light: #8C7B7B;
+            --white: #FFFFFF;
+            --danger: #E74C3C;
+            --success: #27AE60;
+            --warning: #F39C12;
+            --shadow: 0 4px 15px rgba(183, 110, 121, 0.15);
+            --radius: 16px;
+            --nav-height: 65px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1, h2, h3 { font-family: 'Playfair Display', serif; color: var(--primary); }
+        button { cursor: pointer; border: none; outline: none; font-family: inherit; }
+        input, select, textarea { font-family: inherit; }
+
+        /* --- LOGIN SCREEN --- */
+        #auth-screen {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: linear-gradient(135deg, var(--bg-color) 0%, var(--secondary) 100%);
+            z-index: 9999; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .logo-area { text-align: center; margin-bottom: 30px; }
+        .logo-area h1 { font-size: 2.2rem; margin-bottom: 5px; }
+        .logo-area p { color: var(--text-light); font-style: italic; font-size: 0.9rem; }
+        
+        .login-card {
+            background: var(--white); padding: 30px; border-radius: var(--radius);
+            width: 100%; max-width: 400px; box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+        }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; margin-bottom: 5px; font-size: 0.85rem; color: var(--text-light); font-weight: 500; }
+        .input-group input {
+            width: 100%; padding: 12px; border: 1px solid var(--secondary);
+            border-radius: 8px; font-size: 1rem; outline: none; transition: 0.3s;
+        }
+        .input-group input:focus { border-color: var(--primary); }
+        
+        .btn-primary {
+            width: 100%; padding: 14px; background: var(--primary); color: white;
+            border-radius: 8px; font-size: 1rem; font-weight: 600; transition: 0.3s;
+        }
+        .btn-primary:active { transform: scale(0.98); background: var(--primary-dark); }
+        .btn-secondary { background: var(--secondary); color: var(--primary-dark); margin-top: 10px; }
+
+        #login-msg { margin-top:15px; font-size:0.85rem; text-align:center; min-height: 20px; }
+        .hidden { display: none !important; }
+
+        /* --- APP STRUCTURE --- */
+        #app-screen { display: none; flex-direction: column; height: 100%; }
+        
+        header {
+            background: var(--white); padding: 12px 20px;
+            display: flex; justify-content: space-between; align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05); z-index: 10;
+        }
+        .header-title { font-size: 1.1rem; font-weight: 600; color: var(--primary); }
+        .user-badge { font-size: 0.75rem; background: var(--bg-color); padding: 4px 10px; border-radius: 20px; color: var(--text-light); border: 1px solid var(--secondary); }
+
+        main {
+            flex: 1; overflow-y: auto; padding: 15px; padding-bottom: calc(var(--nav-height) + 20px);
+            scroll-behavior: smooth;
+        }
+
+        /* --- MOBILE NAV --- */
+        nav {
+            position: fixed; bottom: 0; left: 0; width: 100%; height: var(--nav-height);
+            background: var(--white); border-top: 1px solid var(--secondary);
+            display: flex; justify-content: space-around; align-items: center;
+            z-index: 100; padding-bottom: env(safe-area-inset-bottom);
+        }
+        .nav-item {
+            display: flex; flex-direction: column; align-items: center;
+            color: var(--text-light); font-size: 0.65rem; cursor: pointer; transition: 0.3s; flex: 1;
+        }
+        .nav-item i { font-size: 1.3rem; margin-bottom: 3px; }
+        .nav-item.active { color: var(--primary); transform: translateY(-2px); }
+
+        /* --- COMPONENTS --- */
+        .card {
+            background: var(--white); border-radius: 12px; padding: 15px;
+            margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+        }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+        
+        .stat-box { text-align: center; padding: 15px 5px; background: var(--white); border-radius: 12px; border: 1px solid var(--secondary); }
+        .stat-val { font-size: 1.2rem; font-weight: 700; color: var(--primary); }
+        .stat-lbl { font-size: 0.7rem; color: var(--text-light); margin-top: 4px; }
+
+        .list-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 12px 0; border-bottom: 1px solid #f0f0f0;
+        }
+        .list-item:last-child { border-bottom: none; }
+        
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 0.7rem; font-weight: 600; }
+        .badge-open { background: #FFF3CD; color: #856404; }
+        .badge-paid { background: #D4EDDA; color: #155724; }
+        .badge-debt { background: #F8D7DA; color: #721C24; }
+
+        .fab {
+            position: fixed; bottom: calc(var(--nav-height) + 20px); right: 20px;
+            width: 56px; height: 56px; background: var(--primary); color: white;
+            border-radius: 50%; display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem; box-shadow: 0 4px 15px rgba(183, 110, 121, 0.4);
+            z-index: 90;
+        }
+
+        .view { display: none; animation: fadeIn 0.3s ease; }
+        .view.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Modal Bottom Sheet */
+        .modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 200; display: none;
+            align-items: flex-end;
+        }
+        .modal.open { display: flex; }
+        .modal-content {
+            background: var(--white); width: 100%; border-radius: 20px 20px 0 0;
+            padding: 20px; max-height: 90vh; overflow-y: auto;
+            animation: slideUp 0.3s ease;
+        }
+        @keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+
+        /* Menu Lateral / Categorias */
+        .category-scroll { display: flex; overflow-x: auto; gap: 10px; padding-bottom: 10px; margin-bottom: 15px; scrollbar-width: none; }
+        .category-scroll::-webkit-scrollbar { display: none; }
+        .cat-chip { padding: 8px 16px; background: var(--white); border: 1px solid var(--secondary); border-radius: 20px; font-size: 0.85rem; white-space: nowrap; color: var(--text-light); }
+        .cat-chip.active { background: var(--primary); color: white; border-color: var(--primary); }
+
     </style>
 </head>
 <body>
 
-    <!-- ========================================== -->
-    <!-- TELA DE LOGIN                              -->
-    <!-- ========================================== -->
-    <div id="login-screen" class="min-h-screen flex flex-col items-center justify-center p-4">
-        <div class="w-full max-w-sm bg-white rounded-3xl shadow-xl p-8 text-center border border-rose/30">
-            <h1 class="text-4xl font-serif text-brown mb-2 tracking-wide">ESTÚDIO</h1>
-            <h2 class="text-3xl font-serif text-rose mb-1">Amor que Cuida</h2>
-            <p class="text-brown/60 text-sm italic mb-8">by Andressa Vieira</p>
-
-            <form id="login-form" class="flex flex-col gap-4">
-                <!-- Alterado para Usuário -->
-                <input type="text" id="username" placeholder="Usuário (ex: nome.sobrenome)" required
-                    class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:border-rose text-brown lowercase">
-                
-                <input type="password" id="password" placeholder="Senha" required
-                    class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:border-rose text-brown">
-                
-                <button type="submit" class="w-full bg-rose hover:bg-roseDark text-white font-bold py-4 rounded-xl transition-colors mt-2 shadow-md">
-                    Entrar no Sistema
-                </button>
-            </form>
-            <p id="login-error" class="text-red-500 text-sm mt-4 hidden">Usuário ou senha incorretos.</p>
+    <!-- TELA DE LOGIN INTELIGENTE -->
+    <div id="auth-screen">
+        <div class="logo-area">
+            <h1>Amor que Cuida</h1>
+            <p>by Andressa Vieira</p>
         </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- TELA DE PRIMEIRO ACESSO (MUDAR SENHA)      -->
-    <!-- ========================================== -->
-    <div id="first-login-screen" class="hidden-screen min-h-screen flex flex-col items-center justify-center p-4">
-        <div class="w-full max-w-sm bg-white rounded-3xl shadow-xl p-8 text-center border border-rose/30">
-            <i class="fas fa-shield-alt text-4xl text-rose mb-4"></i>
-            <h2 class="text-2xl font-serif text-brown mb-2">Bem-vinda(o)!</h2>
-            <p class="text-sm text-gray-500 mb-6">Este é o seu primeiro acesso. Por segurança, crie a sua senha pessoal e intransferível.</p>
-
-            <form id="new-password-form" class="flex flex-col gap-4">
-                <input type="password" id="new-password" placeholder="Nova Senha (min. 6 caracteres)" required minlength="6"
-                    class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:border-rose text-brown">
-                
-                <input type="password" id="confirm-password" placeholder="Confirme a Nova Senha" required minlength="6"
-                    class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:border-rose text-brown">
-                
-                <button type="submit" class="w-full bg-brown hover:bg-brown/90 text-white font-bold py-4 rounded-xl transition-colors mt-2 shadow-md">
-                    Salvar e Entrar
-                </button>
-            </form>
-            <p id="password-error" class="text-red-500 text-sm mt-4 hidden">As senhas não coincidem.</p>
-        </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- SISTEMA PRINCIPAL (Após Login)             -->
-    <!-- ========================================== -->
-    <div id="app-screen" class="hidden-screen h-screen flex flex-col md:flex-row overflow-hidden">
         
-        <!-- MENU LATERAL / INFERIOR -->
-        <nav id="main-nav" class="bg-white border-r border-t border-gray-200 flex md:flex-col justify-around md:justify-start p-2 md:w-64 md:h-full fixed bottom-0 w-full md:relative z-50 pb-safe md:pb-4">
-            
-            <div class="hidden md:block p-4 text-center border-b border-gray-100 mb-4">
-                <h2 class="font-serif text-rose text-xl">Amor que Cuida</h2>
-                <p id="user-name-display" class="text-xs text-brown mt-1">Colaborador</p>
-                <p id="user-role-badge" class="text-[10px] bg-rose/20 text-roseDark px-2 py-1 rounded-full inline-block mt-2">Nível</p>
+        <!-- Passo 1: Identificação -->
+        <div class="login-card" id="step-identify">
+            <div class="input-group">
+                <label>Usuário (nome.sobrenome)</label>
+                <input type="text" id="username" placeholder="ex: andressa.vieira" autocomplete="off">
+            </div>
+            <button class="btn-primary" onclick="checkUser()">Continuar</button>
+            <p id="login-msg"></p>
+        </div>
+
+        <!-- Passo 2A: Criar Senha (Primeiro Acesso) -->
+        <div class="login-card hidden" id="step-create-pass">
+            <h3 style="margin-bottom:15px; font-size:1.1rem;">Olá! Crie sua senha</h3>
+            <p style="font-size:0.85rem; color:var(--text-light); margin-bottom:15px;">Primeiro acesso detectado. Defina uma senha segura.</p>
+            <div class="input-group">
+                <label>Nova Senha</label>
+                <input type="password" id="new-password" placeholder="Mínimo 6 caracteres">
+            </div>
+            <button class="btn-primary" onclick="createPassword()">Salvar e Entrar</button>
+            <button class="btn-primary btn-secondary" onclick="resetLogin()">Voltar</button>
+        </div>
+
+        <!-- Passo 2B: Login (Já tem senha) -->
+        <div class="login-card hidden" id="step-login-pass">
+            <h3 style="margin-bottom:15px; font-size:1.1rem;">Bem-vindo(a) de volta!</h3>
+            <div class="input-group">
+                <label>Sua Senha</label>
+                <input type="password" id="existing-password" placeholder="••••••••">
+            </div>
+            <button class="btn-primary" onclick="doLogin()">Entrar</button>
+            <button class="btn-primary btn-secondary" onclick="resetLogin()">Voltar</button>
+            <p id="login-msg-2" style="margin-top:10px; font-size:0.8rem; color:var(--danger); text-align:center;"></p>
+        </div>
+    </div>
+
+    <!-- TELA DO APP -->
+    <div id="app-screen">
+        <header>
+            <div class="header-title">Estúdio AQ Cuida</div>
+            <div class="user-badge" id="user-role-display">...</div>
+        </header>
+
+        <main>
+            <!-- HOME / DASHBOARD -->
+            <div id="view-home" class="view active">
+                <div class="grid-3 mb-2">
+                    <div class="stat-box">
+                        <div class="stat-val" id="dash-revenue">R$ 0</div>
+                        <div class="stat-lbl">Hoje</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-val" id="dash-appts">0</div>
+                        <div class="stat-lbl">Agendas</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-val" id="dash-pending">0</div>
+                        <div class="stat-lbl">Pendentes</div>
+                    </div>
+                </div>
+
+                <h3 style="margin: 15px 0 10px; font-size:1.1rem;">Próximos Horários</h3>
+                <div id="home-appointments-list"></div>
             </div>
 
-            <!-- Menus -->
-            <button onclick="navigate('agenda')" class="menu-item flex flex-col md:flex-row items-center md:p-3 text-brown hover:text-rose transition w-full md:text-left">
-                <i class="fas fa-calendar-alt text-xl md:w-8"></i>
-                <span class="text-[10px] md:text-base mt-1 md:mt-0">Agenda</span>
-            </button>
+            <!-- AGENDA -->
+            <div id="view-agenda" class="view">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                    <h2>Minha Agenda</h2>
+                    <input type="date" id="agenda-date-picker" style="padding:6px; border-radius:8px; border:1px solid var(--secondary); color:var(--primary);">
+                </div>
+                <div id="agenda-list"></div>
+            </div>
+
+            <!-- COMANDAS -->
+            <div id="view-comandas" class="view">
+                <h2>Comandas Abertas</h2>
+                <div id="comandas-list" class="mt-2"></div>
+            </div>
+
+            <!-- COBRANÇAS (DEVEDORES) -->
+            <div id="view-cobrancas" class="view">
+                <h2>Cobranças Pendentes</h2>
+                <p style="font-size:0.85rem; color:var(--text-light); margin-bottom:15px;">Clientes com débitos de produtos ou serviços.</p>
+                <div id="cobrancas-list"></div>
+            </div>
+
+            <!-- CLIENTES -->
+            <div id="view-clientes" class="view">
+                <div style="display:flex; gap:10px; margin-bottom:15px;">
+                    <input type="text" id="search-client" placeholder="Buscar cliente..." style="flex:1; padding:10px; border-radius:8px; border:1px solid var(--secondary);">
+                </div>
+                <div id="clientes-list"></div>
+            </div>
+
+            <!-- MENSAGENS -->
+            <div id="view-mensagens" class="view">
+                <h2>Mensagens Pré-definidas</h2>
+                <div id="templates-list" class="mt-2"></div>
+            </div>
+
+            <!-- SERVIÇOS & PACOTES -->
+            <div id="view-servicos" class="view">
+                <h2>Serviços & Pacotes</h2>
+                <div id="servicos-list" class="mt-2"></div>
+            </div>
+
+            <!-- PRODUTOS -->
+            <div id="view-produtos" class="view">
+                <h2>Produtos & Estoque</h2>
+                <div id="produtos-list" class="mt-2"></div>
+            </div>
+
+            <!-- DESPESAS -->
+            <div id="view-despesas" class="view">
+                <h2>Despesas</h2>
+                <div id="despesas-list" class="mt-2"></div>
+            </div>
+
+            <!-- FUNCIONÁRIOS -->
+            <div id="view-funcionarios" class="view">
+                <h2>Profissionais & Comissão</h2>
+                <div id="funcionarios-list" class="mt-2"></div>
+            </div>
+
+            <!-- RELATÓRIOS -->
+            <div id="view-relatorios" class="view">
+                <h2>Performance Financeira</h2>
+                <div class="card">
+                    <div class="grid-2">
+                        <div>
+                            <small style="color:var(--text-light)">Receita Total</small>
+                            <h3 id="rep-revenue" style="color:var(--success)">R$ 0,00</h3>
+                        </div>
+                        <div>
+                            <small style="color:var(--text-light)">Despesas</small>
+                            <h3 id="rep-expenses" style="color:var(--danger)">R$ 0,00</h3>
+                        </div>
+                    </div>
+                    <hr style="margin:15px 0; border:0; border-top:1px dashed #eee;">
+                    <div style="text-align:center">
+                        <small style="color:var(--text-light)">LUCRO LÍQUIDO</small>
+                        <h2 id="rep-profit" style="color:var(--primary)">R$ 0,00</h2>
+                    </div>
+                </div>
+                <h3 class="mt-2" style="font-size:1rem;">Melhores Clientes</h3>
+                <div id="top-clients-list"></div>
+            </div>
             
-            <button onclick="navigate('comandas')" class="menu-item flex flex-col md:flex-row items-center md:p-3 text-brown hover:text-rose transition w-full md:text-left">
-                <i class="fas fa-receipt text-xl md:w-8"></i>
-                <span class="text-[10px] md:text-base mt-1 md:mt-0">Comandas</span>
-            </button>
-
-            <button onclick="navigate('clientes')" class="menu-item flex flex-col md:flex-row items-center md:p-3 text-brown hover:text-rose transition w-full md:text-left">
-                <i class="fas fa-users text-xl md:w-8"></i>
-                <span class="text-[10px] md:text-base mt-1 md:mt-0">Clientes</span>
-            </button>
-
-            <!-- Apenas Proprietário -->
-            <button id="menu-financeiro" onclick="navigate('financeiro')" class="menu-item hidden flex flex-col md:flex-row items-center md:p-3 text-brown hover:text-rose transition w-full md:text-left">
-                <i class="fas fa-chart-line text-xl md:w-8"></i>
-                <span class="text-[10px] md:text-base mt-1 md:mt-0">Relatórios</span>
-            </button>
-            
-            <button id="menu-servicos" onclick="navigate('servicos')" class="menu-item hidden flex flex-col md:flex-row items-center md:p-3 text-brown hover:text-rose transition w-full md:text-left">
-                <i class="fas fa-spa text-xl md:w-8"></i>
-                <span class="text-[10px] md:text-base mt-1 md:mt-0">Serviços</span>
-            </button>
-
-            <button onclick="logout()" class="hidden md:flex flex-col md:flex-row items-center md:p-3 text-red-400 hover:text-red-600 transition w-full md:text-left mt-auto">
-                <i class="fas fa-sign-out-alt text-xl md:w-8"></i>
-                <span class="text-[10px] md:text-base mt-1 md:mt-0">Sair</span>
-            </button>
-        </nav>
-
-        <!-- ÁREA DE CONTEÚDO DAS TELAS -->
-        <main class="flex-1 bg-nude overflow-y-auto pb-20 md:pb-0">
-            <!-- TELA: AGENDA -->
-            <div id="view-agenda" class="view-section p-4">
-                <header class="flex justify-between items-center mb-6">
-                    <h1 class="text-2xl font-serif text-brown">Minha Agenda</h1>
-                    <button class="bg-rose text-white px-4 py-2 rounded-xl shadow hover:bg-roseDark transition">
-                        + Novo Agendamento
-                    </button>
-                </header>
-                <div id="agenda-list" class="space-y-4">
-                    <p class="text-center text-gray-500 mt-10">Carregando horários...</p>
+            <!-- CONFIGURAÇÕES -->
+            <div id="view-config" class="view">
+                <h2>Configurações</h2>
+                <div class="card" onclick="handleLogout()" style="cursor:pointer; color:var(--danger); text-align:center; font-weight:600;">
+                    <i class="fas fa-sign-out-alt"></i> Sair do Sistema
                 </div>
             </div>
-
-            <!-- Outras telas ocultas para navegação futura -->
-            <div id="view-comandas" class="view-section hidden-screen p-4">
-                <h1 class="text-2xl font-serif text-brown mb-6">Comandas Abertas</h1>
-            </div>
-            <div id="view-clientes" class="view-section hidden-screen p-4">
-                <h1 class="text-2xl font-serif text-brown mb-6">Clientes</h1>
-            </div>
-            <div id="view-financeiro" class="view-section hidden-screen p-4">
-                <h1 class="text-2xl font-serif text-brown mb-6">Relatórios</h1>
-            </div>
-            <div id="view-servicos" class="view-section hidden-screen p-4">
-                <h1 class="text-2xl font-serif text-brown mb-6">Gestão de Serviços</h1>
-            </div>
         </main>
+
+        <!-- NAVEGAÇÃO INFERIOR (Scrollável se necessário) -->
+        <nav>
+            <div class="nav-item active" onclick="router('home', this)">
+                <i class="fas fa-home"></i><span>Início</span>
+            </div>
+            <div class="nav-item" onclick="router('agenda', this)">
+                <i class="fas fa-calendar-alt"></i><span>Agenda</span>
+            </div>
+            <div class="nav-item" onclick="router('comandas', this)">
+                <i class="fas fa-file-invoice-dollar"></i><span>Comandas</span>
+            </div>
+            <div class="nav-item" onclick="router('clientes', this)">
+                <i class="fas fa-user-friends"></i><span>Clientes</span>
+            </div>
+            <!-- Menu Mais (Simulado com clique longo ou apenas mais itens) -->
+            <div class="nav-item" onclick="toggleMoreMenu()">
+                <i class="fas fa-bars"></i><span>Menu</span>
+            </div>
+        </nav>
+
+        <!-- FAB -->
+        <button class="fab" onclick="openNewAppointmentModal()">
+            <i class="fas fa-plus"></i>
+        </button>
     </div>
 
-    <!-- ========================================== -->
-    <!-- LÓGICA JAVASCRIPT (SUPABASE E INTERFACE)   -->
-    <!-- ========================================== -->
+    <!-- MODAL NOVO AGENDAMENTO -->
+    <div id="modal-appt" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Novo Agendamento</h3>
+                <i class="fas fa-times" onclick="closeModal('modal-appt')" style="cursor:pointer; font-size:1.2rem; color:var(--text-light)"></i>
+            </div>
+            
+            <div class="input-group">
+                <label>Cliente (Nome ou Telefone)</label>
+                <input type="text" id="appt-client-search" placeholder="Buscar cliente...">
+            </div>
+            <div class="input-group">
+                <label>WhatsApp (Obrigatório para lembretes)</label>
+                <input type="tel" id="appt-whatsapp" placeholder="(00) 00000-0000">
+            </div>
+            <div class="input-group">
+                <label>Serviço</label>
+                <select id="appt-service" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--secondary);"></select>
+            </div>
+            <div class="grid-2">
+                <div class="input-group">
+                    <label>Data</label>
+                    <input type="date" id="appt-date">
+                </div>
+                <div class="input-group">
+                    <label>Hora</label>
+                    <input type="time" id="appt-time">
+                </div>
+            </div>
+            <div class="input-group">
+                <label>Profissional (Apenas Admin pode alterar)</label>
+                <select id="appt-professional" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--secondary);" disabled></select>
+            </div>
+            <button class="btn-primary" onclick="saveAppointment()">Confirmar Horário</button>
+        </div>
+    </div>
+
+    <!-- MODAL MENU EXTRA -->
+    <div id="modal-menu" class="modal">
+        <div class="modal-content" style="height: 50vh;">
+            <div class="modal-header">
+                <h3>Menu Completo</h3>
+                <i class="fas fa-times" onclick="closeModal('modal-menu')" style="cursor:pointer;"></i>
+            </div>
+            <div class="grid-2" style="gap:15px;">
+                <div class="card" onclick="router('cobrancas', null); closeModal('modal-menu')" style="text-align:center">
+                    <i class="fas fa-money-bill-wave" style="font-size:1.5rem; color:var(--primary); margin-bottom:5px;"></i>
+                    <div style="font-size:0.8rem">Cobranças</div>
+                </div>
+                <div class="card" onclick="router('mensagens', null); closeModal('modal-menu')" style="text-align:center">
+                    <i class="fab fa-whatsapp" style="font-size:1.5rem; color:var(--success); margin-bottom:5px;"></i>
+                    <div style="font-size:0.8rem">Mensagens</div>
+                </div>
+                <div class="card" onclick="router('servicos', null); closeModal('modal-menu')" style="text-align:center">
+                    <i class="fas fa-cut" style="font-size:1.5rem; color:var(--primary); margin-bottom:5px;"></i>
+                    <div style="font-size:0.8rem">Serviços</div>
+                </div>
+                <div class="card" onclick="router('produtos', null); closeModal('modal-menu')" style="text-align:center">
+                    <i class="fas fa-box" style="font-size:1.5rem; color:var(--warning); margin-bottom:5px;"></i>
+                    <div style="font-size:0.8rem">Estoque</div>
+                </div>
+                <div class="card" onclick="router('despesas', null); closeModal('modal-menu')" style="text-align:center">
+                    <i class="fas fa-receipt" style="font-size:1.5rem; color:var(--danger); margin-bottom:5px;"></i>
+                    <div style="font-size:0.8rem">Despesas</div>
+                </div>
+                <div class="card" onclick="router('funcionarios', null); closeModal('modal-menu')" style="text-align:center">
+                    <i class="fas fa-users" style="font-size:1.5rem; color:var(--text-light); margin-bottom:5px;"></i>
+                    <div style="font-size:0.8rem">Equipe</div>
+                </div>
+                <div class="card admin-only hidden" onclick="router('relatorios', null); closeModal('modal-menu')" style="text-align:center">
+                    <i class="fas fa-chart-pie" style="font-size:1.5rem; color:var(--primary); margin-bottom:5px;"></i>
+                    <div style="font-size:0.8rem">Relatórios</div>
+                </div>
+                <div class="card" onclick="router('config', null); closeModal('modal-menu')" style="text-align:center">
+                    <i class="fas fa-cog" style="font-size:1.5rem; color:var(--text-light); margin-bottom:5px;"></i>
+                    <div style="font-size:0.8rem">Config</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
-        // Chaves da sua base de dados
+        // --- CONFIG SUPABASE ---
         const SUPABASE_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
         const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
-        
         const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
         let currentUser = null;
         let userProfile = null;
+        let tempUsername = null; // Para guardar o username durante o fluxo de login
+        let servicesCache = [];
+        let professionalsCache = [];
 
-        // 1. SISTEMA DE LOGIN (nome.sobrenome)
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const usernameInput = document.getElementById('username').value.trim().toLowerCase();
-            const password = document.getElementById('password').value;
-            const errorText = document.getElementById('login-error');
-            const btn = e.target.querySelector('button');
-            
-            // Mascarando o login como e-mail para o Supabase aceitar
-            const email = usernameInput + '@estudio.com';
-            
-            btn.innerText = "Verificando...";
-
-            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-
-            if (error) {
-                errorText.classList.remove('hidden');
-                btn.innerText = "Entrar no Sistema";
-            } else {
-                errorText.classList.add('hidden');
-                checkSession();
-            }
-        });
-
-        // 2. RECUPERAR SESSÃO E VERIFICAR PRIMEIRO ACESSO
-        async function checkSession() {
+        // --- INICIALIZAÇÃO ---
+        document.addEventListener('DOMContentLoaded', async () => {
             const { data: { session } } = await supabase.auth.getSession();
-            
             if (session) {
                 currentUser = session.user;
-                
-                const { data: profile } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', currentUser.id)
-                    .single();
-                
-                userProfile = profile;
-                
-                // Ocultar Login
-                document.getElementById('login-screen').classList.add('hidden-screen');
-
-                // Verificar se é Primeiro Acesso
-                if (userProfile.first_login) {
-                    document.getElementById('first-login-screen').classList.remove('hidden-screen');
-                } else {
-                    iniciarSistema();
-                }
-
-            } else {
-                document.getElementById('login-screen').classList.remove('hidden-screen');
-                document.getElementById('first-login-screen').classList.add('hidden-screen');
-                document.getElementById('app-screen').classList.add('hidden-screen');
+                await loadUserProfile();
+                showApp();
             }
-        }
-
-        // 3. FLUXO DE TROCA DE SENHA (PRIMEIRO ACESSO)
-        document.getElementById('new-password-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const newPass = document.getElementById('new-password').value;
-            const confirmPass = document.getElementById('confirm-password').value;
-            const errorText = document.getElementById('password-error');
-            const btn = e.target.querySelector('button');
-
-            if (newPass !== confirmPass) {
-                errorText.classList.remove('hidden');
-                return;
-            }
-
-            errorText.classList.add('hidden');
-            btn.innerText = "Salvando...";
-
-            // Atualiza a senha no painel de Autenticação
-            const { error: authError } = await supabase.auth.updateUser({ password: newPass });
-
-            if (!authError) {
-                // Atualiza o perfil para registrar que não é mais o primeiro acesso
-                await supabase.from('profiles').update({ first_login: false }).eq('id', currentUser.id);
-                userProfile.first_login = false;
-                
-                document.getElementById('first-login-screen').classList.add('hidden-screen');
-                iniciarSistema();
-            } else {
-                alert("Erro ao salvar senha. Tente novamente.");
-                btn.innerText = "Salvar e Entrar";
-            }
+            
+            // Setar datas
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('agenda-date-picker').value = today;
+            document.getElementById('appt-date').value = today;
+            
+            document.getElementById('agenda-date-picker').addEventListener('change', loadAgenda);
         });
 
-        // 4. INICIAR O SISTEMA APÓS VALIDAÇÕES
-        function iniciarSistema() {
-            document.getElementById('app-screen').classList.remove('hidden-screen');
-
-            // Preencher dados no menu
-            document.getElementById('user-name-display').innerText = userProfile.full_name;
+        // --- FLUXO DE LOGIN INTELIGENTE ---
+        
+        async function checkUser() {
+            const username = document.getElementById('username').value.trim().toLowerCase();
+            const msg = document.getElementById('login-msg');
             
-            const roleBadge = document.getElementById('user-role-badge');
-            if(userProfile.role === 'admin') {
-                roleBadge.innerText = 'Proprietário';
-                roleBadge.classList.add('bg-brown', 'text-white');
-                document.getElementById('menu-financeiro').classList.remove('hidden');
-                document.getElementById('menu-servicos').classList.remove('hidden');
+            if (!username) { msg.innerText = "Digite seu usuário."; msg.style.color = "var(--danger)"; return; }
+            
+            msg.innerText = "Verificando..."; msg.style.color = "var(--text-light)";
+            tempUsername = username;
+            const email = `${username}@estudio.local`;
+
+            // Tenta buscar o perfil pelo email associado (já que o auth usa email)
+            // Nota: Precisamos verificar se o usuário existe na auth. 
+            // Como não podemos listar users da auth por segurança, tentamos um login falso ou verificamos a tabela profiles se o trigger criar sem auth?
+            // Melhor abordagem: Tentar signIn. Se erro "Invalid login", o usuário não existe.
+            // Mas o Supabase não diferencia "user not found" de "wrong password" por segurança.
+            
+            // SOLUÇÃO: Vamos assumir que o Proprietário cria o usuário no painel do Supabase Auth primeiro.
+            // Se o usuário existir no Auth, mas nunca logou, ele não terá senha? Não, o Auth exige senha.
+            
+            // AJUSTE DE LÓGICA PARA O QUE VOCÊ PEDIU:
+            // "Se não tiver o primeiro acesso... abrir modal para criar senha".
+            // Isso implica que o usuário JÁ EXISTE no banco (talvez criado pelo admin via SQL ou painel) mas não tem credenciais de auth?
+            // No Supabase, Auth e Profiles são separados.
+            
+            // Vamos fazer assim:
+            // 1. Verificamos se existe um registro na tabela `profiles` com phone ou full_name batendo? Não, o login é nome.sobrenome.
+            // Vamos usar o email `nome.sobrenome@estudio.local`.
+            // Se o admin criou o usuário no painel Auth com esse email e uma senha temporária qualquer, o usuário não sabe.
+            
+            // IMPLEMENTAÇÃO PRÁTICA:
+            // Vamos tentar logar com uma senha "dummy". Se falhar, verificamos se o email existe usando uma função específica ou assumimos que se falhar, é primeiro acesso?
+            // Não seguro.
+            
+            // VAMOS SIMPLIFICAR PARA FUNCIONAR NO SEU CENÁRIO:
+            // O Admin cria o usuário no Supabase Auth com email `nome.sobrenome@estudio.local` e SEM senha? Não dá.
+            // O Admin cria com senha `123456` (padrão).
+            // O usuário digita o nome. O sistema tenta logar com `123456`.
+            // Se funcionar -> É primeiro acesso -> Pede pra mudar senha.
+            // Se falhar -> Pede a senha real.
+            
+            const { data, error } = await supabase.auth.signInWithPassword({ email: email, password: '123456' });
+            
+            if (data && data.user) {
+                // Login com senha padrão funcionou -> Primeiro Acesso
+                currentUser = data.user;
+                await supabase.auth.signOut(); // Sai para poder criar a nova senha limpo? Não, melhor manter a sessão e atualizar.
+                // Na verdade, se logou, já temos a sessão. Vamos direto para tela de criar senha.
+                currentUser = data.user; // Mantém a sessão
+                document.getElementById('step-identify').classList.add('hidden');
+                document.getElementById('step-create-pass').classList.remove('hidden');
             } else {
-                roleBadge.innerText = 'Colaborador';
+                // Falhou. Ou não existe, ou a senha não é 123456.
+                // Vamos assumir que se não existe no Auth, o erro é específico.
+                if (error.message.includes("Invalid login credentials")) {
+                    // Pode ser que não exista OU senha errada.
+                    // Para distinguir, precisaríamos de uma Edge Function. 
+                    // Como queremos simples: Vamos assumir que o Admin SEMPRE cria o usuário no painel Auth antes.
+                    // Se falhou aqui, pedimos a senha. Se a senha estiver errada, o próximo passo falha.
+                    
+                    // MAS, se o usuário NÃO EXISTE no Auth,我们不能 criar senha sem ele existir.
+                    // O Admin precisa criar o usuário no painel Auth primeiro.
+                    
+                    document.getElementById('step-identify').classList.add('hidden');
+                    document.getElementById('step-login-pass').classList.remove('hidden');
+                } else {
+                    msg.innerText = "Erro: " + error.message;
+                    msg.style.color = "var(--danger)";
+                }
             }
-
-            navigate('agenda');
-            loadAgenda();
         }
 
-        // Logout
-        async function logout() {
+        async function createPassword() {
+            const newPass = document.getElementById('new-password').value;
+            if (newPass.length < 6) { alert("Senha muito curta"); return; }
+            
+            // Atualiza a senha do usuário atual (que logou com 123456)
+            const { error } = await supabase.auth.updateUser({ password: newPass });
+            
+            if (error) {
+                alert("Erro ao salvar senha: " + error.message);
+            } else {
+                // Senha salva. Agora carregamos o perfil e entramos.
+                await loadUserProfile();
+                showApp();
+            }
+        }
+
+        async function doLogin() {
+            const pass = document.getElementById('existing-password').value;
+            const email = `${tempUsername}@estudio.local`;
+            const msg = document.getElementById('login-msg-2');
+            
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
+            
+            if (error) {
+                msg.innerText = "Senha incorreta.";
+            } else {
+                currentUser = data.user;
+                await loadUserProfile();
+                showApp();
+            }
+        }
+
+        function resetLogin() {
+            document.querySelectorAll('.login-card').forEach(el => el.classList.add('hidden'));
+            document.getElementById('step-identify').classList.remove('hidden');
+            document.getElementById('login-msg').innerText = "";
+            tempUsername = null;
+        }
+
+        async function loadUserProfile() {
+            const { data } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+            if (data) {
+                userProfile = data;
+                setupUI();
+                loadInitialData();
+            }
+        }
+
+        function setupUI() {
+            const roleDisplay = document.getElementById('user-role-display');
+            const adminItems = document.querySelectorAll('.admin-only');
+            
+            let roleName = "Colaborador";
+            if (userProfile.role === 'admin') {
+                roleName = "Proprietário";
+                adminItems.forEach(el => el.classList.remove('hidden'));
+            } else {
+                adminItems.forEach(el => el.classList.add('hidden'));
+            }
+            roleDisplay.innerText = roleName;
+            
+            subscribeToRealtime();
+        }
+
+        function showApp() {
+            document.getElementById('auth-screen').style.display = 'none';
+            document.getElementById('app-screen').style.display = 'flex';
+        }
+
+        async function handleLogout() {
             await supabase.auth.signOut();
-            window.location.reload();
+            location.reload();
         }
 
-        // Navegação de Abas
-        function navigate(viewName) {
-            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden-screen'));
-            document.querySelectorAll('.menu-item').forEach(el => {
-                el.classList.remove('text-rose');
-                el.classList.add('text-brown');
-            });
-            document.getElementById(`view-${viewName}`).classList.remove('hidden-screen');
-            const clickedBtn = event ? event.currentTarget : null;
-            if(clickedBtn) {
-                clickedBtn.classList.add('text-rose');
-                clickedBtn.classList.remove('text-brown');
+        // --- NAVEGAÇÃO ---
+        function router(viewName, navEl) {
+            document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+            document.getElementById(`view-${viewName}`).classList.add('active');
+            
+            if (navEl) {
+                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                navEl.classList.add('active');
             }
+
+            // Carregar dados específicos
+            if (viewName === 'agenda') loadAgenda();
+            if (viewName === 'comandas') loadComandas();
+            if (viewName === 'cobrancas') loadCobrancas();
+            if (viewName === 'clientes') loadClientes();
+            if (viewName === 'mensagens') loadTemplates();
+            if (viewName === 'servicos') loadServices();
+            if (viewName === 'produtos') loadProducts();
+            if (viewName === 'despesas') loadExpenses();
+            if (viewName === 'funcionarios') loadProfessionals();
+            if (viewName === 'relatorios') loadReports();
+            if (viewName === 'home') loadDashboard();
         }
 
-        // Carregar Agenda 
-        async function loadAgenda() {
-            const agendaContainer = document.getElementById('agenda-list');
-            let query = supabase.from('appointments').select(`id, appointment_date, status, profiles!client_id(full_name), services(name)`).order('appointment_date', { ascending: true });
+        function toggleMoreMenu() {
+            document.getElementById('modal-menu').classList.add('open');
+        }
 
-            // Se não for admin, vê só a própria agenda
-            if(userProfile.role !== 'admin') {
+        function closeModal(id) {
+            document.getElementById(id).classList.remove('open');
+        }
+
+        // --- DADOS ---
+
+        async function loadInitialData() {
+            // Carregar Serviços
+            const { data: servs } = await supabase.from('services').select('*').eq('is_active', true);
+            servicesCache = servs || [];
+            const selServ = document.getElementById('appt-service');
+            selServ.innerHTML = '<option value="">Selecione...</option>';
+            servicesCache.forEach(s => {
+                selServ.innerHTML += `<option value="${s.id}" data-duration="${s.duration_minutes}">${s.name} - R$ ${s.price}</option>`;
+            });
+
+            // Carregar Profissionais (Para o Admin escolher)
+            const { data: profs } = await supabase.from('profiles').select('*').neq('role', 'cliente');
+            professionalsCache = profs || [];
+            const selProf = document.getElementById('appt-professional');
+            selProf.innerHTML = '';
+            professionalsCache.forEach(p => {
+                selProf.innerHTML += `<option value="${p.id}">${p.full_name}</option>`;
+            });
+            
+            // Se não for admin, trava no próprio ID
+            if (userProfile.role !== 'admin') {
+                selProf.value = currentUser.id;
+            } else {
+                selProf.disabled = false;
+            }
+
+            loadDashboard();
+        }
+
+        async function loadDashboard() {
+            const today = new Date().toISOString().split('T')[0];
+            
+            // Receita Hoje
+            const { data: cmds } = await supabase.from('commands').select('total_amount').eq('status', 'paid').gte('closed_at', `${today}T00:00:00`);
+            const rev = cmds ? cmds.reduce((a, b) => a + parseFloat(b.total_amount), 0) : 0;
+            document.getElementById('dash-revenue').innerText = `R$ ${rev.toFixed(0)}`;
+
+            // Agendamentos Hoje
+            const { data: appts } = await supabase.from('appointments').select('id').gte('appointment_date', `${today}T00:00:00`).lte('appointment_date', `${today}T23:59:59`);
+            document.getElementById('dash-appts').innerText = appts ? appts.length : 0;
+
+            // Pendentes
+            const pending = appts ? appts.filter(a => a.status === 'pending').length : 0;
+            document.getElementById('dash-pending').innerText = pending;
+
+            loadAgendaList('home-appointments-list', 3);
+        }
+
+        async function loadAgenda() {
+            const dateStr = document.getElementById('agenda-date-picker').value;
+            loadAgendaList('agenda-list', 50, dateStr);
+        }
+
+        async function loadAgendaList(elementId, limit, specificDate = null) {
+            const container = document.getElementById(elementId);
+            const dateToUse = specificDate || new Date().toISOString().split('T')[0];
+            
+            let query = supabase
+                .from('appointments')
+                .select('*, client:profiles(full_name), service:services(name)')
+                .gte('appointment_date', `${dateToUse}T00:00:00`)
+                .lte('appointment_date', `${dateToUse}T23:59:59`)
+                .order('appointment_date', { ascending: true })
+                .limit(limit);
+
+            // AGENDA EXCLUSIVA
+            if (userProfile.role !== 'admin') {
                 query = query.eq('employee_id', currentUser.id);
             }
 
-            const { data: appointments } = await query;
-            if (appointments && appointments.length > 0) {
-                agendaContainer.innerHTML = appointments.map(apt => `
-                    <div class="bg-white p-4 rounded-xl border-l-4 border-rose shadow-sm mb-2">
-                        <h3 class="font-bold text-brown">${apt.profiles.full_name}</h3>
-                        <p class="text-sm text-gray-600">${apt.services.name}</p>
+            const { data, error } = await query;
+
+            if (error) { console.error(error); container.innerHTML = '<div class="card">Erro ao carregar.</div>'; return; }
+            if (!data || data.length === 0) { container.innerHTML = '<div class="card" style="text-align:center; color:#aaa">Nenhum horário.</div>'; return; }
+
+            container.innerHTML = data.map(appt => {
+                const time = new Date(appt.appointment_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                const statusClass = appt.status === 'completed' ? 'badge-paid' : (appt.status === 'cancelled' ? 'badge-debt' : 'badge-open');
+                return `
+                <div class="card" style="border-left: 4px solid var(--primary)">
+                    <div style="display:flex; justify-content:space-between">
+                        <strong style="color:var(--primary)">${time}</strong>
+                        <span class="badge ${statusClass}">${appt.status}</span>
                     </div>
-                `).join('');
-            } else {
-                agendaContainer.innerHTML = `<p class="text-center text-gray-500 mt-10">Sua agenda está livre.</p>`;
+                    <div style="margin-top:5px; font-weight:600">${appt.client?.full_name || 'Cliente'}</div>
+                    <div style="font-size:0.85rem; color:var(--text-light)">${appt.service?.name || 'Avulso'}</div>
+                </div>`;
+            }).join('');
+        }
+
+        async function loadComandas() {
+            const container = document.getElementById('comandas-list');
+            const { data } = await supabase.from('commands').select('*, client:profiles(full_name)').eq('status', 'open').order('opened_at', { ascending: false });
+            
+            if (!data || data.length === 0) { container.innerHTML = '<div class="card">Nenhuma comanda aberta.</div>'; return; }
+            
+            container.innerHTML = data.map(cmd => `
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between">
+                        <strong>#${cmd.cmd_number || 'Nova'}</strong>
+                        <span class="badge badge-open">Aberta</span>
+                    </div>
+                    <div class="mt-2">${cmd.client?.full_name}</div>
+                    <div class="text-right mt-2" style="font-weight:bold; color:var(--primary)">R$ ${parseFloat(cmd.total_amount||0).toFixed(2)}</div>
+                    <button class="btn-primary mt-2" style="padding:8px" onclick="closeCommand('${cmd.id}')">Fechar e Faturar</button>
+                </div>
+            `).join('');
+        }
+
+        async function loadCobrancas() {
+            const container = document.getElementById('cobrancas-list');
+            // Comandas com status 'debt' ou 'open' antigas? Vamos pegar 'debt'
+            const { data } = await supabase.from('commands').select('*, client:profiles(full_name, phone)').eq('status', 'debt');
+            
+            if (!data || data.length === 0) { container.innerHTML = '<div class="card">Nenhum débito pendente.</div>'; return; }
+            
+            container.innerHTML = data.map(cmd => `
+                <div class="card" style="border-left: 4px solid var(--danger)">
+                    <div style="display:flex; justify-content:space-between">
+                        <strong>${cmd.client?.full_name}</strong>
+                        <span class="badge badge-debt">Devendo</span>
+                    </div>
+                    <div style="font-size:0.85rem"><i class="fab fa-whatsapp"></i> ${cmd.client?.phone}</div>
+                    <div class="text-right mt-2" style="font-weight:bold; color:var(--danger)">R$ ${parseFloat(cmd.total_amount||0).toFixed(2)}</div>
+                </div>
+            `).join('');
+        }
+
+        async function loadClientes() {
+            const container = document.getElementById('clientes-list');
+            const { data } = await supabase.from('profiles').select('*').eq('role', 'cliente').limit(20);
+            container.innerHTML = data.map(c => `
+                <div class="card">
+                    <div style="font-weight:600">${c.full_name}</div>
+                    <div style="font-size:0.85rem; color:var(--text-light)">${c.phone}</div>
+                </div>
+            `).join('');
+        }
+
+        async function loadTemplates() {
+            const container = document.getElementById('templates-list');
+            const { data } = await supabase.from('message_templates').select('*');
+            container.innerHTML = data.map(t => `
+                <div class="card">
+                    <strong>${t.name}</strong>
+                    <p style="font-size:0.85rem; color:var(--text-light); margin-top:5px;">${t.message_body}</p>
+                </div>
+            `).join('');
+        }
+
+        async function loadServices() {
+            const container = document.getElementById('servicos-list');
+            const { data } = await supabase.from('services').select('*');
+            container.innerHTML = data.map(s => `
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between">
+                        <strong>${s.name}</strong>
+                        <span style="color:var(--primary); font-weight:bold">R$ ${s.price}</span>
+                    </div>
+                    <small style="color:var(--text-light)">${s.duration_minutes} min | Custo: R$ ${s.cost_price || 0}</small>
+                </div>
+            `).join('');
+        }
+
+        async function loadProducts() {
+            const container = document.getElementById('produtos-list');
+            const { data } = await supabase.from('products').select('*');
+            container.innerHTML = data.map(p => `
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between">
+                        <strong>${p.name}</strong>
+                        <span class="badge ${p.stock_qty < p.min_stock ? 'badge-debt' : 'badge-paid'}">${p.stock_qty} un</span>
+                    </div>
+                    <small style="color:var(--text-light)">Preço: R$ ${p.sale_price}</small>
+                </div>
+            `).join('');
+        }
+
+        async function loadExpenses() {
+            const container = document.getElementById('despesas-list');
+            const { data } = await supabase.from('expenses').select('*').order('date', {ascending: false}).limit(10);
+            container.innerHTML = data.map(e => `
+                <div class="card">
+                    <div style="display:flex; justify-content:space-between">
+                        <strong>${e.description}</strong>
+                        <span style="color:var(--danger)">- R$ ${e.amount}</span>
+                    </div>
+                    <small style="color:var(--text-light)">${e.date}</small>
+                </div>
+            `).join('');
+        }
+
+        async function loadProfessionals() {
+            const container = document.getElementById('funcionarios-list');
+            const { data } = await supabase.from('profiles').select('*').neq('role', 'cliente');
+            container.innerHTML = data.map(p => `
+                <div class="card">
+                    <strong>${p.full_name}</strong>
+                    <div style="font-size:0.85rem; color:var(--text-light)">Comissão: ${p.commission_rate || 0}%</div>
+                </div>
+            `).join('');
+        }
+
+        async function loadReports() {
+            if (userProfile.role !== 'admin') return;
+            const { data: rev } = await supabase.from('commands').select('total_amount').eq('status', 'paid');
+            const { data: exp } = await supabase.from('expenses').select('amount');
+            
+            const totalRev = rev ? rev.reduce((a, b) => a + parseFloat(b.total_amount), 0) : 0;
+            const totalExp = exp ? exp.reduce((a, b) => a + parseFloat(b.amount), 0) : 0;
+            
+            document.getElementById('rep-revenue').innerText = `R$ ${totalRev.toFixed(2)}`;
+            document.getElementById('rep-expenses').innerText = `R$ ${totalExp.toFixed(2)}`;
+            document.getElementById('rep-profit').innerText = `R$ ${(totalRev - totalExp).toFixed(2)}`;
+        }
+
+        // --- AÇÕES ---
+
+        function openNewAppointmentModal() {
+            document.getElementById('modal-appt').classList.add('open');
+        }
+
+        async function saveAppointment() {
+            const clientPhone = document.getElementById('appt-whatsapp').value;
+            const serviceId = document.getElementById('appt-service').value;
+            const date = document.getElementById('appt-date').value;
+            const time = document.getElementById('appt-time').value;
+            const clientName = document.getElementById('appt-client-search').value;
+            const profId = document.getElementById('appt-professional').value;
+
+            if (!date || !time || !serviceId || !clientPhone) { alert("Preencha tudo."); return; }
+
+            const startDateTime = `${date}T${time}:00`;
+            const service = servicesCache.find(s => s.id == serviceId);
+            const duration = service ? service.duration_minutes : 60;
+            const endDate = new Date(new Date(startDateTime).getTime() + duration * 60000).toISOString();
+
+            // Cliente
+            let clientId = null;
+            const { data: existing } = await supabase.from('profiles').select('id').eq('phone', clientPhone).single();
+            if (existing) { clientId = existing.id; } 
+            else {
+                const { data: newC } = await supabase.from('profiles').insert({ full_name: clientName || "Cliente", phone: clientPhone, role: 'cliente' }).select().single();
+                clientId = newC.id;
+            }
+
+            // Agendamento (Usando employee_id e appointment_date conforme seu schema)
+            const { error } = await supabase.from('appointments').insert({
+                client_id: clientId,
+                employee_id: profId,
+                service_id: serviceId,
+                appointment_date: startDateTime,
+                end_date: endDate,
+                status: 'pending'
+            });
+
+            if (error) alert("Erro: " + error.message);
+            else {
+                alert("Agendado!");
+                closeModal('modal-appt');
+                loadAgenda();
+                loadDashboard();
             }
         }
 
-        // Inicializa
-        checkSession();
+        async function closeCommand(cmdId) {
+            if(!confirm("Fechar comanda?")) return;
+            await supabase.from('commands').update({ status: 'paid', closed_at: new Date().toISOString() }).eq('id', cmdId);
+            loadComandas();
+            loadDashboard();
+        }
+
+        // --- REALTIME ---
+        function subscribeToRealtime() {
+            supabase.channel('public:appointments').on('postgres_changes', { event: '*', schema: 'public', table: 'appointments' }, () => {
+                if (document.getElementById('view-agenda').classList.contains('active')) loadAgenda();
+                if (document.getElementById('view-home').classList.contains('active')) loadDashboard();
+            }).subscribe();
+        }
+
     </script>
 </body>
 </html>

@@ -1,180 +1,97 @@
-// Credenciais integradas
-const SUPABASE_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-let currentUserAttempt = null;
-let loggedUser = null;
-
-// Elementos Principais
-const splashScreen = document.getElementById('splash-screen');
-const loginScreen = document.getElementById('login-screen');
-const appScreen = document.getElementById('app-screen');
-
-// Login Elements
-const step1 = document.getElementById('login-step-1');
-const step2 = document.getElementById('login-step-2');
-const inputUsername = document.getElementById('username');
-const inputPassword = document.getElementById('password');
-const btnVerify = document.getElementById('btn-verify-user');
-const btnLogin = document.getElementById('btn-login');
-const btnBack = document.getElementById('btn-back');
-const errorMsg = document.getElementById('login-error');
-
-// SPLASH & INICIALIZAÇÃO
-window.addEventListener('DOMContentLoaded', () => {
-    setTimeout(() => {
-        splashScreen.classList.remove('active');
-        const sessionUser = sessionStorage.getItem('estudioUser');
-        if (sessionUser) {
-            loggedUser = JSON.parse(sessionUser);
-            initApp();
-        } else {
-            loginScreen.classList.add('active');
-        }
-    }, 1200);
-});
-
-function showError(msg) {
-    errorMsg.textContent = msg;
-    setTimeout(() => errorMsg.textContent = '', 3000);
+:root {
+    --primary: #B76E79;       /* Rose Gold */
+    --primary-dark: #965A64;
+    --secondary: #F4C2C2;     /* Blush */
+    --bg-color: #FDF6F0;      /* Cream */
+    --text-dark: #4A3B3B;
+    --text-light: #8C7B7B;
+    --white: #FFFFFF;
+    --success: #27AE60;
+    --danger: #E74C3C;
+    --shadow: 0 4px 15px rgba(183, 110, 121, 0.1);
+    --nav-height: 65px;
 }
 
-// LÓGICA DE LOGIN (PASSO 1)
-btnVerify.addEventListener('click', async () => {
-    const username = inputUsername.value.trim().toLowerCase();
-    if (!username) return showError('Digite seu nome de usuário.');
+* { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Poppins', sans-serif; -webkit-tap-highlight-color: transparent; }
 
-    try {
-        btnVerify.disabled = true;
-        btnVerify.textContent = 'Verificando...';
-        const { data: user, error } = await supabase.from('usuarios').select('*').eq('username', username).single();
+body { background-color: var(--bg-color); color: var(--text-dark); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 
-        if (error || !user) throw new Error('Usuário não encontrado.');
-        if (!user.ativo) throw new Error('Usuário desativado.');
+h1, h2, h3 { font-family: 'Playfair Display', serif; color: var(--primary); }
+.text-primary { color: var(--primary) !important; }
+.text-success { color: var(--success) !important; }
+.text-danger { color: var(--danger) !important; }
+.mt-2 { margin-top: 1rem; }
+.mt-3 { margin-top: 1.5rem; }
+.mb-2 { margin-bottom: 1rem; }
+.w-100 { width: 100%; }
+.text-center { text-align: center; }
+.flex-between { display: flex; justify-content: space-between; align-items: center; }
 
-        currentUserAttempt = user;
-        step1.classList.remove('active');
-        step2.classList.add('active');
+/* --- CONTROLE DE TELAS (VIEWS) --- */
+.view { display: none; height: 100%; width: 100%; }
+.view.active-flex { display: flex; animation: fadeIn 0.4s ease; }
+.view.app-layout { display: flex; flex-direction: column; }
 
-        document.getElementById('welcome-message').textContent = user.senha ? `Bem-vindo de volta!` : `Primeiro acesso.`;
-        document.getElementById('password-label').textContent = user.senha ? 'Digite sua senha' : 'Crie sua senha (mín. 6)';
-        btnLogin.textContent = user.senha ? 'Entrar' : 'Salvar e Entrar';
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.hidden { display: none !important; }
+.admin-only { display: none; } /* Ativado via JS para Proprietários */
 
-    } catch (err) {
-        showError(err.message || 'Erro ao conectar.');
-    } finally {
-        btnVerify.disabled = false;
-        btnVerify.textContent = 'Continuar';
-    }
-});
+/* --- TELA DE LOGIN / SPLASH --- */
+#splash-screen, #auth-screen { flex-direction: column; align-items: center; justify-content: center; background: linear-gradient(135deg, var(--bg-color) 0%, var(--secondary) 100%); }
+.logo-area { text-align: center; margin-bottom: 30px; }
+.logo-area h1 { font-size: 2.2rem; line-height: 1.1; margin-bottom: 5px; }
+.logo-area p { color: var(--primary-dark); font-style: italic; }
+.spinner { width: 40px; height: 40px; margin: 20px auto; border: 4px solid var(--white); border-top: 4px solid var(--primary); border-radius: 50%; animation: spin 1s linear infinite; }
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
-// LÓGICA DE LOGIN (PASSO 2)
-btnLogin.addEventListener('click', async () => {
-    const password = inputPassword.value.trim();
-    if (password.length < 6) return showError('Mínimo 6 caracteres.');
+.login-card { background: var(--white); padding: 30px; border-radius: 20px; width: 90%; max-width: 400px; box-shadow: var(--shadow); }
+.input-group { margin-bottom: 15px; }
+.input-group label { display: block; font-size: 0.85rem; color: var(--text-light); margin-bottom: 5px; font-weight: 500; }
+.input-styled { width: 100%; padding: 12px; border: 1px solid var(--secondary); border-radius: 8px; outline: none; transition: 0.3s; font-size: 1rem; background: var(--white); }
+.input-styled:focus { border-color: var(--primary); }
 
-    try {
-        btnLogin.disabled = true;
-        btnLogin.textContent = 'Aguarde...';
+.btn-primary { width: 100%; padding: 14px; background: var(--primary); color: var(--white); border: none; border-radius: 8px; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 1rem; }
+.btn-primary:active { transform: scale(0.98); background: var(--primary-dark); }
+.btn-secondary { width: 100%; padding: 10px; background: transparent; color: var(--text-light); border: none; cursor: pointer; margin-top: 5px; }
+.msg-text { margin-top: 15px; font-size: 0.85rem; text-align: center; min-height: 20px; color: var(--primary-dark); }
 
-        if (!currentUserAttempt.senha) {
-            const { error: updateError } = await supabase.from('usuarios').update({ senha: password }).eq('id', currentUserAttempt.id);
-            if (updateError) throw updateError;
-            currentUserAttempt.senha = password;
-        } else if (password !== currentUserAttempt.senha) {
-            throw new Error('Senha incorreta.');
-        }
+/* --- APP LAYOUT --- */
+.top-header { background: var(--white); padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.05); z-index: 10; }
+.header-title { font-weight: 600; color: var(--primary); font-size: 1.1rem; }
+.user-badge { font-size: 0.75rem; background: var(--secondary); padding: 4px 12px; border-radius: 20px; color: var(--primary-dark); font-weight: 600; }
 
-        sessionStorage.setItem('estudioUser', JSON.stringify(currentUserAttempt));
-        loggedUser = currentUserAttempt;
-        loginScreen.classList.remove('active');
-        initApp();
+#main-content { flex: 1; overflow-y: auto; padding: 15px; padding-bottom: calc(var(--nav-height) + 20px); }
+.page { display: none; animation: fadeIn 0.3s ease; }
+.page.active { display: block; }
+.section-title { font-size: 1.1rem; margin: 15px 0 10px; }
 
-    } catch (err) {
-        showError(err.message || 'Erro no login.');
-        btnLogin.disabled = false;
-        btnLogin.textContent = currentUserAttempt.senha ? 'Entrar' : 'Salvar e Entrar';
-    }
-});
+/* Cards Genéricos */
+.card { background: var(--white); padding: 15px; border-radius: 12px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); border-left: 4px solid var(--primary); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.grid-2 { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.stat-box { background: var(--white); padding: 15px 5px; border-radius: 12px; text-align: center; border: 1px solid var(--secondary); }
+.stat-val { font-size: 1.2rem; font-weight: 700; color: var(--primary); }
+.stat-lbl { font-size: 0.7rem; color: var(--text-light); margin-top: 4px; }
+.dashed-line { margin: 15px 0; border: 0; border-top: 1px dashed var(--secondary); }
 
-btnBack.addEventListener('click', () => {
-    step2.classList.remove('active');
-    step1.classList.add('active');
-    inputPassword.value = '';
-});
+/* --- BOTTOM NAV & FAB --- */
+.bottom-nav { position: fixed; bottom: 0; left: 0; width: 100%; height: var(--nav-height); background: var(--white); border-top: 1px solid var(--secondary); display: flex; justify-content: space-around; align-items: center; z-index: 100; padding-bottom: env(safe-area-inset-bottom); }
+.nav-item { display: flex; flex-direction: column; align-items: center; color: var(--text-light); font-size: 0.7rem; cursor: pointer; transition: 0.2s; }
+.nav-item i { font-size: 1.3rem; margin-bottom: 3px; }
+.nav-item.active { color: var(--primary); transform: translateY(-2px); }
 
-// INICIALIZAÇÃO DO APP (Após Login)
-function initApp() {
-    appScreen.classList.add('active');
-    document.getElementById('logged-user-name').textContent = loggedUser.username.split('.')[0];
-    
-    // Controle de Permissões (Proprietário vs Freelancer)
-    const propElements = document.querySelectorAll('.prop-only');
-    propElements.forEach(el => {
-        if (loggedUser.perfil === 'proprietario') {
-            el.style.display = el.tagName === 'A' ? 'flex' : 'block';
-        } else {
-            el.style.display = 'none';
-        }
-    });
+.fab-btn { position: fixed; bottom: calc(var(--nav-height) + 15px); right: 20px; width: 56px; height: 56px; background: var(--primary); color: var(--white); border: none; border-radius: 50%; font-size: 1.5rem; display: flex; align-items: center; justify-content: center; box-shadow: var(--shadow); z-index: 90; cursor: pointer; transition: 0.2s; }
+.fab-btn:active { transform: scale(0.95); }
 
-    navigateTo('page-dashboard', 'Dashboard');
-}
+/* --- MODAIS (Bottom Sheet) --- */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(74, 59, 59, 0.5); display: flex; flex-direction: column; justify-content: flex-end; opacity: 0; pointer-events: none; transition: opacity 0.3s; z-index: 200; }
+.modal-overlay.active { opacity: 1; pointer-events: auto; }
+.modal-sheet { background: var(--bg-color); width: 100%; border-radius: 20px 20px 0 0; padding: 20px; transform: translateY(100%); transition: transform 0.3s ease-out; max-height: 90vh; overflow-y: auto; }
+.modal-overlay.active .modal-sheet { transform: translateY(0); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--secondary); padding-bottom: 10px; }
+.close-btn { background: none; border: none; font-size: 1.5rem; color: var(--text-dark); cursor: pointer; }
 
-// LOGOUT
-document.getElementById('btn-logout').addEventListener('click', () => {
-    sessionStorage.removeItem('estudioUser');
-    window.location.reload();
-});
-
-// ---------------- LÓGICA SPA (NAVEGAÇÃO) ----------------
-const pages = document.querySelectorAll('.page');
-const navItems = document.querySelectorAll('.nav-item');
-const menuLinks = document.querySelectorAll('.menu-link');
-const headerTitle = document.getElementById('header-title');
-
-function navigateTo(pageId, title) {
-    // Esconde todas as páginas
-    pages.forEach(p => p.classList.remove('active'));
-    // Mostra a página alvo
-    document.getElementById(pageId).classList.add('active');
-    // Atualiza título do Header
-    if(title) headerTitle.textContent = title;
-    // Fecha o modal de menu se estiver aberto
-    closeModal('menu-modal');
-
-    // Atualiza o estado do Bottom Nav
-    navItems.forEach(nav => {
-        nav.classList.remove('active');
-        if(nav.getAttribute('data-target') === pageId) {
-            nav.classList.add('active');
-        }
-    });
-}
-
-// Event Listeners para o Menu Inferior
-navItems.forEach(nav => {
-    if(nav.hasAttribute('data-target')){
-        nav.addEventListener('click', (e) => {
-            e.preventDefault();
-            navigateTo(nav.getAttribute('data-target'), nav.querySelector('span').textContent);
-        });
-    }
-});
-
-// Event Listeners para o Menu Expandido
-menuLinks.forEach(link => {
-    link.addEventListener('click', (e) => {
-        e.preventDefault();
-        navigateTo(link.getAttribute('data-target'), link.textContent.trim());
-    });
-});
-
-// ---------------- CONTROLE DE MODAIS ----------------
-function openModal(modalId) {
-    document.getElementById(modalId).classList.add('active');
-}
-function closeModal(modalId) {
-    document.getElementById(modalId).classList.remove('active');
-}
+/* Menu Lateral Links */
+.menu-category { font-size: 0.8rem; text-transform: uppercase; color: var(--text-light); font-weight: 600; margin-bottom: 10px; letter-spacing: 1px; }
+.menu-link { display: flex; align-items: center; gap: 15px; padding: 15px; background: var(--white); border-radius: 12px; margin-bottom: 10px; text-decoration: none; color: var(--text-dark); font-weight: 500; }
+.menu-link i { color: var(--primary); font-size: 1.2rem; width: 20px; text-align: center; }

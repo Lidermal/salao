@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Estúdio Amor que Cuida</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        nude: '#Fdf8f5',
+                        rose: '#D5A193',
+                        roseDark: '#B87A6B',
+                        brown: '#4A362D'
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Ícones -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background-color: #Fdf8f5; color: #4A362D; }
+        .hidden-screen { display: none !important; }
+        .pb-safe { padding-bottom: env(safe-area-inset-bottom, 20px); }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body>
+
+    <!-- ========================================== -->
+    <!-- TELA DE LOGIN                              -->
+    <!-- ========================================== -->
+    <div id="login-screen" class="min-h-screen flex flex-col items-center justify-center p-4">
+        <div class="w-full max-w-sm bg-white rounded-3xl shadow-xl p-8 text-center border border-rose/30">
+            <h1 class="text-4xl font-serif text-brown mb-2 tracking-wide">ESTÚDIO</h1>
+            <h2 class="text-3xl font-serif text-rose mb-1">Amor que Cuida</h2>
+            <p class="text-brown/60 text-sm italic mb-8">by Andressa Vieira</p>
+
+            <form id="login-form" class="flex flex-col gap-4">
+                <!-- Alterado para Usuário -->
+                <input type="text" id="username" placeholder="Usuário (ex: nome.sobrenome)" required
+                    class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:border-rose text-brown lowercase">
+                
+                <input type="password" id="password" placeholder="Senha" required
+                    class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:border-rose text-brown">
+                
+                <button type="submit" class="w-full bg-rose hover:bg-roseDark text-white font-bold py-4 rounded-xl transition-colors mt-2 shadow-md">
+                    Entrar no Sistema
+                </button>
+            </form>
+            <p id="login-error" class="text-red-500 text-sm mt-4 hidden">Usuário ou senha incorretos.</p>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- TELA DE PRIMEIRO ACESSO (MUDAR SENHA)      -->
+    <!-- ========================================== -->
+    <div id="first-login-screen" class="hidden-screen min-h-screen flex flex-col items-center justify-center p-4">
+        <div class="w-full max-w-sm bg-white rounded-3xl shadow-xl p-8 text-center border border-rose/30">
+            <i class="fas fa-shield-alt text-4xl text-rose mb-4"></i>
+            <h2 class="text-2xl font-serif text-brown mb-2">Bem-vinda(o)!</h2>
+            <p class="text-sm text-gray-500 mb-6">Este é o seu primeiro acesso. Por segurança, crie a sua senha pessoal e intransferível.</p>
+
+            <form id="new-password-form" class="flex flex-col gap-4">
+                <input type="password" id="new-password" placeholder="Nova Senha (min. 6 caracteres)" required minlength="6"
+                    class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:border-rose text-brown">
+                
+                <input type="password" id="confirm-password" placeholder="Confirme a Nova Senha" required minlength="6"
+                    class="w-full p-4 rounded-xl border border-gray-200 focus:outline-none focus:border-rose text-brown">
+                
+                <button type="submit" class="w-full bg-brown hover:bg-brown/90 text-white font-bold py-4 rounded-xl transition-colors mt-2 shadow-md">
+                    Salvar e Entrar
+                </button>
+            </form>
+            <p id="password-error" class="text-red-500 text-sm mt-4 hidden">As senhas não coincidem.</p>
+        </div>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- SISTEMA PRINCIPAL (Após Login)             -->
+    <!-- ========================================== -->
+    <div id="app-screen" class="hidden-screen h-screen flex flex-col md:flex-row overflow-hidden">
+        
+        <!-- MENU LATERAL / INFERIOR -->
+        <nav id="main-nav" class="bg-white border-r border-t border-gray-200 flex md:flex-col justify-around md:justify-start p-2 md:w-64 md:h-full fixed bottom-0 w-full md:relative z-50 pb-safe md:pb-4">
+            
+            <div class="hidden md:block p-4 text-center border-b border-gray-100 mb-4">
+                <h2 class="font-serif text-rose text-xl">Amor que Cuida</h2>
+                <p id="user-name-display" class="text-xs text-brown mt-1">Colaborador</p>
+                <p id="user-role-badge" class="text-[10px] bg-rose/20 text-roseDark px-2 py-1 rounded-full inline-block mt-2">Nível</p>
+            </div>
+
+            <!-- Menus -->
+            <button onclick="navigate('agenda')" class="menu-item flex flex-col md:flex-row items-center md:p-3 text-brown hover:text-rose transition w-full md:text-left">
+                <i class="fas fa-calendar-alt text-xl md:w-8"></i>
+                <span class="text-[10px] md:text-base mt-1 md:mt-0">Agenda</span>
+            </button>
+            
+            <button onclick="navigate('comandas')" class="menu-item flex flex-col md:flex-row items-center md:p-3 text-brown hover:text-rose transition w-full md:text-left">
+                <i class="fas fa-receipt text-xl md:w-8"></i>
+                <span class="text-[10px] md:text-base mt-1 md:mt-0">Comandas</span>
+            </button>
+
+            <button onclick="navigate('clientes')" class="menu-item flex flex-col md:flex-row items-center md:p-3 text-brown hover:text-rose transition w-full md:text-left">
+                <i class="fas fa-users text-xl md:w-8"></i>
+                <span class="text-[10px] md:text-base mt-1 md:mt-0">Clientes</span>
+            </button>
+
+            <!-- Apenas Proprietário -->
+            <button id="menu-financeiro" onclick="navigate('financeiro')" class="menu-item hidden flex flex-col md:flex-row items-center md:p-3 text-brown hover:text-rose transition w-full md:text-left">
+                <i class="fas fa-chart-line text-xl md:w-8"></i>
+                <span class="text-[10px] md:text-base mt-1 md:mt-0">Relatórios</span>
+            </button>
+            
+            <button id="menu-servicos" onclick="navigate('servicos')" class="menu-item hidden flex flex-col md:flex-row items-center md:p-3 text-brown hover:text-rose transition w-full md:text-left">
+                <i class="fas fa-spa text-xl md:w-8"></i>
+                <span class="text-[10px] md:text-base mt-1 md:mt-0">Serviços</span>
+            </button>
+
+            <button onclick="logout()" class="hidden md:flex flex-col md:flex-row items-center md:p-3 text-red-400 hover:text-red-600 transition w-full md:text-left mt-auto">
+                <i class="fas fa-sign-out-alt text-xl md:w-8"></i>
+                <span class="text-[10px] md:text-base mt-1 md:mt-0">Sair</span>
+            </button>
+        </nav>
+
+        <!-- ÁREA DE CONTEÚDO DAS TELAS -->
+        <main class="flex-1 bg-nude overflow-y-auto pb-20 md:pb-0">
+            <!-- TELA: AGENDA -->
+            <div id="view-agenda" class="view-section p-4">
+                <header class="flex justify-between items-center mb-6">
+                    <h1 class="text-2xl font-serif text-brown">Minha Agenda</h1>
+                    <button class="bg-rose text-white px-4 py-2 rounded-xl shadow hover:bg-roseDark transition">
+                        + Novo Agendamento
+                    </button>
+                </header>
+                <div id="agenda-list" class="space-y-4">
+                    <p class="text-center text-gray-500 mt-10">Carregando horários...</p>
+                </div>
+            </div>
+
+            <!-- Outras telas ocultas para navegação futura -->
+            <div id="view-comandas" class="view-section hidden-screen p-4">
+                <h1 class="text-2xl font-serif text-brown mb-6">Comandas Abertas</h1>
+            </div>
+            <div id="view-clientes" class="view-section hidden-screen p-4">
+                <h1 class="text-2xl font-serif text-brown mb-6">Clientes</h1>
+            </div>
+            <div id="view-financeiro" class="view-section hidden-screen p-4">
+                <h1 class="text-2xl font-serif text-brown mb-6">Relatórios</h1>
+            </div>
+            <div id="view-servicos" class="view-section hidden-screen p-4">
+                <h1 class="text-2xl font-serif text-brown mb-6">Gestão de Serviços</h1>
+            </div>
+        </main>
+    </div>
+
+    <!-- ========================================== -->
+    <!-- LÓGICA JAVASCRIPT (SUPABASE E INTERFACE)   -->
+    <!-- ========================================== -->
+    <script>
+        // Chaves da sua base de dados
+        const SUPABASE_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
+        
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        let currentUser = null;
+        let userProfile = null;
+
+        // 1. SISTEMA DE LOGIN (nome.sobrenome)
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const usernameInput = document.getElementById('username').value.trim().toLowerCase();
+            const password = document.getElementById('password').value;
+            const errorText = document.getElementById('login-error');
+            const btn = e.target.querySelector('button');
+            
+            // Mascarando o login como e-mail para o Supabase aceitar
+            const email = usernameInput + '@estudio.com';
+            
+            btn.innerText = "Verificando...";
+
+            const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+
+            if (error) {
+                errorText.classList.remove('hidden');
+                btn.innerText = "Entrar no Sistema";
+            } else {
+                errorText.classList.add('hidden');
+                checkSession();
+            }
+        });
+
+        // 2. RECUPERAR SESSÃO E VERIFICAR PRIMEIRO ACESSO
+        async function checkSession() {
+            const { data: { session } } = await supabase.auth.getSession();
+            
+            if (session) {
+                currentUser = session.user;
+                
+                const { data: profile } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', currentUser.id)
+                    .single();
+                
+                userProfile = profile;
+                
+                // Ocultar Login
+                document.getElementById('login-screen').classList.add('hidden-screen');
+
+                // Verificar se é Primeiro Acesso
+                if (userProfile.first_login) {
+                    document.getElementById('first-login-screen').classList.remove('hidden-screen');
+                } else {
+                    iniciarSistema();
+                }
+
+            } else {
+                document.getElementById('login-screen').classList.remove('hidden-screen');
+                document.getElementById('first-login-screen').classList.add('hidden-screen');
+                document.getElementById('app-screen').classList.add('hidden-screen');
+            }
+        }
+
+        // 3. FLUXO DE TROCA DE SENHA (PRIMEIRO ACESSO)
+        document.getElementById('new-password-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const newPass = document.getElementById('new-password').value;
+            const confirmPass = document.getElementById('confirm-password').value;
+            const errorText = document.getElementById('password-error');
+            const btn = e.target.querySelector('button');
+
+            if (newPass !== confirmPass) {
+                errorText.classList.remove('hidden');
+                return;
+            }
+
+            errorText.classList.add('hidden');
+            btn.innerText = "Salvando...";
+
+            // Atualiza a senha no painel de Autenticação
+            const { error: authError } = await supabase.auth.updateUser({ password: newPass });
+
+            if (!authError) {
+                // Atualiza o perfil para registrar que não é mais o primeiro acesso
+                await supabase.from('profiles').update({ first_login: false }).eq('id', currentUser.id);
+                userProfile.first_login = false;
+                
+                document.getElementById('first-login-screen').classList.add('hidden-screen');
+                iniciarSistema();
+            } else {
+                alert("Erro ao salvar senha. Tente novamente.");
+                btn.innerText = "Salvar e Entrar";
+            }
+        });
+
+        // 4. INICIAR O SISTEMA APÓS VALIDAÇÕES
+        function iniciarSistema() {
+            document.getElementById('app-screen').classList.remove('hidden-screen');
+
+            // Preencher dados no menu
+            document.getElementById('user-name-display').innerText = userProfile.full_name;
+            
+            const roleBadge = document.getElementById('user-role-badge');
+            if(userProfile.role === 'admin') {
+                roleBadge.innerText = 'Proprietário';
+                roleBadge.classList.add('bg-brown', 'text-white');
+                document.getElementById('menu-financeiro').classList.remove('hidden');
+                document.getElementById('menu-servicos').classList.remove('hidden');
+            } else {
+                roleBadge.innerText = 'Colaborador';
+            }
+
+            navigate('agenda');
+            loadAgenda();
+        }
+
+        // Logout
+        async function logout() {
+            await supabase.auth.signOut();
+            window.location.reload();
+        }
+
+        // Navegação de Abas
+        function navigate(viewName) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden-screen'));
+            document.querySelectorAll('.menu-item').forEach(el => {
+                el.classList.remove('text-rose');
+                el.classList.add('text-brown');
+            });
+            document.getElementById(`view-${viewName}`).classList.remove('hidden-screen');
+            const clickedBtn = event ? event.currentTarget : null;
+            if(clickedBtn) {
+                clickedBtn.classList.add('text-rose');
+                clickedBtn.classList.remove('text-brown');
+            }
+        }
+
+        // Carregar Agenda 
+        async function loadAgenda() {
+            const agendaContainer = document.getElementById('agenda-list');
+            let query = supabase.from('appointments').select(`id, appointment_date, status, profiles!client_id(full_name), services(name)`).order('appointment_date', { ascending: true });
+
+            // Se não for admin, vê só a própria agenda
+            if(userProfile.role !== 'admin') {
+                query = query.eq('employee_id', currentUser.id);
+            }
+
+            const { data: appointments } = await query;
+            if (appointments && appointments.length > 0) {
+                agendaContainer.innerHTML = appointments.map(apt => `
+                    <div class="bg-white p-4 rounded-xl border-l-4 border-rose shadow-sm mb-2">
+                        <h3 class="font-bold text-brown">${apt.profiles.full_name}</h3>
+                        <p class="text-sm text-gray-600">${apt.services.name}</p>
+                    </div>
+                `).join('');
+            } else {
+                agendaContainer.innerHTML = `<p class="text-center text-gray-500 mt-10">Sua agenda está livre.</p>`;
+            }
+        }
+
+        // Inicializa
+        checkSession();
+    </script>
+</body>
+</html>

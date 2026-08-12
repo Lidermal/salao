@@ -4,16 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Estúdio Amor que Cuida</title>
-
-  <!-- Supabase SDK -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Icons -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <!-- Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
-
-  <!-- CSS -->
   <link rel="stylesheet" href="style.css" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
 </head>
 <body>
   <!-- SPLASH -->
@@ -22,15 +16,19 @@
       <h1>Estúdio Amor que Cuida</h1>
       <p>by Andressa Vieira</p>
     </div>
-    <div style="margin-top: 20px; color: var(--text-light);">Carregando...</div>
+    <div class="spinner"></div>
+    <div style="color: var(--text-light); font-size: 0.95rem;">Carregando...</div>
   </div>
 
   <!-- LOGIN -->
   <div id="login-screen">
     <div class="login-card">
-      <h2>Entrar</h2>
+      <div class="login-header">
+        <h2>Entrar no Estúdio</h2>
+        <p>Use seu usuário (nome.sobrenome)</p>
+      </div>
       <div class="input-group">
-        <label>Usuário (nome.sobrenome)</label>
+        <label>Usuário</label>
         <input type="text" id="username" placeholder="ex: andressa.vieira" autocomplete="off" />
       </div>
       <button class="btn btn-primary" id="btn-login">Continuar</button>
@@ -41,8 +39,10 @@
   <!-- APP -->
   <div id="app">
     <header>
-      <div class="header-title">Amor que Cuida</div>
-      <div class="user-role" id="role-display">...</div>
+      <div class="header-title">
+        <i class="fas fa-heart"></i> Amor que Cuida
+      </div>
+      <div class="user-role" id="role-display">Proprietário</div>
     </header>
 
     <main>
@@ -59,7 +59,7 @@
 
       <!-- AGENDA -->
       <div id="agenda" class="view">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:18px;">
           <h2>Minha Agenda</h2>
           <input type="date" id="date-picker" />
         </div>
@@ -93,13 +93,13 @@
       <!-- CONFIG -->
       <div id="config" class="view">
         <h2>Configurações</h2>
-        <div class="card" id="btn-logout" style="cursor:pointer; color:var(--danger); text-align:center; font-weight:600;">
+        <div class="card" id="btn-logout">
           <i class="fas fa-sign-out-alt"></i> Sair
         </div>
       </div>
     </main>
 
-    <!-- NAV -->
+    <!-- NAV BOTTOM -->
     <nav>
       <div class="nav-item active" data-view="home"><i class="fas fa-home"></i><span>Início</span></div>
       <div class="nav-item" data-view="agenda"><i class="fas fa-calendar-alt"></i><span>Agenda</span></div>
@@ -108,10 +108,13 @@
       <div class="nav-item" id="more-btn"><i class="fas fa-bars"></i><span>Menu</span></div>
     </nav>
 
-    <button class="fab" id="fab-new-appt"><i class="fas fa-plus"></i></button>
+    <!-- FAB -->
+    <button class="fab" id="fab-new-appt">
+      <i class="fas fa-plus"></i>
+    </button>
   </div>
 
-  <!-- MODALS -->
+  <!-- MODAL NOVO AGENDAMENTO -->
   <div id="modal-appt" class="modal">
     <div class="modal-content">
       <div class="modal-header">
@@ -138,20 +141,20 @@
     </div>
   </div>
 
+  <!-- MODAL MENU -->
   <div id="modal-menu" class="modal">
     <div class="modal-content" style="height: 40vh;">
       <div class="modal-header"><h3>Menu</h3><i class="fas fa-times" id="close-menu"></i></div>
-      <div class="grid-2" style="gap:12px;">
-        <div class="card menu-link" data-view="comandas">Comandas</div>
-        <div class="card menu-link" data-view="clientes">Clientes</div>
-        <div class="card menu-link" data-view="mensagens">Mensagens</div>
-        <div class="card menu-link" data-view="servicos">Serviços</div>
-        <div class="card menu-link" data-view="config">Config</div>
+      <div class="grid-2" style="gap:14px;">
+        <div class="card menu-link" data-view="comandas"><i class="fas fa-file-invoice-dollar"></i> Comandas</div>
+        <div class="card menu-link" data-view="clientes"><i class="fas fa-user-friends"></i> Clientes</div>
+        <div class="card menu-link" data-view="mensagens"><i class="fab fa-whatsapp"></i> Mensagens</div>
+        <div class="card menu-link" data-view="servicos"><i class="fas fa-cut"></i> Serviços</div>
+        <div class="card menu-link" data-view="config"><i class="fas fa-cog"></i> Config</div>
       </div>
     </div>
   </div>
 
-  <!-- JS -->
   <script src="script.js"></script>
 </body>
 </html>

@@ -4,263 +4,239 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#B76E79">
-    <title>Estúdio Amor que Cuida by Andressa Vieira</title>
-    
-    <!-- Supabase Client Library -->
+    <title>Estúdio Amor que Cuida</title>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
     <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
-
-    <!-- CSS DE EMERGÊNCIA (Garante funcionamento mesmo se style.css falhar) -->
-    <style>
-        /* Garante que telas inativas fiquem escondidas */
-        .screen { display: none !important; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; }
-        .screen.active { display: flex !important; }
-        .hidden { display: none !important; }
-        
-        /* Estilo básico do Splash caso o CSS externo demore */
-        #splash-screen { 
-            background: linear-gradient(135deg, #B76E79 0%, #F4C2C2 100%); 
-            justify-content: center; align-items: center; flex-direction: column; color: white; font-family: sans-serif;
-        }
-        .spinner { 
-            width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); 
-            border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; margin-top: 20px; 
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-    </style>
+    <!-- Ícones Premium (Phosphor Icons) -->
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
 </head>
 <body>
-    <!-- 1. TELA DE SPLASH -->
+
+    <!-- SPLASH -->
     <section id="splash-screen" class="screen active">
-        <div class="splash-content" style="text-align: center;">
-            <div class="logo-container">
-                <svg class="logo-icon" viewBox="0 0 100 100" width="120" height="120">
-                    <circle cx="50" cy="50" r="40" fill="none" stroke="#B76E79" stroke-width="2"/>
-                    <text x="50" y="60" text-anchor="middle" font-family="Playfair Display" font-size="32" fill="#B76E79">AQ</text>
-                </svg>
-                <h1 class="brand-name" style="font-family: 'Playfair Display', serif; font-size: 2rem; margin: 10px 0;">Estúdio<br><span style="color: #FDF6F0;">Amor que Cuida</span></h1>
-                <p class="by-line" style="font-style: italic; opacity: 0.9;">by Andressa Vieira</p>
-            </div>
-            <div class="spinner"></div>
-            <p id="loading-status" style="margin-top: 10px; font-size: 0.8rem; opacity: 0.7;">Carregando sistema...</p>
+        <div style="text-align:center; animation: fadeIn 1s;">
+            <i class="ph ph-scissors" style="font-size: 4rem; color: var(--primary); margin-bottom: 1rem;"></i>
+            <h1 style="font-size: 2.5rem; margin-bottom: 0.5rem;">Amor que Cuida</h1>
+            <p style="letter-spacing: 3px; text-transform: uppercase; font-size: 0.8rem; color: var(--text-muted);">by Andressa Vieira</p>
+            <div class="spinner" style="width:30px; height:30px; border:3px solid #eee; border-top-color:var(--primary); border-radius:50%; animation:spin 1s linear infinite; margin: 2rem auto;"></div>
         </div>
     </section>
 
-    <!-- 2. TELA DE LOGIN -->
+    <!-- LOGIN -->
     <section id="login-screen" class="screen">
         <div class="login-container">
             <div class="logo-small">
-                <h2>Estúdio<br><span class="highlight">Amor que Cuida</span></h2>
-                <p>by Andressa Vieira</p>
+                <i class="ph ph-heart" style="font-size: 2rem; color: var(--primary); margin-bottom: 1rem;"></i>
+                <h2>Bem-vinda</h2>
+                <p>Estúdio Amor que Cuida</p>
             </div>
             <form id="login-form">
                 <div class="input-group">
-                    <label for="username">Usuário</label>
-                    <input type="text" id="username" placeholder="nome.sobrenome" autocomplete="off" required>
-                    <small class="hint">Exemplo: admin.teste</small>
+                    <label>Usuário</label>
+                    <input type="text" id="username" placeholder="seu.usuario" required>
                 </div>
-                <button type="submit" class="btn btn-primary">Continuar</button>
+                <button type="submit" class="btn-primary">Entrar no Sistema</button>
             </form>
-            <div id="login-error" class="error-message hidden"></div>
+            <div id="login-error" class="error-message hidden" style="color:red; margin-top:1rem; font-size:0.9rem;"></div>
         </div>
     </section>
 
-    <!-- 3. TELA DE CRIAÇÃO DE SENHA -->
+    <!-- CREATE PASSWORD -->
     <section id="create-password-screen" class="screen">
         <div class="login-container">
-            <div class="logo-small">
-                <h2>Crie sua Senha</h2>
-                <p>Primeiro acesso</p>
-            </div>
+            <div class="logo-small"><h2>Crie sua Senha</h2><p>Primeiro acesso</p></div>
             <form id="create-password-form">
-                <div class="input-group">
-                    <label for="new-password">Nova Senha</label>
-                    <input type="password" id="new-password" minlength="6" required>
-                </div>
-                <div class="input-group">
-                    <label for="confirm-password">Confirmar Senha</label>
-                    <input type="password" id="confirm-password" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Salvar e Entrar</button>
+                <div class="input-group"><label>Nova Senha</label><input type="password" id="new-password" required></div>
+                <div class="input-group"><label>Confirmar</label><input type="password" id="confirm-password" required></div>
+                <button type="submit" class="btn-primary">Salvar e Entrar</button>
             </form>
-            <div id="password-error" class="error-message hidden"></div>
+            <div id="password-error" class="hidden" style="color:red; margin-top:1rem;"></div>
         </div>
     </section>
 
-    <!-- 4. TELA DE DIGITAR SENHA -->
+    <!-- ENTER PASSWORD -->
     <section id="enter-password-screen" class="screen">
         <div class="login-container">
-            <div class="logo-small">
-                <h2>Bem-vindo(a)</h2>
-                <p id="user-display-name"></p>
-            </div>
+            <div class="logo-small"><h2>Olá, <span id="user-display-name"></span></h2></div>
             <form id="enter-password-form">
-                <div class="input-group">
-                    <label for="current-password">Senha</label>
-                    <input type="password" id="current-password" required>
-                </div>
-                <button type="submit" class="btn btn-primary">Entrar</button>
+                <div class="input-group"><label>Sua Senha</label><input type="password" id="current-password" required></div>
+                <button type="submit" class="btn-primary">Acessar</button>
             </form>
-            <div id="password-login-error" class="error-message hidden"></div>
-            <button type="button" onclick="Navigation.showScreen('login-screen')" style="background:none; border:none; color:#666; margin-top:10px; cursor:pointer; width:100%;">Voltar</button>
+            <div id="password-login-error" class="hidden" style="color:red; margin-top:1rem;"></div>
+            <button onclick="Navigation.showScreen('login-screen')" style="background:none; border:none; margin-top:1rem; color:#999; cursor:pointer;">Voltar</button>
         </div>
     </section>
 
     <!-- APP PRINCIPAL -->
     <div id="main-app" class="hidden">
         <header class="app-header">
-            <div class="header-left"><h1 id="page-title">Dashboard</h1></div>
-            <div class="header-right"><button id="menu-btn" class="icon-btn">☰</button></div>
+            <h1 id="page-title">Dashboard</h1>
+            <button id="menu-btn" class="icon-btn"><i class="ph ph-list"></i></button>
         </header>
 
         <main class="app-content">
             <!-- DASHBOARD -->
             <section id="dashboard-view" class="view active">
                 <div class="stats-grid">
-                    <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-info"><h3>Receita Hoje</h3><p class="stat-value" id="today-revenue">R$ 0,00</p></div></div>
-                    <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-info"><h3>Agendas</h3><p class="stat-value" id="today-appointments">0</p></div></div>
-                    <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-info"><h3>Pendentes</h3><p class="stat-value" id="pending-count">0</p></div></div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="ph ph-currency-dollar"></i></div>
+                        <div class="stat-info"><h3>Receita Hoje</h3><p class="stat-value" id="today-revenue">R$ 0</p></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="ph ph-calendar-check"></i></div>
+                        <div class="stat-info"><h3>Agendas</h3><p class="stat-value" id="today-appointments">0</p></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="ph ph-hourglass"></i></div>
+                        <div class="stat-info"><h3>Pendentes</h3><p class="stat-value" id="pending-count">0</p></div>
+                    </div>
                 </div>
-                <div class="section">
-                    <h2 class="section-title">Próximos Horários</h2>
-                    <div id="upcoming-appointments" class="appointments-list"></div>
-                </div>
+                <h2 class="section-title">Próximos Horários</h2>
+                <div id="upcoming-appointments" class="list-container"></div>
             </section>
 
             <!-- AGENDA -->
             <section id="agenda-view" class="view">
-                <div class="date-selector"><input type="date" id="agenda-date" class="date-input"></div>
-                <div id="agenda-filter" class="filter-bar hidden"><select id="professional-filter"><option value="all">Todos</option></select></div>
-                <div id="agenda-list" class="appointments-list"></div>
+                <div style="display:flex; gap:1rem; margin-bottom:2rem;">
+                    <input type="date" id="agenda-date" class="date-input" style="flex:1; padding:1rem; border-radius:12px; border:1px solid #eee;">
+                    <select id="professional-filter" class="hidden" style="padding:1rem; border-radius:12px; border:1px solid #eee;"></select>
+                </div>
+                <div id="agenda-list" class="list-container"></div>
             </section>
 
             <!-- COMANDAS -->
             <section id="comandas-view" class="view">
-                <div class="search-bar"><input type="text" id="comanda-search" placeholder="Buscar cliente..."></div>
-                <div id="comandas-list" class="comandas-list"></div>
+                <div class="search-bar"><input type="text" id="comanda-search" placeholder="Buscar comanda..."></div>
+                <div id="comandas-list" class="list-container"></div>
             </section>
 
             <!-- CLIENTES -->
             <section id="clientes-view" class="view">
-                <div class="search-bar"><input type="text" id="cliente-search" placeholder="Buscar nome/tel..."></div>
-                <div id="clientes-list" class="clientes-list"></div>
-            </section>
-
-            <!-- MENSAGENS -->
-            <section id="mensagens-view" class="view">
-                <div id="templates-list" class="templates-list"></div>
+                <div class="search-bar"><input type="text" id="cliente-search" placeholder="Buscar cliente ou telefone..."></div>
+                <div id="clientes-list" class="list-container"></div>
             </section>
 
             <!-- SERVIÇOS -->
             <section id="servicos-view" class="view">
-                <button id="add-servico-btn" class="btn btn-secondary hidden" style="margin-bottom:1rem;">+ Novo Serviço</button>
-                <div id="servicos-list" class="servicos-list"></div>
+                <button id="add-servico-btn" class="btn-primary hidden" style="margin-bottom:2rem; width:auto; padding: 0.8rem 2rem;">+ Novo Serviço</button>
+                <div id="servicos-list" class="list-container"></div>
             </section>
 
             <!-- PRODUTOS -->
             <section id="produtos-view" class="view">
-                <button id="add-produto-btn" class="btn btn-secondary hidden" style="margin-bottom:1rem;">+ Novo Produto</button>
-                <div id="produtos-list" class="produtos-list"></div>
+                <button id="add-produto-btn" class="btn-primary hidden" style="margin-bottom:2rem; width:auto; padding: 0.8rem 2rem;">+ Novo Produto</button>
+                <div id="produtos-list" class="list-container"></div>
             </section>
 
-            <!-- DESPESAS -->
-            <section id="despesas-view" class="view">
-                <button id="add-despesa-btn" class="btn btn-secondary hidden" style="margin-bottom:1rem;">+ Nova Despesa</button>
-                <div id="despesas-list" class="despesas-list"></div>
+             <!-- DESPESAS -->
+             <section id="despesas-view" class="view">
+                <button id="add-despesa-btn" class="btn-primary hidden" style="margin-bottom:2rem; width:auto; padding: 0.8rem 2rem;">+ Nova Despesa</button>
+                <div id="despesas-list" class="list-container"></div>
             </section>
 
-            <!-- FUNCIONÁRIOS -->
-            <section id="funcionarios-view" class="view">
-                <button id="add-funcionario-btn" class="btn btn-secondary hidden" style="margin-bottom:1rem;">+ Novo Funcionário</button>
-                <div id="funcionarios-list" class="funcionarios-list"></div>
+             <!-- FUNCIONÁRIOS -->
+             <section id="funcionarios-view" class="view">
+                <button id="add-funcionario-btn" class="btn-primary hidden" style="margin-bottom:2rem; width:auto; padding: 0.8rem 2rem;">+ Novo Funcionário</button>
+                <div id="funcionarios-list" class="list-container"></div>
             </section>
 
             <!-- RELATÓRIOS -->
             <section id="relatorios-view" class="view">
-                <div class="tabs">
-                    <button class="tab-btn active" data-tab="performance">Performance</button>
-                    <button class="tab-btn" data-tab="financeiro">Financeiro</button>
-                    <button class="tab-btn" data-tab="melhores-clientes">Top Clientes</button>
+                <div style="display:flex; gap:1rem; margin-bottom:2rem; overflow-x:auto;">
+                    <button class="tab-btn active" data-tab="performance" style="padding:1rem 2rem; border-radius:50px; border:1px solid #eee; background:white;">Performance</button>
+                    <button class="tab-btn" data-tab="financeiro" style="padding:1rem 2rem; border-radius:50px; border:1px solid #eee; background:white;">Financeiro</button>
                 </div>
                 <div id="report-performance" class="report-content active">
-                    <div class="summary-cards">
-                        <div class="summary-card"><h4>Receita Total</h4><p id="total-revenue">R$ 0,00</p></div>
-                        <div class="summary-card"><h4>Despesas</h4><p id="total-expenses">R$ 0,00</p></div>
-                        <div class="summary-card"><h4>Lucro Líquido</h4><p id="net-profit">R$ 0,00</p></div>
+                    <div class="stats-grid">
+                        <div class="stat-card"><div class="stat-info"><h3>Receita Total</h3><p class="stat-value" id="total-revenue">R$ 0</p></div></div>
+                        <div class="stat-card"><div class="stat-info"><h3>Despesas</h3><p class="stat-value" id="total-expenses" style="color:#d32f2f">R$ 0</p></div></div>
+                        <div class="stat-card"><div class="stat-info"><h3>Lucro Líquido</h3><p class="stat-value" id="net-profit">R$ 0</p></div></div>
                     </div>
                 </div>
-                <div id="report-financeiro" class="report-content"></div>
-                <div id="report-melhores-clientes" class="report-content">
-                    <div id="top-clients-list" class="ranking-list"></div>
+                <div id="report-melhores-clientes" class="report-content" style="margin-top:2rem;">
+                    <h2 class="section-title">Top Clientes</h2>
+                    <div id="top-clients-list" class="list-container"></div>
                 </div>
             </section>
 
             <!-- CONFIGURAÇÕES -->
             <section id="configuracoes-view" class="view">
-                <div class="settings-menu">
-                    <div class="settings-item"><span>👤 Perfil</span><span class="arrow">›</span></div>
-                    <div class="settings-item"><span>🔔 Notificações</span><span class="arrow">›</span></div>
-                    <button id="logout-btn" class="btn btn-danger full-width" style="margin-top:1rem;">Sair do Sistema</button>
+                <div class="list-container">
+                    <div class="list-item"><div class="item-title">👤 Meu Perfil</div><i class="ph ph-caret-right"></i></div>
+                    <div class="list-item"><div class="item-title"> Notificações</div><i class="ph ph-caret-right"></i></div>
+                    <button id="logout-btn" class="btn-primary" style="background:#f44336; margin-top:2rem;">Sair do Sistema</button>
                 </div>
             </section>
         </main>
 
-        <!-- BOTTOM NAVIGATION -->
+        <!-- BOTTOM NAV FLUTUANTE -->
         <nav class="bottom-nav">
-            <button class="nav-item active" data-view="dashboard"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></button>
-            <button class="nav-item" data-view="agenda"><span class="nav-icon">📅</span><span class="nav-label">Agenda</span></button>
-            <button class="nav-item" data-view="comandas"><span class="nav-icon">📋</span><span class="nav-label">Comandas</span></button>
-            <button class="nav-item" data-view="clientes"><span class="nav-icon"></span><span class="nav-label">Clientes</span></button>
-            <button class="nav-item" data-view="mais"><span class="nav-icon">☰</span><span class="nav-label">Mais</span></button>
+            <button class="nav-item active" data-view="dashboard"><i class="ph ph-house"></i><span>Home</span></button>
+            <button class="nav-item" data-view="agenda"><i class="ph ph-calendar"></i><span>Agenda</span></button>
+            <button class="nav-item" data-view="comandas"><i class="ph ph-receipt"></i><span>Comandas</span></button>
+            <button class="nav-item" data-view="clientes"><i class="ph ph-users"></i><span>Clientes</span></button>
+            <button class="nav-item" data-view="mais"><i class="ph ph-dots-three-circle"></i><span>Mais</span></button>
         </nav>
+    </div>
 
-        <!-- MODAL MENU -->
-        <div id="menu-modal" class="modal bottom-sheet hidden">
-            <div class="modal-handle"></div>
-            <div class="modal-content">
-                <h3>Menu</h3>
-                <div class="menu-categories">
-                    <div class="menu-category"><h4>Financeiro</h4><ul><li data-view="comandas">Comandas</li><li data-view="despesas">Despesas</li><li data-view="relatorios">Relatórios</li></ul></div>
-                    <div class="menu-category"><h4>Operacional</h4><ul><li data-view="agenda">Agenda</li><li data-view="clientes">Clientes</li><li data-view="servicos">Serviços</li><li data-view="produtos">Produtos</li></ul></div>
-                    <div class="menu-category"><h4>Admin</h4><ul><li data-view="funcionarios">Equipe</li><li data-view="configuracoes">Configurações</li></ul></div>
+    <!-- MODAL MENU -->
+    <div id="modal-overlay" class="modal-overlay"></div>
+    <div id="menu-modal" class="modal">
+        <div class="modal-handle"></div>
+        <h3>Menu</h3>
+        <div class="menu-categories">
+            <div class="menu-category">
+                <h4>FINANCEIRO</h4>
+                <div class="menu-grid">
+                    <div class="menu-btn" data-view="comandas">Comandas</div>
+                    <div class="menu-btn" data-view="despesas">Despesas</div>
+                    <div class="menu-btn" data-view="relatorios">Relatórios</div>
+                </div>
+            </div>
+            <div class="menu-category">
+                <h4>OPERACIONAL</h4>
+                <div class="menu-grid">
+                    <div class="menu-btn" data-view="agenda">Agenda</div>
+                    <div class="menu-btn" data-view="clientes">Clientes</div>
+                    <div class="menu-btn" data-view="servicos">Serviços</div>
+                    <div class="menu-btn" data-view="produtos">Produtos</div>
+                </div>
+            </div>
+            <div class="menu-category">
+                <h4>ADMINISTRAÇÃO</h4>
+                <div class="menu-grid">
+                    <div class="menu-btn" data-view="funcionarios">Equipe</div>
+                    <div class="menu-btn" data-view="configuracoes">Configurações</div>
                 </div>
             </div>
         </div>
+    </div>
 
-        <!-- MODAL AGENDAMENTO -->
-        <div id="agendamento-modal" class="modal bottom-sheet hidden">
-            <div class="modal-handle"></div>
-            <div class="modal-content">
-                <h3>Novo Agendamento</h3>
-                <form id="agendamento-form">
-                    <div class="form-group"><label>Cliente *</label><input type="text" id="ag-cliente" required></div>
-                    <div class="form-group"><label>WhatsApp *</label><input type="tel" id="ag-whatsapp" required></div>
-                    <div class="form-group"><label>Serviço *</label><select id="ag-servico" required><option value="">Selecione...</option></select></div>
-                    <div class="form-row">
-                        <div class="form-group"><label>Data *</label><input type="date" id="ag-data" required></div>
-                        <div class="form-group"><label>Hora *</label><input type="time" id="ag-hora" required></div>
-                    </div>
-                    <div class="form-group" id="ag-profissional-group"><label>Profissional *</label><select id="ag-profissional" required><option value="">Selecione...</option></select></div>
-                    <div class="form-actions">
-                        <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
-                        <button type="submit" class="btn btn-primary">Salvar</button>
-                    </div>
-                </form>
+    <!-- MODAL AGENDAMENTO -->
+    <div id="agendamento-modal" class="modal">
+        <div class="modal-handle"></div>
+        <h3>Novo Agendamento</h3>
+        <form id="agendamento-form">
+            <div class="input-group"><label>Cliente</label><input type="text" id="ag-cliente" required></div>
+            <div class="input-group"><label>WhatsApp</label><input type="tel" id="ag-whatsapp" required></div>
+            <div class="input-group"><label>Serviço</label><select id="ag-servico" required style="width:100%; padding:1rem; border-radius:12px; border:1px solid #eee;"></select></div>
+            <div style="display:flex; gap:1rem;">
+                <div class="input-group" style="flex:1"><label>Data</label><input type="date" id="ag-data" required></div>
+                <div class="input-group" style="flex:1"><label>Hora</label><input type="time" id="ag-hora" required></div>
             </div>
-        </div>
+            <div class="input-group" id="ag-profissional-group"><label>Profissional</label><select id="ag-profissional" required style="width:100%; padding:1rem; border-radius:12px; border:1px solid #eee;"></select></div>
+            <div style="display:flex; gap:1rem; margin-top:2rem;">
+                <button type="button" class="modal-close" style="flex:1; padding:1rem; border-radius:12px; border:1px solid #eee; background:white;">Cancelar</button>
+                <button type="submit" class="btn-primary" style="flex:1;">Salvar</button>
+            </div>
+        </form>
+    </div>
 
-        <!-- MODAL DETALHE CLIENTE -->
-        <div id="cliente-detail-modal" class="modal bottom-sheet hidden">
-            <div class="modal-handle"></div>
-            <div class="modal-content">
-                <h3 id="cliente-detail-name">Detalhes</h3>
-                <div id="cliente-history" class="client-history"></div>
-            </div>
-        </div>
+    <!-- MODAL DETALHE CLIENTE -->
+    <div id="cliente-detail-modal" class="modal">
+        <div class="modal-handle"></div>
+        <h3 id="cliente-detail-name">Detalhes</h3>
+        <div id="cliente-history" class="list-container"></div>
     </div>
 
     <script src="script.js"></script>

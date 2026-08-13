@@ -13,20 +13,40 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <!-- CSS DE EMERGÊNCIA (Garante funcionamento mesmo se style.css falhar) -->
+    <style>
+        /* Garante que telas inativas fiquem escondidas */
+        .screen { display: none !important; position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9999; }
+        .screen.active { display: flex !important; }
+        .hidden { display: none !important; }
+        
+        /* Estilo básico do Splash caso o CSS externo demore */
+        #splash-screen { 
+            background: linear-gradient(135deg, #B76E79 0%, #F4C2C2 100%); 
+            justify-content: center; align-items: center; flex-direction: column; color: white; font-family: sans-serif;
+        }
+        .spinner { 
+            width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.3); 
+            border-top-color: white; border-radius: 50%; animation: spin 1s linear infinite; margin-top: 20px; 
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
 </head>
 <body>
     <!-- 1. TELA DE SPLASH -->
     <section id="splash-screen" class="screen active">
-        <div class="splash-content">
+        <div class="splash-content" style="text-align: center;">
             <div class="logo-container">
                 <svg class="logo-icon" viewBox="0 0 100 100" width="120" height="120">
                     <circle cx="50" cy="50" r="40" fill="none" stroke="#B76E79" stroke-width="2"/>
                     <text x="50" y="60" text-anchor="middle" font-family="Playfair Display" font-size="32" fill="#B76E79">AQ</text>
                 </svg>
-                <h1 class="brand-name">Estúdio<br><span class="highlight">Amor que Cuida</span></h1>
-                <p class="by-line">by Andressa Vieira</p>
+                <h1 class="brand-name" style="font-family: 'Playfair Display', serif; font-size: 2rem; margin: 10px 0;">Estúdio<br><span style="color: #FDF6F0;">Amor que Cuida</span></h1>
+                <p class="by-line" style="font-style: italic; opacity: 0.9;">by Andressa Vieira</p>
             </div>
             <div class="spinner"></div>
+            <p id="loading-status" style="margin-top: 10px; font-size: 0.8rem; opacity: 0.7;">Carregando sistema...</p>
         </div>
     </section>
 
@@ -41,7 +61,7 @@
                 <div class="input-group">
                     <label for="username">Usuário</label>
                     <input type="text" id="username" placeholder="nome.sobrenome" autocomplete="off" required>
-                    <small class="hint">Exemplo: andressa.vieira</small>
+                    <small class="hint">Exemplo: admin.teste</small>
                 </div>
                 <button type="submit" class="btn btn-primary">Continuar</button>
             </form>
@@ -49,7 +69,7 @@
         </div>
     </section>
 
-    <!-- 3. TELA DE CRIAÇÃO DE SENHA (Primeiro Acesso) -->
+    <!-- 3. TELA DE CRIAÇÃO DE SENHA -->
     <section id="create-password-screen" class="screen">
         <div class="login-container">
             <div class="logo-small">
@@ -59,12 +79,11 @@
             <form id="create-password-form">
                 <div class="input-group">
                     <label for="new-password">Nova Senha</label>
-                    <input type="password" id="new-password" placeholder="Mínimo 6 caracteres" minlength="6" required>
-                    <small class="hint">Use pelo menos 6 caracteres</small>
+                    <input type="password" id="new-password" minlength="6" required>
                 </div>
                 <div class="input-group">
                     <label for="confirm-password">Confirmar Senha</label>
-                    <input type="password" id="confirm-password" placeholder="Repita a senha" minlength="6" required>
+                    <input type="password" id="confirm-password" required>
                 </div>
                 <button type="submit" class="btn btn-primary">Salvar e Entrar</button>
             </form>
@@ -72,7 +91,7 @@
         </div>
     </section>
 
-    <!-- 4. TELA DE DIGITAR SENHA (Login Normal) -->
+    <!-- 4. TELA DE DIGITAR SENHA -->
     <section id="enter-password-screen" class="screen">
         <div class="login-container">
             <div class="logo-small">
@@ -82,291 +101,150 @@
             <form id="enter-password-form">
                 <div class="input-group">
                     <label for="current-password">Senha</label>
-                    <input type="password" id="current-password" placeholder="Digite sua senha" required>
+                    <input type="password" id="current-password" required>
                 </div>
                 <button type="submit" class="btn btn-primary">Entrar</button>
             </form>
             <div id="password-login-error" class="error-message hidden"></div>
+            <button type="button" onclick="Navigation.showScreen('login-screen')" style="background:none; border:none; color:#666; margin-top:10px; cursor:pointer; width:100%;">Voltar</button>
         </div>
     </section>
 
-    <!-- APP PRINCIPAL (após login) -->
+    <!-- APP PRINCIPAL -->
     <div id="main-app" class="hidden">
-        <!-- HEADER -->
         <header class="app-header">
-            <div class="header-left">
-                <h1 id="page-title">Dashboard</h1>
-            </div>
-            <div class="header-right">
-                <button id="menu-btn" class="icon-btn" aria-label="Menu">☰</button>
-            </div>
+            <div class="header-left"><h1 id="page-title">Dashboard</h1></div>
+            <div class="header-right"><button id="menu-btn" class="icon-btn">☰</button></div>
         </header>
 
-        <!-- CONTEÚDO DAS TELAS -->
         <main class="app-content">
-            
-            <!-- 5. DASHBOARD / HOME -->
+            <!-- DASHBOARD -->
             <section id="dashboard-view" class="view active">
                 <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon">💰</div>
-                        <div class="stat-info">
-                            <h3>Receita Hoje</h3>
-                            <p class="stat-value" id="today-revenue">R$ 0,00</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">📅</div>
-                        <div class="stat-info">
-                            <h3>Total Agendas</h3>
-                            <p class="stat-value" id="today-appointments">0</p>
-                        </div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-icon">⏳</div>
-                        <div class="stat-info">
-                            <h3>Pendentes</h3>
-                            <p class="stat-value" id="pending-count">0</p>
-                        </div>
-                    </div>
+                    <div class="stat-card"><div class="stat-icon">💰</div><div class="stat-info"><h3>Receita Hoje</h3><p class="stat-value" id="today-revenue">R$ 0,00</p></div></div>
+                    <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-info"><h3>Agendas</h3><p class="stat-value" id="today-appointments">0</p></div></div>
+                    <div class="stat-card"><div class="stat-icon">⏳</div><div class="stat-info"><h3>Pendentes</h3><p class="stat-value" id="pending-count">0</p></div></div>
                 </div>
-
                 <div class="section">
                     <h2 class="section-title">Próximos Horários</h2>
-                    <div id="upcoming-appointments" class="appointments-list">
-                        <!-- Preenchido via JS -->
-                    </div>
+                    <div id="upcoming-appointments" class="appointments-list"></div>
                 </div>
             </section>
 
-            <!-- 6. AGENDA -->
+            <!-- AGENDA -->
             <section id="agenda-view" class="view">
-                <div class="date-selector">
-                    <input type="date" id="agenda-date" class="date-input">
-                </div>
-                <div id="agenda-filter" class="filter-bar hidden">
-                    <select id="professional-filter">
-                        <option value="all">Todos os Profissionais</option>
-                    </select>
-                </div>
-                <div id="agenda-list" class="appointments-list">
-                    <!-- Preenchido via JS -->
-                </div>
+                <div class="date-selector"><input type="date" id="agenda-date" class="date-input"></div>
+                <div id="agenda-filter" class="filter-bar hidden"><select id="professional-filter"><option value="all">Todos</option></select></div>
+                <div id="agenda-list" class="appointments-list"></div>
             </section>
 
-            <!-- 7. COMANDAS ABERTAS -->
+            <!-- COMANDAS -->
             <section id="comandas-view" class="view">
-                <div class="search-bar">
-                    <input type="text" id="comanda-search" placeholder="Buscar cliente...">
-                </div>
-                <div id="comandas-list" class="comandas-list">
-                    <!-- Preenchido via JS -->
-                </div>
+                <div class="search-bar"><input type="text" id="comanda-search" placeholder="Buscar cliente..."></div>
+                <div id="comandas-list" class="comandas-list"></div>
             </section>
 
-            <!-- 8. CLIENTES & ANAMNESE -->
+            <!-- CLIENTES -->
             <section id="clientes-view" class="view">
-                <div class="search-bar">
-                    <input type="text" id="cliente-search" placeholder="Buscar por nome ou telefone...">
-                </div>
-                <div id="clientes-list" class="clientes-list">
-                    <!-- Preenchido via JS -->
-                </div>
+                <div class="search-bar"><input type="text" id="cliente-search" placeholder="Buscar nome/tel..."></div>
+                <div id="clientes-list" class="clientes-list"></div>
             </section>
 
-            <!-- 9. MENSAGENS PRÉ-DEFINIDAS -->
+            <!-- MENSAGENS -->
             <section id="mensagens-view" class="view">
-                <div id="templates-list" class="templates-list">
-                    <!-- Preenchido via JS -->
-                </div>
+                <div id="templates-list" class="templates-list"></div>
             </section>
 
-            <!-- 10. SERVIÇOS & PACOTES -->
+            <!-- SERVIÇOS -->
             <section id="servicos-view" class="view">
-                <button id="add-servico-btn" class="btn btn-secondary hidden">+ Novo Serviço</button>
-                <div id="servicos-list" class="servicos-list">
-                    <!-- Preenchido via JS -->
-                </div>
+                <button id="add-servico-btn" class="btn btn-secondary hidden" style="margin-bottom:1rem;">+ Novo Serviço</button>
+                <div id="servicos-list" class="servicos-list"></div>
             </section>
 
-            <!-- 11. PRODUTOS & ESTOQUE -->
+            <!-- PRODUTOS -->
             <section id="produtos-view" class="view">
-                <button id="add-produto-btn" class="btn btn-secondary hidden">+ Novo Produto</button>
-                <div id="produtos-list" class="produtos-list">
-                    <!-- Preenchido via JS -->
-                </div>
+                <button id="add-produto-btn" class="btn btn-secondary hidden" style="margin-bottom:1rem;">+ Novo Produto</button>
+                <div id="produtos-list" class="produtos-list"></div>
             </section>
 
-            <!-- 12. DESPESAS -->
+            <!-- DESPESAS -->
             <section id="despesas-view" class="view">
-                <button id="add-despesa-btn" class="btn btn-secondary hidden">+ Nova Despesa</button>
-                <div id="despesas-list" class="despesas-list">
-                    <!-- Preenchido via JS -->
-                </div>
+                <button id="add-despesa-btn" class="btn btn-secondary hidden" style="margin-bottom:1rem;">+ Nova Despesa</button>
+                <div id="despesas-list" class="despesas-list"></div>
             </section>
 
-            <!-- 13. FUNCIONÁRIOS & COMISSÃO -->
+            <!-- FUNCIONÁRIOS -->
             <section id="funcionarios-view" class="view">
-                <button id="add-funcionario-btn" class="btn btn-secondary hidden">+ Novo Funcionário</button>
-                <div id="funcionarios-list" class="funcionarios-list">
-                    <!-- Preenchido via JS -->
-                </div>
+                <button id="add-funcionario-btn" class="btn btn-secondary hidden" style="margin-bottom:1rem;">+ Novo Funcionário</button>
+                <div id="funcionarios-list" class="funcionarios-list"></div>
             </section>
 
-            <!-- 14. RELATÓRIOS -->
+            <!-- RELATÓRIOS -->
             <section id="relatorios-view" class="view">
                 <div class="tabs">
                     <button class="tab-btn active" data-tab="performance">Performance</button>
                     <button class="tab-btn" data-tab="financeiro">Financeiro</button>
-                    <button class="tab-btn" data-tab="melhores-clientes">Melhores Clientes</button>
+                    <button class="tab-btn" data-tab="melhores-clientes">Top Clientes</button>
                 </div>
                 <div id="report-performance" class="report-content active">
                     <div class="summary-cards">
-                        <div class="summary-card">
-                            <h4>Receita Total</h4>
-                            <p id="total-revenue">R$ 0,00</p>
-                        </div>
-                        <div class="summary-card">
-                            <h4>Despesas Totais</h4>
-                            <p id="total-expenses">R$ 0,00</p>
-                        </div>
-                        <div class="summary-card">
-                            <h4>Lucro Líquido</h4>
-                            <p id="net-profit">R$ 0,00</p>
-                        </div>
+                        <div class="summary-card"><h4>Receita Total</h4><p id="total-revenue">R$ 0,00</p></div>
+                        <div class="summary-card"><h4>Despesas</h4><p id="total-expenses">R$ 0,00</p></div>
+                        <div class="summary-card"><h4>Lucro Líquido</h4><p id="net-profit">R$ 0,00</p></div>
                     </div>
                 </div>
-                <div id="report-financeiro" class="report-content">
-                    <!-- Conteúdo financeiro -->
-                </div>
+                <div id="report-financeiro" class="report-content"></div>
                 <div id="report-melhores-clientes" class="report-content">
-                    <div id="top-clients-list" class="ranking-list">
-                        <!-- Preenchido via JS -->
-                    </div>
+                    <div id="top-clients-list" class="ranking-list"></div>
                 </div>
             </section>
 
-            <!-- 15. CONFIGURAÇÕES -->
+            <!-- CONFIGURAÇÕES -->
             <section id="configuracoes-view" class="view">
                 <div class="settings-menu">
-                    <div class="settings-item">
-                        <span>👤 Perfil do Usuário</span>
-                        <span class="arrow">›</span>
-                    </div>
-                    <div class="settings-item">
-                        <span>🔔 Notificações</span>
-                        <span class="arrow">›</span>
-                    </div>
-                    <div class="settings-item">
-                        <span>🎨 Tema</span>
-                        <span class="arrow">›</span>
-                    </div>
-                    <button id="logout-btn" class="btn btn-danger full-width">Sair</button>
+                    <div class="settings-item"><span>👤 Perfil</span><span class="arrow">›</span></div>
+                    <div class="settings-item"><span>🔔 Notificações</span><span class="arrow">›</span></div>
+                    <button id="logout-btn" class="btn btn-danger full-width" style="margin-top:1rem;">Sair do Sistema</button>
                 </div>
             </section>
-
         </main>
 
         <!-- BOTTOM NAVIGATION -->
         <nav class="bottom-nav">
-            <button class="nav-item active" data-view="dashboard">
-                <span class="nav-icon">🏠</span>
-                <span class="nav-label">Home</span>
-            </button>
-            <button class="nav-item" data-view="agenda">
-                <span class="nav-icon"></span>
-                <span class="nav-label">Agenda</span>
-            </button>
-            <button class="nav-item" data-view="comandas">
-                <span class="nav-icon">📋</span>
-                <span class="nav-label">Comandas</span>
-            </button>
-            <button class="nav-item" data-view="clientes">
-                <span class="nav-icon">👥</span>
-                <span class="nav-label">Clientes</span>
-            </button>
-            <button class="nav-item" data-view="mais">
-                <span class="nav-icon"></span>
-                <span class="nav-label">Mais</span>
-            </button>
+            <button class="nav-item active" data-view="dashboard"><span class="nav-icon">🏠</span><span class="nav-label">Home</span></button>
+            <button class="nav-item" data-view="agenda"><span class="nav-icon">📅</span><span class="nav-label">Agenda</span></button>
+            <button class="nav-item" data-view="comandas"><span class="nav-icon">📋</span><span class="nav-label">Comandas</span></button>
+            <button class="nav-item" data-view="clientes"><span class="nav-icon"></span><span class="nav-label">Clientes</span></button>
+            <button class="nav-item" data-view="mais"><span class="nav-icon">☰</span><span class="nav-label">Mais</span></button>
         </nav>
 
-        <!-- 17. MODAL MENU EXPANDIDO -->
+        <!-- MODAL MENU -->
         <div id="menu-modal" class="modal bottom-sheet hidden">
             <div class="modal-handle"></div>
             <div class="modal-content">
                 <h3>Menu</h3>
                 <div class="menu-categories">
-                    <div class="menu-category">
-                        <h4>Financeiro</h4>
-                        <ul>
-                            <li data-view="comandas">Comandas</li>
-                            <li data-view="despesas">Despesas</li>
-                            <li data-view="relatorios">Relatórios</li>
-                        </ul>
-                    </div>
-                    <div class="menu-category">
-                        <h4>Operacional</h4>
-                        <ul>
-                            <li data-view="agenda">Agenda</li>
-                            <li data-view="clientes">Clientes</li>
-                            <li data-view="servicos">Serviços</li>
-                            <li data-view="produtos">Produtos</li>
-                        </ul>
-                    </div>
-                    <div class="menu-category">
-                        <h4>Comunicação</h4>
-                        <ul>
-                            <li data-view="mensagens">Mensagens</li>
-                        </ul>
-                    </div>
-                    <div class="menu-category">
-                        <h4>Administrativo</h4>
-                        <ul>
-                            <li data-view="funcionarios">Funcionários</li>
-                            <li data-view="configuracoes">Configurações</li>
-                        </ul>
-                    </div>
+                    <div class="menu-category"><h4>Financeiro</h4><ul><li data-view="comandas">Comandas</li><li data-view="despesas">Despesas</li><li data-view="relatorios">Relatórios</li></ul></div>
+                    <div class="menu-category"><h4>Operacional</h4><ul><li data-view="agenda">Agenda</li><li data-view="clientes">Clientes</li><li data-view="servicos">Serviços</li><li data-view="produtos">Produtos</li></ul></div>
+                    <div class="menu-category"><h4>Admin</h4><ul><li data-view="funcionarios">Equipe</li><li data-view="configuracoes">Configurações</li></ul></div>
                 </div>
             </div>
         </div>
 
-        <!-- 16. MODAL NOVO AGENDAMENTO -->
+        <!-- MODAL AGENDAMENTO -->
         <div id="agendamento-modal" class="modal bottom-sheet hidden">
             <div class="modal-handle"></div>
             <div class="modal-content">
                 <h3>Novo Agendamento</h3>
                 <form id="agendamento-form">
-                    <div class="form-group">
-                        <label for="ag-cliente">Cliente *</label>
-                        <input type="text" id="ag-cliente" placeholder="Nome do cliente" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="ag-whatsapp">WhatsApp *</label>
-                        <input type="tel" id="ag-whatsapp" placeholder="(00) 00000-0000" required>
-                    </div>
-                    <div class="form-group">
-                        <label for="ag-servico">Serviço *</label>
-                        <select id="ag-servico" required>
-                            <option value="">Selecione...</option>
-                        </select>
-                    </div>
+                    <div class="form-group"><label>Cliente *</label><input type="text" id="ag-cliente" required></div>
+                    <div class="form-group"><label>WhatsApp *</label><input type="tel" id="ag-whatsapp" required></div>
+                    <div class="form-group"><label>Serviço *</label><select id="ag-servico" required><option value="">Selecione...</option></select></div>
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="ag-data">Data *</label>
-                            <input type="date" id="ag-data" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="ag-hora">Hora *</label>
-                            <input type="time" id="ag-hora" required>
-                        </div>
+                        <div class="form-group"><label>Data *</label><input type="date" id="ag-data" required></div>
+                        <div class="form-group"><label>Hora *</label><input type="time" id="ag-hora" required></div>
                     </div>
-                    <div class="form-group" id="ag-profissional-group">
-                        <label for="ag-profissional">Profissional *</label>
-                        <select id="ag-profissional" required>
-                            <option value="">Selecione...</option>
-                        </select>
-                    </div>
+                    <div class="form-group" id="ag-profissional-group"><label>Profissional *</label><select id="ag-profissional" required><option value="">Selecione...</option></select></div>
                     <div class="form-actions">
                         <button type="button" class="btn btn-secondary modal-close">Cancelar</button>
                         <button type="submit" class="btn btn-primary">Salvar</button>
@@ -379,13 +257,10 @@
         <div id="cliente-detail-modal" class="modal bottom-sheet hidden">
             <div class="modal-handle"></div>
             <div class="modal-content">
-                <h3 id="cliente-detail-name">Detalhes do Cliente</h3>
-                <div id="cliente-history" class="client-history">
-                    <!-- Histórico preenchido via JS -->
-                </div>
+                <h3 id="cliente-detail-name">Detalhes</h3>
+                <div id="cliente-history" class="client-history"></div>
             </div>
         </div>
-
     </div>
 
     <script src="script.js"></script>

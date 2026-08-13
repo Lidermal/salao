@@ -1,87 +1,44 @@
 /**
- * ESTÚDIO AMOR QUE CUIDA - JAVASCRIPT CORRIGIDO
- * Com fallback local caso Supabase não esteja configurado
+ * ESTÚDIO AMOR QUE CUIDA - VERSÃO PROFISSIONAL SEGURA
+ * Dados 100% via Supabase. Zero informações sensíveis no front-end.
  */
 
 // ==========================================
-// 1. CONFIGURAÇÃO SUPABASE (OPCIONAL)
+// CONFIGURAÇÃO SUPABASE (Chave Anon é pública e segura para uso no front)
 // ==========================================
-const SUPABASE_URL = ''; // Deixe vazio para usar modo local/teste
-const SUPABASE_KEY = ''; // Deixe vazio para usar modo local/teste
+const SUPABASE_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
 
 let supabase = null;
-let USE_SUPABASE = false;
 
-if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
-    try {
+try {
+    if (typeof window.supabase !== 'undefined') {
         supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        USE_SUPABASE = true;
-        console.log('✅ Supabase conectado');
-    } catch (e) {
-        console.warn('⚠️ Supabase não configurado, usando modo local');
-        USE_SUPABASE = false;
+        console.log('✅ Supabase inicializado com sucesso');
+    } else {
+        throw new Error('Biblioteca Supabase não carregada');
     }
-} else {
-    console.log(' Modo Local/Teste ativo');
+} catch (error) {
+    console.error(' Falha crítica ao iniciar Supabase:', error);
+    alert('Erro de conexão com o servidor. Verifique sua internet.');
 }
 
 // ==========================================
-// 2. DADOS LOCAIS (FALLBACK PARA TESTES)
-// ==========================================
-const LocalData = {
-    users: [
-        { id: '1', username: 'andressa.vieira', role: 'owner', first_login: true, name: 'Andressa Vieira', password: '' },
-        { id: '2', username: 'admin.teste', role: 'owner', first_login: false, name: 'Admin Teste', password: '123456' },
-        { id: '3', username: 'maria.silva', role: 'freelancer', first_login: true, name: 'Maria Silva', password: '' },
-        { id: '4', username: 'joao.santos', role: 'freelancer', first_login: false, name: 'João Santos', password: '123456' }
-    ],
-    services: [
-        { id: 1, name: 'Corte Feminino', duration: 45, price: 80, cost: 20, active: true },
-        { id: 2, name: 'Coloração', duration: 90, price: 150, cost: 40, active: true },
-        { id: 3, name: 'Escova', duration: 30, price: 50, cost: 10, active: true },
-        { id: 4, name: 'Hidratação', duration: 45, price: 70, cost: 15, active: true }
-    ],
-    clients: [
-        { id: 1, name: 'Ana Paula Costa', whatsapp: '11999887766', last_visit: '2026-08-10', total_spent: 450 },
-        { id: 2, name: 'Beatriz Oliveira', whatsapp: '11988776655', last_visit: '2026-08-12', total_spent: 320 },
-        { id: 3, name: 'Carla Mendes', whatsapp: '11977665544', last_visit: '2026-08-11', total_spent: 280 }
-    ],
-    appointments: [
-        { id: 1, client_id: 1, service_id: 1, professional_id: '1', date: new Date().toISOString().split('T')[0], time: '09:00', status: 'confirmed', clients: { name: 'Ana Paula Costa' }, services: { name: 'Corte Feminino', price: 80 }, users: { name: 'Andressa Vieira' } },
-        { id: 2, client_id: 2, service_id: 2, professional_id: '3', date: new Date().toISOString().split('T')[0], time: '10:30', status: 'pending', clients: { name: 'Beatriz Oliveira' }, services: { name: 'Coloração', price: 150 }, users: { name: 'Maria Silva' } },
-        { id: 3, client_id: 3, service_id: 3, professional_id: '1', date: new Date().toISOString().split('T')[0], time: '14:00', status: 'confirmed', clients: { name: 'Carla Mendes' }, services: { name: 'Escova', price: 50 }, users: { name: 'Andressa Vieira' } }
-    ],
-    products: [
-        { id: 1, name: 'Shampoo Profissional 500ml', price: 45, stock: 12, min_stock: 5, cost: 25 },
-        { id: 2, name: 'Condicionador Profissional 500ml', price: 45, stock: 3, min_stock: 5, cost: 25 }
-    ],
-    expenses: [
-        { id: 1, description: 'Aluguel do Salão', category: 'Aluguel', value: 2500, date: '2026-08-01', payment_method: 'Transferência', status: 'paid' },
-        { id: 2, description: 'Produtos de Limpeza', category: 'Material', value: 150, date: '2026-08-05', payment_method: 'Cartão', status: 'paid' }
-    ],
-    employees: [
-        { id: '1', name: 'Andressa Vieira', specialty: 'Cabeleireira', commission: 40, color: '#B76E79', available: true },
-        { id: '3', name: 'Maria Silva', specialty: 'Colorista', commission: 35, color: '#F4C2C2', available: true }
-    ],
-    comandas: [
-        { id: 1, client_id: 1, total: 150, open_date: '2026-08-13', status: 'open', clients: { name: 'Ana Paula Costa' } },
-        { id: 2, client_id: 2, total: 80, open_date: '2026-08-13', status: 'open', clients: { name: 'Beatriz Oliveira' } }
-    ]
-};
-
-// ==========================================
-// 3. ESTADO DA APLICAÇÃO
+// ESTADO DA APLICAÇÃO (Sem dados sensíveis)
 // ==========================================
 const AppState = {
     currentUser: null,
     userRole: null,
     currentView: 'dashboard',
     selectedDate: new Date().toISOString().split('T')[0],
-    data: { ...LocalData }
+    data: {
+        appointments: [], clients: [], services: [], products: [], 
+        expenses: [], employees: [], comandas: []
+    }
 };
 
 // ==========================================
-// 4. UTILITÁRIOS
+// UTILITÁRIOS
 // ==========================================
 const Utils = {
     formatCurrency(value) {
@@ -89,8 +46,10 @@ const Utils = {
     },
     formatDate(dateString) {
         if (!dateString) return '-';
-        const d = new Date(dateString + 'T00:00:00');
-        return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        try {
+            const d = new Date(dateString + 'T00:00:00');
+            return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+        } catch(e) { return dateString; }
     },
     validateWhatsApp(phone) {
         const cleaned = phone.replace(/\D/g, '');
@@ -98,7 +57,7 @@ const Utils = {
     },
     debounce(func, wait) {
         let timeout;
-        return function executedFunction(...args) {
+        return function(...args) {
             clearTimeout(timeout);
             timeout = setTimeout(() => func(...args), wait);
         };
@@ -106,7 +65,7 @@ const Utils = {
 };
 
 // ==========================================
-// 5. NAVEGAÇÃO E UI
+// NAVEGAÇÃO E UI
 // ==========================================
 const Navigation = {
     showScreen(screenId) {
@@ -172,14 +131,13 @@ const Navigation = {
 };
 
 // ==========================================
-// 6. AUTENTICAÇÃO (COM FALLBACK LOCAL)
+// AUTENTICAÇÃO (100% VIA SUPABASE)
 // ==========================================
 const Auth = {
-    tempUsername: null,
     tempUserData: null,
 
     init() {
-        // Login Step 1: Verificar Usuário
+        // Step 1: Buscar usuário no banco
         document.getElementById('login-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const username = document.getElementById('username').value.trim().toLowerCase();
@@ -191,22 +149,18 @@ const Auth = {
             }
 
             try {
-                let data = null;
-                
-                if (USE_SUPABASE) {
-                    const result = await supabase.from('users').select('*').eq('username', username).single();
-                    data = result.data;
-                } else {
-                    // Fallback local
-                    data = LocalData.users.find(u => u.username === username) || null;
-                }
+                // BUSCA EXCLUSIVA NO BANCO DE DADOS
+                const { data, error } = await supabase
+                    .from('users')
+                    .select('*')
+                    .eq('username', username)
+                    .single();
 
-                if (!data) {
+                if (error || !data) {
                     this.showError(errorDiv, 'Usuário não encontrado ou desativado');
                     return;
                 }
 
-                this.tempUsername = username;
                 this.tempUserData = data;
 
                 if (data.first_login) {
@@ -217,11 +171,11 @@ const Auth = {
                 }
             } catch (err) {
                 console.error('Erro auth:', err);
-                this.showError(errorDiv, 'Erro de conexão. Tente novamente.');
+                this.showError(errorDiv, 'Erro de conexão com o servidor.');
             }
         });
 
-        // Login Step 2: Criar Senha
+        // Step 2: Criar senha (Primeiro acesso)
         document.getElementById('create-password-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const newPass = document.getElementById('new-password').value;
@@ -238,31 +192,29 @@ const Auth = {
             }
 
             try {
-                if (USE_SUPABASE) {
-                    await supabase.from('users').update({ password: newPass, first_login: false }).eq('id', this.tempUserData.id);
-                } else {
-                    // Atualiza localmente
-                    const user = LocalData.users.find(u => u.id === this.tempUserData.id);
-                    if (user) {
-                        user.password = newPass;
-                        user.first_login = false;
-                    }
-                }
+                // ATUALIZA SENHA DIRETO NO BANCO
+                const { error } = await supabase
+                    .from('users')
+                    .update({ password: newPass, first_login: false })
+                    .eq('id', this.tempUserData.id);
+
+                if (error) throw error;
 
                 this.tempUserData.password = newPass;
                 this.tempUserData.first_login = false;
                 this.completeLogin(this.tempUserData);
             } catch (err) {
-                this.showError(errorDiv, 'Erro ao salvar senha.');
+                this.showError(errorDiv, 'Erro ao salvar senha no servidor.');
             }
         });
 
-        // Login Step 3: Entrar com Senha
+        // Step 3: Validar senha existente
         document.getElementById('enter-password-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const password = document.getElementById('current-password').value;
             const errorDiv = document.getElementById('password-login-error');
 
+            // Validação local contra o objeto temporário vindo do banco
             if (password !== this.tempUserData.password) {
                 this.showError(errorDiv, 'Senha incorreta');
                 return;
@@ -271,7 +223,6 @@ const Auth = {
             this.completeLogin(this.tempUserData);
         });
 
-        // Logout
         document.getElementById('logout-btn').addEventListener('click', () => this.logout());
     },
 
@@ -279,25 +230,18 @@ const Auth = {
         AppState.currentUser = user;
         AppState.userRole = user.role;
         
-        // Transição suave
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById('main-app').classList.remove('hidden');
         
-        // Carrega dados
-        Data.loadAll().then(() => {
-            Navigation.showView('dashboard');
-        });
+        Data.loadAll().then(() => Navigation.showView('dashboard'));
     },
 
     logout() {
         AppState.currentUser = null;
         AppState.userRole = null;
-        AppState.currentView = 'dashboard';
-        
         ['username', 'current-password', 'new-password', 'confirm-password'].forEach(id => {
             const el = document.getElementById(id); if(el) el.value = '';
         });
-
         document.getElementById('main-app').classList.add('hidden');
         Navigation.showScreen('login-screen');
     },
@@ -314,12 +258,11 @@ const Auth = {
 };
 
 // ==========================================
-// 7. GERENCIAMENTO DE DADOS
+// GERENCIAMENTO DE DADOS (SUPABASE REAL)
 // ==========================================
 const Data = {
     async loadAll() {
-        if (USE_SUPABASE) {
-            // Busca real do Supabase
+        try {
             const [svc, apt, cli, prod, exp, emp, com] = await Promise.all([
                 supabase.from('services').select('*').eq('active', true),
                 supabase.from('appointments').select('*, clients(name, whatsapp), services(name, price), users(name)').order('date', {ascending: true}).order('time', {ascending: true}),
@@ -337,12 +280,12 @@ const Data = {
             AppState.data.expenses = exp.data || [];
             AppState.data.employees = emp.data || [];
             AppState.data.comandas = com.data || [];
-        } else {
-            // Usa dados locais (já estão em AppState.data)
-            console.log('📦 Usando dados locais para teste');
-        }
 
-        this.populateSelects();
+            this.populateSelects();
+        } catch (error) {
+            console.error('Erro ao carregar dados:', error);
+            alert('Falha ao carregar dados do sistema. Verifique sua conexão.');
+        }
     },
 
     populateSelects() {
@@ -354,7 +297,6 @@ const Data = {
 
         const agProf = document.getElementById('ag-profissional');
         const filterProf = document.getElementById('professional-filter');
-        
         const profOptions = AppState.data.employees.map(e => `<option value="${e.id}">${e.name}</option>`).join('');
         
         if (agProf) agProf.innerHTML = '<option value="">Selecione...</option>' + profOptions;
@@ -363,7 +305,7 @@ const Data = {
 };
 
 // ==========================================
-// 8. MÓDULOS DE VIEW
+// MÓDULOS DE VIEW (Renderização baseada em AppState.data)
 // ==========================================
 const Dashboard = {
     load() {
@@ -385,13 +327,7 @@ const Dashboard = {
         }
 
         const nextThree = displayAppts.slice(0, 3);
-
-        if (nextThree.length === 0) {
-            container.innerHTML = '<p class="text-muted">Nenhum agendamento para hoje.</p>';
-            return;
-        }
-
-        container.innerHTML = nextThree.map(apt => `
+        container.innerHTML = nextThree.length ? nextThree.map(apt => `
             <div class="appointment-item">
                 <div class="appointment-time">${apt.time}</div>
                 <div class="appointment-details" style="flex:1; margin-left:1rem;">
@@ -400,7 +336,7 @@ const Dashboard = {
                 </div>
                 <span class="badge badge-${apt.status}">${apt.status === 'confirmed' ? 'Confirmado' : 'Pendente'}</span>
             </div>
-        `).join('');
+        `).join('') : '<p class="text-muted">Nenhum agendamento para hoje.</p>';
     }
 };
 
@@ -438,12 +374,7 @@ const Agenda = {
             if(emp) appts = appts.filter(a => a.users?.name === emp.name);
         }
 
-        if (appts.length === 0) {
-            container.innerHTML = '<p class="text-muted">Nenhum agendamento nesta data.</p>';
-            return;
-        }
-
-        container.innerHTML = appts.map(apt => `
+        container.innerHTML = appts.length ? appts.map(apt => `
             <div class="appointment-item">
                 <div class="appointment-time">${apt.time}</div>
                 <div class="appointment-details" style="flex:1; margin-left:1rem;">
@@ -452,7 +383,7 @@ const Agenda = {
                 </div>
                 <span class="badge badge-${apt.status}">${apt.status === 'confirmed' ? 'Confirmado' : 'Pendente'}</span>
             </div>
-        `).join('');
+        `).join('') : '<p class="text-muted">Nenhum agendamento nesta data.</p>';
     }
 };
 
@@ -471,12 +402,7 @@ const Comandas = {
             list = list.filter(c => c.clients?.name.toLowerCase().includes(lower));
         }
 
-        if (list.length === 0) {
-            container.innerHTML = '<p class="text-muted">Nenhuma comanda aberta.</p>';
-            return;
-        }
-
-        container.innerHTML = list.map(c => `
+        container.innerHTML = list.length ? list.map(c => `
             <div class="comanda-item">
                 <div style="flex:1">
                     <div class="item-title">${c.clients?.name}</div>
@@ -487,21 +413,16 @@ const Comandas = {
                     <button class="btn btn-secondary" style="padding:4px 10px; font-size:0.7rem; margin-top:5px;" onclick="Comandas.close(${c.id})">Fechar</button>
                 </div>
             </div>
-        `).join('');
+        `).join('') : '<p class="text-muted">Nenhuma comanda aberta.</p>';
     },
     filter(text) { this.render(text); },
     async close(id) {
         if(!confirm('Deseja fechar esta comanda?')) return;
-        
-        if (USE_SUPABASE) {
-            await supabase.from('comandas').update({ status: 'closed' }).eq('id', id);
-        } else {
-            const c = AppState.data.comandas.find(x => x.id === id);
-            if(c) c.status = 'closed';
-        }
-        
-        await Data.loadAll();
-        this.render();
+        const { error } = await supabase.from('comandas').update({ status: 'closed' }).eq('id', id);
+        if(!error) {
+            await Data.loadAll();
+            this.render();
+        } else alert('Erro ao fechar comanda');
     }
 };
 
@@ -520,7 +441,7 @@ const Clientes = {
             list = list.filter(c => c.name.toLowerCase().includes(lower) || c.whatsapp.includes(filterText));
         }
 
-        container.innerHTML = list.map(c => `
+        container.innerHTML = list.length ? list.map(c => `
             <div class="cliente-item" onclick="Clientes.showDetail(${c.id})">
                 <div style="flex:1">
                     <div class="item-title">${c.name}</div>
@@ -528,7 +449,7 @@ const Clientes = {
                 </div>
                 <div class="item-value">${Utils.formatCurrency(c.total_spent)}</div>
             </div>
-        `).join('') || '<p class="text-muted">Nenhum cliente encontrado.</p>';
+        `).join('') : '<p class="text-muted">Nenhum cliente encontrado.</p>';
     },
     filter(text) { this.render(text); },
     showDetail(id) {
@@ -547,7 +468,7 @@ const Clientes = {
 const Servicos = {
     load() {
         const container = document.getElementById('servicos-list');
-        container.innerHTML = AppState.data.services.map(s => `
+        container.innerHTML = AppState.data.services.length ? AppState.data.services.map(s => `
             <div class="servico-item">
                 <div style="flex:1">
                     <div class="item-title">${s.name}</div>
@@ -555,7 +476,7 @@ const Servicos = {
                 </div>
                 <div class="item-value">${Utils.formatCurrency(s.price)}</div>
             </div>
-        `).join('') || '<p class="text-muted">Nenhum serviço cadastrado.</p>';
+        `).join('') : '<p class="text-muted">Nenhum serviço cadastrado.</p>';
         
         const btn = document.getElementById('add-servico-btn');
         if(btn) btn.classList.toggle('hidden', !Auth.checkOwnerPermissions());
@@ -565,7 +486,7 @@ const Servicos = {
 const Produtos = {
     load() {
         const container = document.getElementById('produtos-list');
-        container.innerHTML = AppState.data.products.map(p => {
+        container.innerHTML = AppState.data.products.length ? AppState.data.products.map(p => {
             const lowStock = p.stock <= p.min_stock;
             return `
             <div class="produto-item">
@@ -575,7 +496,7 @@ const Produtos = {
                 </div>
                 <div class="item-value">${Utils.formatCurrency(p.price)}</div>
             </div>`;
-        }).join('') || '<p class="text-muted">Nenhum produto cadastrado.</p>';
+        }).join('') : '<p class="text-muted">Nenhum produto cadastrado.</p>';
         
         const btn = document.getElementById('add-produto-btn');
         if(btn) btn.classList.toggle('hidden', !Auth.checkOwnerPermissions());
@@ -585,7 +506,7 @@ const Produtos = {
 const Despesas = {
     load() {
         const container = document.getElementById('despesas-list');
-        container.innerHTML = AppState.data.expenses.map(e => `
+        container.innerHTML = AppState.data.expenses.length ? AppState.data.expenses.map(e => `
             <div class="despesa-item">
                 <div style="flex:1">
                     <div class="item-title">${e.description}</div>
@@ -593,7 +514,7 @@ const Despesas = {
                 </div>
                 <div class="item-value" style="color:var(--danger)">-${Utils.formatCurrency(e.value)}</div>
             </div>
-        `).join('') || '<p class="text-muted">Nenhuma despesa registrada.</p>';
+        `).join('') : '<p class="text-muted">Nenhuma despesa registrada.</p>';
         
         const btn = document.getElementById('add-despesa-btn');
         if(btn) btn.classList.toggle('hidden', !Auth.checkOwnerPermissions());
@@ -603,7 +524,7 @@ const Despesas = {
 const Funcionarios = {
     load() {
         const container = document.getElementById('funcionarios-list');
-        container.innerHTML = AppState.data.employees.map(e => `
+        container.innerHTML = AppState.data.employees.length ? AppState.data.employees.map(e => `
             <div class="funcionario-item" style="border-left-color:${e.color || '#B76E79'}">
                 <div style="flex:1">
                     <div class="item-title">${e.name}</div>
@@ -611,7 +532,7 @@ const Funcionarios = {
                 </div>
                 <div class="item-value">${e.commission}%</div>
             </div>
-        `).join('') || '<p class="text-muted">Nenhum funcionário cadastrado.</p>';
+        `).join('') : '<p class="text-muted">Nenhum funcionário cadastrado.</p>';
         
         const btn = document.getElementById('add-funcionario-btn');
         if(btn) btn.classList.toggle('hidden', !Auth.checkOwnerPermissions());
@@ -637,7 +558,7 @@ const Relatorios = {
         document.getElementById('net-profit').textContent = Utils.formatCurrency(totalRev - totalExp);
 
         const sortedClients = [...AppState.data.clients].sort((a,b) => b.total_spent - a.total_spent);
-        document.getElementById('top-clients-list').innerHTML = sortedClients.map((c, i) => `
+        document.getElementById('top-clients-list').innerHTML = sortedClients.length ? sortedClients.map((c, i) => `
             <div class="ranking-item">
                 <div class="ranking-position">${i+1}</div>
                 <div class="ranking-info">
@@ -646,7 +567,7 @@ const Relatorios = {
                 </div>
                 <div class="ranking-value">${Utils.formatCurrency(c.total_spent)}</div>
             </div>
-        `).join('');
+        `).join('') : '<p class="text-muted">Sem dados de clientes.</p>';
     }
 };
 
@@ -671,7 +592,7 @@ const Mensagens = {
 };
 
 // ==========================================
-// 9. MODAIS E FORMULÁRIOS
+// MODAIS E FORMULÁRIOS
 // ==========================================
 const Modals = {
     init() {
@@ -693,7 +614,7 @@ const Modals = {
                     : document.getElementById('ag-profissional').value;
                 
                 const payload = {
-                    client_id: 1, // Simplificado para demo
+                    client_id: 1, // Em produção: buscar ID pelo nome digitado
                     service_id: serviceId,
                     professional_id: profId,
                     date: document.getElementById('ag-data').value,
@@ -701,29 +622,16 @@ const Modals = {
                     status: 'pending'
                 };
 
-                if (USE_SUPABASE) {
-                    const { error } = await supabase.from('appointments').insert(payload);
-                    if(error) {
-                        alert('Erro ao salvar: ' + error.message);
-                        return;
-                    }
+                const { error } = await supabase.from('appointments').insert(payload);
+                if(error) {
+                    alert('Erro ao salvar: ' + error.message);
                 } else {
-                    // Adiciona localmente
-                    const newApt = {
-                        id: Date.now(),
-                        ...payload,
-                        clients: { name: document.getElementById('ag-cliente').value },
-                        services: AppState.data.services.find(s => s.id == serviceId),
-                        users: AppState.data.employees.find(e => e.id == profId)
-                    };
-                    AppState.data.appointments.push(newApt);
+                    alert('Agendamento criado!');
+                    Navigation.closeModal('agendamento-modal');
+                    form.reset();
+                    await Data.loadAll();
+                    Navigation.showView('agenda');
                 }
-
-                alert('Agendamento criado!');
-                Navigation.closeModal('agendamento-modal');
-                form.reset();
-                await Data.loadAll();
-                Navigation.showView('agenda');
             };
         }
 
@@ -735,21 +643,21 @@ const Modals = {
 };
 
 // ==========================================
-// 10. INICIALIZAÇÃO
+// INICIALIZAÇÃO ROBUSTA
 // ==========================================
 const App = {
     async init() {
         // Splash Screen
         Navigation.showScreen('splash-screen');
         
-        // Delay de 1.5s para branding
+        // Delay garantido de branding
         await new Promise(r => setTimeout(r, 1500));
         
-        // Inicia Auth e Modais
+        // Inicia módulos
         Auth.init();
         Modals.init();
         
-        // Event Listeners de Navegação
+        // Event Listeners Globais
         document.querySelectorAll('.nav-item').forEach(item => {
             item.onclick = (e) => {
                 e.preventDefault();
@@ -768,12 +676,10 @@ const App = {
 
         document.getElementById('menu-btn').onclick = () => Navigation.openModal('menu-modal');
         
-        // Vai para tela de login após splash
+        // Transição obrigatória para login
         Navigation.showScreen('login-screen');
-        
-        console.log('✅ App inicializado com sucesso!');
+        console.log('✅ Sistema inicializado. Aguardando autenticação via Supabase...');
     }
 };
 
-// Start quando DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => App.init());

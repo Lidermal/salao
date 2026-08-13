@@ -1,87 +1,112 @@
 /**
- * SISTEMA ESTÚDIO AMOR QUE CUIDA
- * Versão Completa - CRUD, Renderizadores e Regras de Negócio (Comissão)
+ * SISTEMA ESTÚDIO AMOR QUE CUIDA - REALTIME & DB INTEGRATION
  */
 
-// --- 1. CONFIGURAÇÃO SUPABASE ---
+// 1. SUPABASE CONNECTION
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const DB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
+const db = window.supabase.createClient(DB_URL, DB_KEY);
 
-let db = null;
-if (typeof window.supabase !== 'undefined') {
-    db = window.supabase.createClient(DB_URL, DB_KEY);
-}
-
-// --- 2. UTILITÁRIOS ---
-const U = {
-    money: (v) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v || 0),
-    date: (d) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '-',
-    id: () => Math.random().toString(36).substr(2, 9)
+// 2. GLOBAL STATE
+const App = {
+    user: null, role: 'freelancer', view: 'agenda',
+    currentDate: new Date(),
+    data: {} // Cache de dados
 };
 
-// --- 3. ESTADO GLOBAL E DADOS (MEMÓRIA LOCAL) ---
-const App = { 
-    user: null, 
-    role: 'employee',
-    currentView: 'agenda',
-    data: {
-        agenda: [], clientes: [], servicos: [], produtos: [], 
-        despesas: [], funcionarios: [], comandas: [], cobrancas: []
+// 3. UTILS & UI
+const U = {
+    money: v => new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'}).format(v||0),
+    date: d => d ? new Date(d+'T00:00:00').toLocaleDateString('pt-BR') : '-',
+    iso: d => d.toISOString().split('T')[0]
+};
+
+const UI = {
+    toast(msg, type='success') {
+        const cont = document.getElementById('toast-container');
+        const t = document.createElement('div');
+        t.className = `toast ${type}`;
+        t.innerHTML = `<i class="ph ${type==='success'?'ph-check-circle':'ph-warning-circle'}"></i> ${msg}`;
+        cont.appendChild(t);
+        setTimeout(() => t.remove(), 3500);
+    },
+    handleFabClick() {
+        const v = App.view;
+        if(v === 'agenda') Modals.open('agendamento');
+        else if(v === 'comandas') Modals.open('comanda');
+        else if(v === 'clientes') Modals.open('cliente');
+        else if(v === 'servicos' && App.role==='owner') Modals.open('servico');
+        else if(v === 'produtos' && App.role==='owner') Modals.open('produto');
+        else if(v === 'cobrancas') Modals.open('cobranca');
+        else this.toast('Ação não configurada para esta aba.', 'error');
     }
 };
 
-// Dados Iniciais para testes imediatos (Mock)
-App.data.servicos = [
-    { id: '1', nome: 'Corte Feminino', valor: 120, comissao: 40, tempo: 60 },
-    { id: '2', nome: 'Mechas Premium', valor: 450, comissao: 50, tempo: 180 }
-];
-App.data.clientes = [
-    { id: '1', nome: 'Maria Silva', telefone: '86999999999', gastoTotal: 570 }
-];
-App.data.funcionarios = [
-    { id: '1', nome: 'Andressa Vieira', cargo: 'Proprietária' },
-    { id: '2', nome: 'Membro Equipe', cargo: 'Cabeleireira' }
-];
-
-// --- 4. CONTROLE DE NAVEGAÇÃO ---
-const Nav = {
+// 4. AUTHENTICATION & INITIALIZATION
+const Auth = {
     init() {
-        document.querySelectorAll('.nav-link, .b-item').forEach(link => {
-            link.addEventListener('click', (e) => {
-                const view = link.dataset.view;
-                if (view && view !== 'menu-mobile') {
-                    e.preventDefault();
-                    this.showView(view);
-                    this.closeMenu();
-                }
-            });
-        });
-        const dtAgenda = document.getElementById('filtro-data-agenda');
-        if(dtAgenda) {
-            dtAgenda.valueAsDate = new Date();
-            dtAgenda.addEventListener('change', () => Render.agenda());
+        setTimeout(() => {
+            document.getElementById('splash-screen').classList.remove('active');
+            document.getElementById('login-screen').classList.add('active');
+        }, 1500);
+        document.getElementById('login-form').onsubmit = (e) => { e.preventDefault(); this.login(); };
+    },
+    async login() {
+        const u = document.getElementById('username').value;
+        const p = document.getElementById('password').value;
+        const btn = document.getElementById('btn-login');
+        btn.textContent = 'Aguarde...';
+        
+        try {
+            const { data, error } = await db.from('users').select('*').eq('username', u).single();
+            if (error || !data || data.password !== p) throw new Error("Credenciais inválidas");
+            
+            App.user = data; App.role = data.role;
+            
+            if(data.first_login) {
+                Modals.open('first_login');
+                btn.textContent = 'Entrar';
+                return;
+            }
+            this.success();
+        } catch(e) {
+            UI.toast(e.message, 'error');
+            btn.textContent = 'Entrar';
         }
     },
+    success() {
+        document.getElementById('auth-layer').classList.add('hidden');
+        document.getElementById('system-layout').classList.remove('hidden');
+        document.getElementById('header-user').textContent = App.user.name;
+        document.getElementById('header-avatar').textContent = App.user.name.substring(0,2).toUpperCase();
+        document.body.classList.toggle('is-owner', App.role === 'owner');
+        Nav.init();
+        Nav.showView('agenda');
+        Render.notificacoes(true); // Registra log de entrada
+    },
+    logout() { if(confirm('Sair do sistema?')) location.reload(); }
+};
+
+// 5. NAVIGATION
+const Nav = {
+    init() {
+        document.querySelectorAll('.nav-link, .b-item').forEach(l => {
+            l.onclick = (e) => {
+                if(!l.dataset.view) return;
+                e.preventDefault();
+                this.showView(l.dataset.view);
+                this.closeMenu();
+            };
+        });
+    },
     showView(id) {
-        App.currentView = id;
-        const titles = {
-            'agenda': 'Agenda', 'cobrancas': 'Cobranças', 'comandas': 'Comandas', 
-            'mensagens': 'Mensagens Prontas', 'clientes': 'Clientes & Anamnese', 
-            'servicos': 'Serviços & Pacotes', 'produtos': 'Produto & Estoque', 
-            'despesas': 'Despesas', 'funcionarios': 'Equipe', 'comissao': 'Minha Comissão', 
-            'performance': 'Performance', 'resumo-financeiro': 'Resumo Financeiro', 
-            'melhores-clientes': 'Melhores Clientes', 'configuracoes': 'Configurações'
-        };
-        const titleEl = document.getElementById('page-title');
-        if (titleEl) titleEl.textContent = titles[id] || 'Sistema';
-
+        App.view = id;
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        const targetView = document.getElementById(`view-${id}`);
-        if (targetView) targetView.classList.add('active');
-
+        document.getElementById(`view-${id}`).classList.add('active');
         document.querySelectorAll('.nav-link, .b-item').forEach(el => el.classList.toggle('active', el.dataset.view === id));
         
-        // Chama a função de renderizar a tela específica
+        const titles = { agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes & Anamnese', servicos:'Serviços', produtos:'Estoque', comissao:'Comissão' };
+        document.getElementById('page-title').textContent = titles[id] || 'Amor que Cuida';
         if(Render[id]) Render[id]();
     },
     toggleMenu() {
@@ -94,331 +119,269 @@ const Nav = {
     }
 };
 
-// --- 5. RENDERIZADORES DE TELAS (O CORE DO SISTEMA) ---
+// 6. RENDERERS (VIEWS & DATA)
 const Render = {
-    agenda() {
-        const container = document.getElementById('view-agenda');
-        const dt = document.getElementById('filtro-data-agenda')?.value || new Date().toISOString().split('T')[0];
-        const agendamentos = App.data.agenda.filter(a => a.data === dt);
+    async agenda() {
+        this.buildCalendar();
+        const dateStr = U.iso(App.currentDate);
+        const { data: agendamentos } = await db.from('appointments').select('*, clients(name), services(name), users(name)').eq('date', dateStr);
         
-        let html = `
-            <div class="header-actions">
-                <h2>Sua Agenda</h2>
-                <input type="date" class="input-date" id="filtro-data-agenda" value="${dt}" onchange="Render.agenda()">
-                <button class="btn-primary" onclick="Modals.open('agendamento')" style="width: auto; padding: 0.8rem 1.5rem;">+ Novo Agendamento</button>
-            </div>
-            <div style="display:flex; flex-direction:column; gap: 1rem;">
-        `;
-
-        if (agendamentos.length === 0) {
-            html += `
-                <div class="empty-state">
-                    <i class="ph ph-calendar-blank"></i><p>Nenhum agendamento para hoje.</p>
-                </div>`;
-        } else {
-            agendamentos.forEach(a => {
-                html += `
-                <div style="background:var(--surface); padding:1.5rem; border-radius:var(--radius); border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                        <strong style="font-size:1.1rem">${a.hora} - ${a.clienteNome}</strong>
-                        <div style="color:var(--muted); font-size:0.9rem; margin-top:4px;">${a.servicoNome} • Profissional: ${a.profissionalNome}</div>
-                    </div>
-                    <div style="font-weight:bold; color:var(--primary); font-size:1.2rem;">${U.money(a.valor)}</div>
-                </div>`;
-            });
+        const cont = document.getElementById('agenda-list');
+        if(!agendamentos || !agendamentos.length) {
+            cont.innerHTML = `<div class="card" style="text-align:center"><p>Nenhum agendamento.</p></div>`; return;
         }
-        html += `</div>`;
-        container.innerHTML = html;
         
-        // Re-atacha evento no novo input
-        document.getElementById('filtro-data-agenda').addEventListener('change', Render.agenda);
+        cont.innerHTML = agendamentos.map(a => `
+            <div class="card" style="display:flex; justify-content:space-between">
+                <div><h4>${a.time} - ${a.clients?.name||'Cliente'}</h4><p>${a.services?.name||'Serviço'} • ${a.users?.name||'Profissional'}</p></div>
+                <div class="val">${a.status}</div>
+            </div>`).join('');
+    },
+    
+    buildCalendar() {
+        const d = App.currentDate;
+        document.getElementById('cal-month-year').textContent = d.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        
+        // Pega inicio da semana (Domingo)
+        const start = new Date(d); start.setDate(d.getDate() - d.getDay());
+        let html = '';
+        const days = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
+        
+        for(let i=0; i<7; i++) {
+            const cur = new Date(start); cur.setDate(start.getDate() + i);
+            const isSelected = U.iso(cur) === U.iso(App.currentDate) ? 'active' : '';
+            html += `<div class="cal-day ${isSelected}" onclick="Render.selectDate('${U.iso(cur)}')">
+                <span>${days[i]}</span><span>${cur.getDate()}</span>
+            </div>`;
+        }
+        document.getElementById('cal-days-row').innerHTML = html;
+    },
+    selectDate(isoDate) { App.currentDate = new Date(isoDate+'T12:00:00'); this.agenda(); },
+    changeWeek(dir) { App.currentDate.setDate(App.currentDate.getDate() + (dir*7)); this.agenda(); },
+
+    async clientes() {
+        const { data } = await db.from('clients').select('*');
+        const cont = document.getElementById('clientes-list');
+        cont.innerHTML = data.map(c => `
+            <div class="card">
+                <a href="https://wa.me/55${c.phone.replace(/\D/g,'')}" target="_blank" class="wpp-btn" onclick="event.stopPropagation()"><i class="ph ph-whatsapp-logo"></i></a>
+                <h4 onclick="Modals.open('anamnese', '${c.id}', '${c.name}')" style="cursor:pointer; color:var(--primary)">${c.name}</h4>
+                <p>${c.phone}</p>
+                <div class="val" style="font-size:1rem; margin-top:10px">Ver Anamnese / Histórico</div>
+            </div>`).join('');
     },
 
-    servicos() {
-        const container = document.getElementById('view-servicos');
-        let html = `
-            <div class="header-actions">
-                <h2>Catálogo de Serviços</h2>
-                <button class="btn-primary owner-only" onclick="Modals.open('servico')" style="width: auto; padding: 0.8rem 1.5rem;">+ Adicionar Serviço</button>
-            </div>
-            <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
-        `;
-        App.data.servicos.forEach(s => {
-            html += `
-            <div style="background:var(--surface); padding:1.5rem; border-radius:var(--radius); border:1px solid var(--border);">
+    async cobrancas() {
+        const { data } = await db.from('debts').select('*, clients(name)').gt('remaining_amount', 0);
+        const cont = document.getElementById('cobrancas-list');
+        cont.innerHTML = data.map(d => `
+            <div class="card">
                 <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
-                    <strong style="font-size:1.2rem">${s.nome}</strong>
-                    <span style="font-family:'Playfair Display'; font-weight:bold; color:var(--primary); font-size:1.3rem;">${U.money(s.valor)}</span>
+                    <h4>${d.clients?.name}</h4><div class="val" style="color:#d32f2f">${U.money(d.remaining_amount)}</div>
                 </div>
-                <div style="color:var(--muted); font-size:0.9rem; display:flex; justify-content:space-between;">
-                    <span>⏱ ${s.tempo} min</span>
-                    <span style="background:var(--primary-light); color:var(--primary-dark); padding:2px 8px; border-radius:10px; font-weight:bold;">Comissão: ${s.comissao}%</span>
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-primary" style="padding:0.5rem; font-size:0.8rem" onclick="Modals.open('debitar', '${d.id}', ${d.remaining_amount})">Debitar Pagamento</button>
+                    ${App.role==='owner' ? `<button class="btn-secondary" style="padding:0.5rem; font-size:0.8rem" onclick="Modals.open('desconto', '${d.id}', ${d.remaining_amount})">Dar Desconto %</button>` : ''}
                 </div>
-            </div>`;
-        });
-        html += `</div>`;
-        container.innerHTML = html;
+            </div>`).join('');
     },
 
-    clientes() {
-        const container = document.getElementById('view-clientes');
-        let html = `
-            <div class="header-actions">
-                <h2>Base de Clientes</h2>
-                <button class="btn-primary" onclick="Modals.open('cliente')" style="width: auto; padding: 0.8rem 1.5rem;">+ Novo Cliente</button>
-            </div>
-            <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
-        `;
-        App.data.clientes.forEach(c => {
-            html += `
-            <div style="background:var(--surface); padding:1.5rem; border-radius:var(--radius); border:1px solid var(--border);">
-                <strong style="font-size:1.1rem; display:block; margin-bottom:5px;">${c.nome}</strong>
-                <div style="color:var(--muted); font-size:0.9rem; margin-bottom:10px;"><i class="ph ph-whatsapp-logo"></i> ${c.telefone}</div>
-                <div style="font-weight:bold; color:var(--primary);">Total Gasto: ${U.money(c.gastoTotal)}</div>
-            </div>`;
-        });
-        html += `</div>`;
-        container.innerHTML = html;
+    async servicos() {
+        const { data } = await db.from('services').select('*');
+        document.getElementById('servicos-list').innerHTML = data.map(s => `
+            <div class="card">
+                <h4>${s.name}</h4>
+                <p>Custo: ${U.money(s.cost)} • Profissional: ${s.commission}%</p>
+                ${s.has_assistant ? `<p>Auxiliar: ${s.assistant_commission}%</p>` : ''}
+                <div class="val">${U.money(s.price)}</div>
+            </div>`).join('');
     },
 
-    comissao() {
-        const container = document.getElementById('view-comissao');
-        // Filtra os agendamentos do usuário logado (simulação simples)
-        const minhas = App.data.agenda.filter(a => a.profissionalNome === App.user.name);
+    async produtos() {
+        const { data } = await db.from('products').select('*');
+        document.getElementById('produtos-list').innerHTML = data.map(p => {
+            const alert = p.stock <= p.min_stock ? '<span style="color:red; font-size:0.8rem; font-weight:bold">ALERTA ESTOQUE</span>' : '';
+            return `<div class="card">
+                <h4>${p.name} <br>${alert}</h4>
+                <p>${p.brand} • Cód: ${p.barcode}</p>
+                <div class="val" style="font-size:1rem">Estoque: ${p.stock} un.</div>
+            </div>`;
+        }).join('');
+    },
+
+    async comissao() {
+        // Visão do Colaborador: Histórico dele
+        let query = db.from('appointments').select('*, services(name, price, commission)').eq('status', 'concluído');
+        if(App.role !== 'owner') query = query.eq('user_id', App.user.id);
+        
+        const { data } = await query;
+        let html = `<h3>Minhas Comissões (Mês Atual)</h3><div class="data-list" style="margin-top:1rem">`;
         let total = 0;
         
-        let html = `
-            <div class="header-actions">
-                <h2>Minhas Comissões</h2>
-            </div>
-            <div style="display:flex; flex-direction:column; gap: 1rem;">
-        `;
-
-        if(minhas.length === 0) {
-            html += `<div class="empty-state"><p>Nenhum serviço realizado ainda.</p></div>`;
-        } else {
-            minhas.forEach(m => {
-                total += m.valorComissao;
-                html += `
-                <div style="background:var(--surface); padding:1rem; border-radius:var(--radius); border:1px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                        <strong>${m.servicoNome}</strong>
-                        <div style="color:var(--muted); font-size:0.85rem;">${U.date(m.data)} • Cliente: ${m.clienteNome}</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div style="font-size:0.8rem; color:var(--muted);">${m.comissaoPerc}%</div>
-                        <div style="font-weight:bold; color:#2e7d32; font-size:1.1rem;">+ ${U.money(m.valorComissao)}</div>
-                    </div>
-                </div>`;
-            });
-        }
-        
-        html += `
-            <div style="margin-top:2rem; padding:1.5rem; background:var(--primary); color:white; border-radius:var(--radius); text-align:center;">
-                <p style="font-size:1rem; opacity:0.9;">Total a Receber</p>
-                <h2 style="color:white; font-size:2.5rem; margin:0;">${U.money(total)}</h2>
-            </div>
+        data.forEach(a => {
+            const v = (a.services.price * a.services.commission) / 100;
+            total += v;
+            html += `<div class="card">
+                <h4>${a.services.name}</h4><p>${U.date(a.date)} • Calculo: ${a.services.commission}% de ${U.money(a.services.price)}</p>
+                <div class="val" style="color:#2e7d32">+ ${U.money(v)}</div>
+            </div>`;
+        });
+        html += `</div><div class="card" style="margin-top:1rem; background:var(--primary); color:white">
+            <h4 style="color:white">Total a Receber</h4><div class="val" style="color:white">${U.money(total)}</div>
         </div>`;
         
-        container.innerHTML = html;
+        document.getElementById('comissao-content').innerHTML = html;
     },
 
-    // Páginas Genéricas/Em Construção (Para manter o app completo)
-    comandas() { document.getElementById('view-comandas').innerHTML = '<h2>Comandas</h2><p>Módulo de comandas abertas será carregado aqui.</p>'; },
-    cobrancas() { document.getElementById('view-cobrancas').innerHTML = '<h2>Cobranças</h2><p>Links de pagamento e pendências.</p>'; },
-    produtos() { document.getElementById('view-produtos').innerHTML = '<h2>Estoque</h2><p>Controle de produtos do estúdio.</p>'; },
-    despesas() { document.getElementById('view-despesas').innerHTML = '<h2>Despesas</h2><p>Controle financeiro de saídas.</p>'; },
-    funcionarios() { document.getElementById('view-funcionarios').innerHTML = '<h2>Equipe</h2><p>Gerenciamento de profissionais.</p>'; },
-    performance() { document.getElementById('view-performance').innerHTML = '<h2>Performance</h2><p>Gráficos em desenvolvimento.</p>'; },
-    'resumo-financeiro': function() { document.getElementById('view-resumo-financeiro').innerHTML = '<h2>Resumo Financeiro</h2><p>Fluxo de caixa completo.</p>'; },
-    'melhores-clientes': function() { document.getElementById('view-melhores-clientes').innerHTML = '<h2>Melhores Clientes</h2><p>Ranking VIP.</p>'; },
-    configuracoes() { document.getElementById('view-configuracoes').innerHTML = '<h2>Configurações</h2><p>Ajustes do estúdio.</p>'; },
-    mensagens() { document.getElementById('view-mensagens').innerHTML = '<h2>Mensagens Prontas</h2><p>Atalhos para WhatsApp.</p>'; }
+    async notificacoes(isLogin = false) {
+        if(isLogin) {
+            await db.from('notifications').insert({ message: `${App.user.name} acessou o sistema.`, read: false });
+        }
+    }
 };
 
-// --- 6. GESTÃO DE MODAIS E FORMULÁRIOS DINÂMICOS ---
+// 7. MODALS & FORMS
 const Modals = {
-    open(type) {
-        // Remove modal anterior se existir
-        const oldModal = document.getElementById('dynamic-modal');
-        if(oldModal) oldModal.remove();
-
-        let content = '';
-        if (type === 'servico') {
-            content = `
-                <h3>Novo Serviço</h3>
-                <form id="form-generico" onsubmit="Actions.saveServico(event)">
-                    <div class="input-group"><label>Nome do Serviço</label><input type="text" id="s-nome" required></div>
-                    <div class="input-group"><label>Valor (R$)</label><input type="number" step="0.01" id="s-valor" required></div>
-                    <div class="input-group"><label>Comissão do Profissional (%) - Digite de 0 a 100</label><input type="number" id="s-comissao" min="0" max="100" required></div>
-                    <div class="input-group"><label>Tempo Estimado (minutos)</label><input type="number" id="s-tempo" required></div>
-                    <button type="submit" class="btn-primary">Salvar Serviço</button>
-                </form>
-            `;
-        } else if (type === 'cliente') {
-            content = `
-                <h3>Novo Cliente</h3>
-                <form id="form-generico" onsubmit="Actions.saveCliente(event)">
-                    <div class="input-group"><label>Nome Completo</label><input type="text" id="c-nome" required></div>
-                    <div class="input-group"><label>WhatsApp</label><input type="tel" id="c-tel" required></div>
-                    <button type="submit" class="btn-primary">Salvar Cliente</button>
-                </form>
-            `;
-        } else if (type === 'agendamento') {
-            // Gera opções para os selects
-            const servOpts = App.data.servicos.map(s => `<option value="${s.id}">${s.nome} - ${U.money(s.valor)}</option>`).join('');
-            const cliOpts = App.data.clientes.map(c => `<option value="${c.id}">${c.nome}</option>`).join('');
-            const funcOpts = App.data.funcionarios.map(f => `<option value="${f.id}">${f.nome}</option>`).join('');
-            
-            content = `
-                <h3>Novo Agendamento</h3>
-                <form id="form-generico" onsubmit="Actions.saveAgendamento(event)">
-                    <div class="input-group"><label>Cliente</label><select id="a-cli" class="input-date" style="width:100%" required>${cliOpts}</select></div>
-                    <div class="input-group"><label>Serviço</label><select id="a-serv" class="input-date" style="width:100%" required>${servOpts}</select></div>
-                    <div class="input-group"><label>Profissional</label><select id="a-func" class="input-date" style="width:100%" required>${funcOpts}</select></div>
-                    <div style="display:flex; gap:10px;">
-                        <div class="input-group" style="flex:1"><label>Data</label><input type="date" id="a-data" required></div>
-                        <div class="input-group" style="flex:1"><label>Hora</label><input type="time" id="a-hora" required></div>
-                    </div>
-                    <button type="submit" class="btn-primary">Confirmar Agendamento</button>
-                </form>
-            `;
+    open(type, param1=null, param2=null) {
+        const cont = document.getElementById('modal-container');
+        cont.classList.remove('hidden');
+        let html = `<div class="modal"><button class="modal-close" onclick="Modals.close()">&times;</button>`;
+        
+        if(type === 'first_login') {
+            html += `<h3>Crie sua Nova Senha</h3><p>Este é seu primeiro acesso.</p>
+            <form onsubmit="Actions.updatePassword(event)">
+                <div class="input-group"><input type="password" id="new-pass" required placeholder="Nova Senha"></div>
+                <button type="submit" class="btn-primary">Salvar e Entrar</button>
+            </form>`;
+        } 
+        else if(type === 'servico') {
+            html += `<h3>Novo Serviço</h3>
+            <form onsubmit="Actions.createService(event)">
+                <div class="input-group"><label>Nome</label><input type="text" id="fs-nome" required></div>
+                <div class="input-group"><label>Valor de Cobrança</label><input type="number" id="fs-valor" step="0.01" required></div>
+                <div class="input-group"><label>Custo do Serviço (R$)</label><input type="number" id="fs-custo" step="0.01" required></div>
+                <div class="input-group"><label>Comissão do Profissional (%)</label><input type="number" id="fs-com" max="100" required></div>
+                <div class="input-group"><label><input type="checkbox" id="fs-aux" onchange="document.getElementById('aux-div').style.display=this.checked?'block':'none'"> Precisa de Auxiliar?</label></div>
+                <div class="input-group" id="aux-div" style="display:none"><label>Comissão do Auxiliar (%)</label><input type="number" id="fs-auxcom" max="100"></div>
+                <button type="submit" class="btn-primary">Salvar Serviço</button>
+            </form>`;
+        }
+        else if(type === 'anamnese') {
+            html += `<h3>Anamnese - ${param2}</h3>
+            <form onsubmit="Actions.saveAnamnese(event, '${param1}')">
+                <div class="input-group"><label>Histórico Capilar (Químicas, Alergias)</label><textarea id="fa-hist" rows="3"></textarea></div>
+                <div class="input-group"><label>Hábitos (Shampoo, Frequência, Secador)</label><textarea id="fa-hab" rows="2"></textarea></div>
+                <div class="input-group"><label>Objetivo da Cliente</label><textarea id="fa-obj" rows="2"></textarea></div>
+                <div class="input-group"><label>Observações Profissionais</label><textarea id="fa-obs" rows="2"></textarea></div>
+                <button type="submit" class="btn-primary">Salvar Ficha</button>
+            </form>
+            <div id="anamnese-history" style="margin-top:1.5rem"><i>Carregando histórico...</i></div>`;
+            Actions.loadAnamnese(param1); // Async load
+        }
+        else if(type === 'debitar') {
+            html += `<h3>Debitar Pagamento</h3><p>Dívida atual: ${U.money(param2)}</p>
+            <form onsubmit="Actions.debitDebt(event, '${param1}', ${param2})">
+                <div class="input-group"><label>Valor Pago Agora</label><input type="number" id="fd-val" step="0.01" max="${param2}" required></div>
+                <button type="submit" class="btn-primary">Confirmar Pagamento</button>
+            </form>`;
+        }
+        else if(type === 'desconto') {
+            html += `<h3>Aplicar Desconto</h3><p>Dívida atual: ${U.money(param2)}</p>
+            <form onsubmit="Actions.discountDebt(event, '${param1}', ${param2})">
+                <div class="input-group"><label>Porcentagem de Desconto (%)</label><input type="number" id="fd-desc" max="100" oninput="document.getElementById('desc-res').innerText = 'Novo total: R$ ' + (${param2} - (${param2} * this.value / 100)).toFixed(2)" required></div>
+                <p id="desc-res" style="font-weight:bold; color:var(--primary); margin-bottom:1rem"></p>
+                <button type="submit" class="btn-primary">Aplicar Desconto e Salvar</button>
+            </form>`;
+        }
+        else if(type === 'produto') {
+            html += `<h3>Novo Produto / Entrada</h3>
+            <form onsubmit="Actions.saveProduct(event)">
+                <div class="input-group"><label>Código de Barras</label><input type="text" id="fp-bar" placeholder="Use leitor ou digite" autofocus required></div>
+                <div class="input-group"><label>Nome</label><input type="text" id="fp-nome" required></div>
+                <div class="input-group"><label>Qtd Estoque Inicial</label><input type="number" id="fp-qtd" required></div>
+                <div class="input-group"><label>Estoque Mínimo (Alerta)</label><input type="number" id="fp-min" value="5" required></div>
+                <button type="submit" class="btn-primary">Salvar Produto</button>
+            </form>`;
         }
 
-        const modalHtml = `
-            <div id="dynamic-modal" class="modal-container">
-                <div class="modal-content">
-                    <button onclick="Modals.close()" style="float:right; background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
-                    ${content}
-                </div>
-            </div>
-        `;
-        
-        document.body.insertAdjacentHTML('beforeend', modalHtml);
-        document.getElementById('mobile-overlay').classList.remove('hidden');
+        html += `</div>`;
+        cont.innerHTML = html;
     },
-    close() {
-        const modal = document.getElementById('dynamic-modal');
-        if(modal) modal.remove();
-        document.getElementById('mobile-overlay').classList.add('hidden');
-    }
+    close() { document.getElementById('modal-container').classList.add('hidden'); }
 };
 
-// CSS Injetado Dinamicamente para os Modais ficarem perfeitos
-document.head.insertAdjacentHTML('beforeend', `
-<style>
-.modal-container { position: fixed; inset: 0; display: flex; justify-content: center; align-items: center; z-index: 10000; padding: 1rem; pointer-events: none; }
-.modal-content { background: var(--surface); padding: 2rem; border-radius: var(--radius); width: 100%; max-width: 500px; box-shadow: var(--shadow); pointer-events: auto; animation: slideUp 0.3s ease; max-height: 90vh; overflow-y: auto; }
-</style>
-`);
-
-// --- 7. AÇÕES DE SALVAMENTO (CRUD) ---
+// 8. ACTIONS / CRUD TO DB
 const Actions = {
-    saveServico(e) {
+    async updatePassword(e) {
         e.preventDefault();
-        const servico = {
-            id: U.id(),
-            nome: document.getElementById('s-nome').value,
-            valor: parseFloat(document.getElementById('s-valor').value),
-            comissao: parseInt(document.getElementById('s-comissao').value), // Regra do 100%
-            tempo: parseInt(document.getElementById('s-tempo').value)
-        };
-        App.data.servicos.push(servico);
-        Modals.close();
-        Render.servicos();
+        const p = document.getElementById('new-pass').value;
+        const { error } = await db.from('users').update({ password: p, first_login: false }).eq('id', App.user.id);
+        if(!error) { Modals.close(); UI.toast('Senha atualizada!'); Auth.success(); }
     },
-    saveCliente(e) {
+    async createService(e) {
         e.preventDefault();
-        const cliente = {
-            id: U.id(),
-            nome: document.getElementById('c-nome').value,
-            telefone: document.getElementById('c-tel').value,
-            gastoTotal: 0
+        const aux = document.getElementById('fs-aux').checked;
+        const payload = {
+            name: document.getElementById('fs-nome').value,
+            price: document.getElementById('fs-valor').value,
+            cost: document.getElementById('fs-custo').value,
+            commission: document.getElementById('fs-com').value,
+            has_assistant: aux,
+            assistant_commission: aux ? document.getElementById('fs-auxcom').value : 0
         };
-        App.data.clientes.push(cliente);
-        Modals.close();
-        Render.clientes();
+        const { error } = await db.from('services').insert(payload);
+        if(!error) { Modals.close(); UI.toast('Serviço criado!'); Render.servicos(); }
     },
-    saveAgendamento(e) {
+    async saveAnamnese(e, clientId) {
         e.preventDefault();
-        const cliId = document.getElementById('a-cli').value;
-        const servId = document.getElementById('a-serv').value;
-        const funcId = document.getElementById('a-func').value;
-        
-        const cliente = App.data.clientes.find(c => c.id === cliId);
-        const servico = App.data.servicos.find(s => s.id === servId);
-        const func = App.data.funcionarios.find(f => f.id === funcId);
-
-        // Cálculo da Comissão Exata com base na porcentagem cadastrada pelo proprietário
-        const valorComissao = (servico.valor * servico.comissao) / 100;
-
-        const agendamento = {
-            id: U.id(),
-            clienteNome: cliente.nome,
-            servicoNome: servico.nome,
-            profissionalNome: func.nome,
-            valor: servico.valor,
-            comissaoPerc: servico.comissao,
-            valorComissao: valorComissao,
-            data: document.getElementById('a-data').value,
-            hora: document.getElementById('a-hora').value
+        const payload = {
+            client_id: clientId,
+            history: document.getElementById('fa-hist').value,
+            habits: document.getElementById('fa-hab').value,
+            objectives: document.getElementById('fa-obj').value,
+            notes: document.getElementById('fa-obs').value
         };
-        
-        App.data.agenda.push(agendamento);
-        Modals.close();
-        Render.agenda();
-        
-        // Atualiza a tela se tiver na mesma data
-        document.getElementById('filtro-data-agenda').value = agendamento.data;
-        Render.agenda();
+        const { error } = await db.from('anamnesis').insert(payload);
+        if(!error) { Modals.close(); UI.toast('Anamnese salva!'); }
+    },
+    async loadAnamnese(clientId) {
+        const { data } = await db.from('anamnesis').select('*').eq('client_id', clientId).order('created_at', {ascending: false});
+        const div = document.getElementById('anamnese-history');
+        if(!data || !data.length) { div.innerHTML = "<i>Sem registros.</i>"; return; }
+        div.innerHTML = data.map(d => `<div style="background:#eee; padding:10px; border-radius:10px; margin-bottom:10px; font-size:0.8rem">
+            <b>Data:</b> ${U.date(d.created_at)}<br>
+            <b>Histórico:</b> ${d.history}<br><b>Objetivo:</b> ${d.objectives}
+        </div>`).join('');
+    },
+    async debitDebt(e, id, max) {
+        e.preventDefault();
+        const v = parseFloat(document.getElementById('fd-val').value);
+        const newTotal = max - v;
+        const { error } = await db.from('debts').update({ remaining_amount: newTotal }).eq('id', id);
+        if(!error) { 
+            await db.from('notifications').insert({message: `Pagamento recebido de dívida: ${U.money(v)}`, read:false});
+            Modals.close(); UI.toast('Pagamento debitado!'); Render.cobrancas(); 
+        }
+    },
+    async discountDebt(e, id, max) {
+        e.preventDefault();
+        const perc = parseFloat(document.getElementById('fd-desc').value);
+        const newTotal = max - (max * perc / 100);
+        const { error } = await db.from('debts').update({ remaining_amount: newTotal }).eq('id', id);
+        if(!error) { Modals.close(); UI.toast('Desconto aplicado!'); Render.cobrancas(); }
+    },
+    async saveProduct(e) {
+        e.preventDefault();
+        const payload = {
+            barcode: document.getElementById('fp-bar').value,
+            name: document.getElementById('fp-nome').value,
+            stock: document.getElementById('fp-qtd').value,
+            min_stock: document.getElementById('fp-min').value
+        };
+        const { error } = await db.from('products').insert(payload);
+        if(!error) { Modals.close(); UI.toast('Produto em estoque!'); Render.produtos(); }
     }
 };
 
-// --- 8. AUTENTICAÇÃO ---
-const Auth = {
-    init() {
-        setTimeout(() => {
-            document.getElementById('splash-screen').classList.remove('active');
-            document.getElementById('login-screen').classList.add('active');
-        }, 1500);
-
-        const loginForm = document.getElementById('login-form');
-        if (loginForm) {
-            loginForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                this.handleLogin();
-            });
-        }
-    },
-    handleLogin() {
-        const user = document.getElementById('username').value.trim().toLowerCase();
-        
-        if (user === 'admin' || user === 'andressa') {
-            this.success({ name: 'Andressa Vieira', role: 'owner', initials: 'AV' });
-        } else {
-            this.success({ name: 'Membro Equipe', role: 'employee', initials: 'ME' });
-        }
-    },
-    success(userData) {
-        App.user = userData;
-        App.role = userData.role;
-        document.getElementById('auth-layer').classList.add('hidden');
-        document.getElementById('system-layout').classList.remove('hidden');
-        document.getElementById('header-user').textContent = userData.name;
-        document.getElementById('header-avatar').textContent = userData.initials;
-
-        if (userData.role === 'owner') document.body.classList.add('is-owner');
-        else document.body.classList.remove('is-owner');
-
-        Nav.showView('agenda');
-    },
-    logout() {
-        if(confirm('Tem certeza que deseja sair?')) location.reload();
-    }
-};
-
-// --- 9. BOOT DO APP ---
-document.addEventListener('DOMContentLoaded', () => {
-    Nav.init();
-    Auth.init();
-});
+// BOOT
+document.addEventListener('DOMContentLoaded', () => Auth.init());

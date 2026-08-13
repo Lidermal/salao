@@ -1,7 +1,7 @@
 /* ============================================
-   ESTÚDIO AMOR QUE CUIDA - STYLESHEET
+   ESTÚDIO AMOR QUE CUIDA - STYLESHEET COMPLETO
    Paleta: Rose Gold (#B76E79), Blush (#F4C2C2), Cream (#FDF6F0)
-   Mobile-First Design | Instagram-inspired UI
+   Mobile-First | Instagram-inspired UI | Web Professional
    ============================================ */
 
 /* RESET & BASE */
@@ -74,18 +74,23 @@ body {
     overflow-x: hidden;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    height: 100vh; /* Previne scroll durante splash/login */
 }
 
-/* SCREENS */
+/* SCREENS (AUTH LAYER) */
 .screen {
     position: fixed;
     top: 0;
     left: 0;
-    width: 100%;
+    width: 100vw;
     height: 100vh;
     display: none;
     opacity: 0;
     transition: opacity 0.3s ease;
+    z-index: 9999; /* Garante cobertura total */
+    background: linear-gradient(135deg, var(--cream) 0%, var(--blush-light) 100%);
+    justify-content: center;
+    align-items: center;
 }
 
 .screen.active {
@@ -97,12 +102,10 @@ body {
     display: none !important;
 }
 
-/* SPLASH SCREEN */
+/* SPLASH SCREEN SPECIFIC */
 #splash-screen {
     background: linear-gradient(135deg, var(--rose-gold) 0%, var(--blush) 50%, var(--cream) 100%);
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
+    z-index: 10000;
 }
 
 .splash-content {
@@ -155,33 +158,19 @@ body {
 }
 
 @keyframes fadeInUp {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
 }
 
 /* LOGIN CONTAINER */
 .login-container {
-    width: 100%;
+    width: 90%;
     max-width: 400px;
     padding: var(--spacing-xl);
-    margin: auto;
     background: var(--white);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-lg);
-}
-
-#login-screen,
-#create-password-screen,
-#enter-password-screen {
-    background: linear-gradient(135deg, var(--cream) 0%, var(--blush-light) 100%);
-    justify-content: center;
-    align-items: center;
+    animation: fadeInUp 0.5s ease-out;
 }
 
 .logo-small {
@@ -340,7 +329,7 @@ body {
     min-height: 100vh;
     display: flex;
     flex-direction: column;
-    padding-bottom: 70px;
+    padding-bottom: 80px; /* Espaço para bottom nav */
 }
 
 /* HEADER */
@@ -366,6 +355,9 @@ body {
 .app-content {
     flex: 1;
     padding: var(--spacing-md);
+    max-width: 1200px;
+    margin: 0 auto;
+    width: 100%;
 }
 
 .view {
@@ -515,12 +507,12 @@ body {
     color: var(--white);
 }
 
-/* DATE SELECTOR */
+/* DATE SELECTOR & FILTERS */
 .date-selector {
     margin-bottom: var(--spacing-md);
 }
 
-.date-input {
+.date-input, .search-bar input, .filter-bar select {
     width: 100%;
     padding: 12px 16px;
     border: 2px solid var(--blush);
@@ -528,56 +520,30 @@ body {
     font-size: 1rem;
     font-family: var(--font-body);
     background: var(--white);
+    margin-bottom: var(--spacing-md);
 }
 
-.date-input:focus {
+.date-input:focus, .search-bar input:focus, .filter-bar select:focus {
     outline: none;
     border-color: var(--rose-gold);
 }
 
-/* FILTER BAR */
 .filter-bar {
     margin-bottom: var(--spacing-md);
 }
 
-.filter-bar select {
-    width: 100%;
-    padding: 12px 16px;
-    border: 2px solid var(--blush);
-    border-radius: var(--radius-md);
-    font-size: 1rem;
-    font-family: var(--font-body);
-    background: var(--white);
-    cursor: pointer;
-}
-
-/* SEARCH BAR */
 .search-bar {
     margin-bottom: var(--spacing-md);
 }
 
-.search-bar input {
-    width: 100%;
-    padding: 12px 16px;
-    border: 2px solid var(--blush);
-    border-radius: var(--radius-md);
-    font-size: 1rem;
-    font-family: var(--font-body);
-    background: var(--white);
-}
-
-.search-bar input:focus {
-    outline: none;
-    border-color: var(--rose-gold);
-}
-
-/* LISTS */
+/* LISTS (Comandas, Clientes, Servicos, etc) */
 .comandas-list,
 .clientes-list,
 .servicos-list,
 .produtos-list,
 .despesas-list,
-.funcionarios-list {
+.funcionarios-list,
+.templates-list {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-md);
@@ -588,12 +554,17 @@ body {
 .servico-item,
 .produto-item,
 .despesa-item,
-.funcionario-item {
+.funcionario-item,
+.template-item {
     background: var(--white);
     padding: var(--spacing-md);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-sm);
     transition: all 0.3s ease;
+    border-left: 4px solid var(--rose-gold);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }
 
 .comanda-item:hover,
@@ -601,16 +572,10 @@ body {
 .servico-item:hover,
 .produto-item:hover,
 .despesa-item:hover,
-.funcionario-item:hover {
+.funcionario-item:hover,
+.template-item:hover {
     box-shadow: var(--shadow-md);
     transform: translateY(-2px);
-}
-
-.item-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: var(--spacing-sm);
 }
 
 .item-title {
@@ -641,24 +606,11 @@ body {
 }
 
 /* TEMPLATES LIST */
-.templates-list {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-}
-
 .template-item {
-    background: var(--white);
-    padding: var(--spacing-md);
-    border-radius: var(--radius-md);
-    box-shadow: var(--shadow-sm);
     cursor: pointer;
-    transition: all 0.3s ease;
 }
 
 .template-item:hover {
-    box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
     border-left: 4px solid var(--rose-gold);
 }
 
@@ -674,7 +626,7 @@ body {
     line-height: 1.4;
 }
 
-/* TABS */
+/* TABS (Relatórios) */
 .tabs {
     display: flex;
     gap: var(--spacing-sm);
@@ -826,7 +778,7 @@ body {
     max-height: 90vh;
     overflow-y: auto;
     transform: translateY(100%);
-    transition: transform 0.3s ease;
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .modal.active {
@@ -852,7 +804,7 @@ body {
     margin-bottom: var(--spacing-lg);
 }
 
-/* FORM GROUPS */
+/* FORM GROUPS (Modals) */
 .form-group {
     margin-bottom: var(--spacing-md);
 }
@@ -1026,7 +978,14 @@ body {
     margin-bottom: var(--spacing-md);
 }
 
-/* RESPONSIVE */
+/* TEXT UTILITIES */
+.text-muted {
+    color: var(--text-muted);
+    text-align: center;
+    padding: var(--spacing-lg);
+}
+
+/* RESPONSIVE DESIGN */
 @media (min-width: 768px) {
     .stats-grid {
         grid-template-columns: repeat(3, 1fr);
@@ -1039,19 +998,35 @@ body {
     .form-row {
         grid-template-columns: 1fr 1fr;
     }
+
+    /* Modal Centralizado no Desktop */
+    .modal {
+        max-width: 500px;
+        left: 50%;
+        transform: translateX(-50%) translateY(100%);
+        bottom: 2rem;
+        border-radius: var(--radius-lg);
+    }
+    
+    .modal.active {
+        transform: translateX(-50%) translateY(0);
+    }
+
+    /* Bottom Nav Estilizada no Desktop */
+    .bottom-nav {
+        max-width: 500px;
+        left: 50%;
+        transform: translateX(-50%);
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+        bottom: 1rem;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+    }
 }
 
 @media (min-width: 1024px) {
     .app-content {
         max-width: 1200px;
         margin: 0 auto;
-    }
-    
-    .bottom-nav {
-        max-width: 1200px;
-        left: 50%;
-        transform: translateX(-50%);
-        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
     }
 }
 
@@ -1094,11 +1069,4 @@ select:focus {
     .view {
         display: block !important;
     }
-}
-
-/* TEXT UTILITIES */
-.text-muted {
-    color: var(--text-muted);
-    text-align: center;
-    padding: var(--spacing-lg);
 }

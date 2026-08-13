@@ -6,6 +6,7 @@
     <title>Estúdio Amor que Cuida</title>
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     
+    <!-- Supabase, PDF e Ícones Phosphor -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -15,6 +16,7 @@
 </head>
 <body>
 
+    <!-- NOTIFICAÇÕES TOAST -->
     <div id="toast-container"></div>
 
     <!-- CAMADA DE AUTENTICAÇÃO -->
@@ -33,18 +35,18 @@
                 <i class="ph ph-lock-key text-primary" style="font-size: 2.5rem; margin-bottom: 1rem;"></i>
                 <h2>Acesso ao Sistema</h2>
                 <form id="login-form">
-                    <div class="input-group"><label>Usuário</label><input type="text" id="username" required></div>
-                    <div class="input-group"><label>Senha</label><input type="password" id="password" required></div>
+                    <div class="input-group"><label>Usuário</label><input type="text" id="username" required autocomplete="username"></div>
+                    <div class="input-group"><label>Senha</label><input type="password" id="password" required autocomplete="current-password"></div>
                     <button type="submit" class="btn-primary" id="btn-login">Entrar</button>
                 </form>
             </div>
         </section>
     </div>
 
-    <!-- ESTRUTURA PRINCIPAL -->
+    <!-- ESTRUTURA PRINCIPAL DO SISTEMA -->
     <div id="system-layout" class="hidden">
         
-        <!-- SIDEBAR -->
+        <!-- SIDEBAR (DESKTOP) & DRAWER (MOBILE) -->
         <aside class="sidebar" id="main-sidebar">
             <div class="sidebar-brand">
                 <i class="ph ph-scissors"></i><span>Amor que Cuida</span>
@@ -58,7 +60,7 @@
                 <a href="#" class="nav-link" data-view="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
                 
                 <div class="nav-section">CADASTROS</div>
-                <a href="#" class="nav-link" data-view="clientes"><i class="ph ph-users"></i> Clientes & Anamnese</a>
+                <a href="#" class="nav-link" data-view="clientes"><i class="ph ph-users"></i> Clientes</a>
                 <a href="#" class="nav-link owner-only" data-view="servicos"><i class="ph ph-sparkle"></i> Serviços & Pacotes</a>
                 <a href="#" class="nav-link owner-only" data-view="produtos"><i class="ph ph-package"></i> Produto & Estoque</a>
                 
@@ -70,6 +72,7 @@
                 <div class="nav-section">FINANCEIRO</div>
                 <a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Comissão</a>
                 <a href="#" class="nav-link owner-only" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Resumo Financeiro</a>
+                <a href="#" class="nav-link owner-only" data-view="performance"><i class="ph ph-chart-line-up"></i> Performance</a>
                 
                 <div class="spacer" style="margin-top: 2rem;"></div>
                 <a href="#" class="nav-link owner-only" data-view="configuracoes"><i class="ph ph-gear"></i> Configurações</a>
@@ -77,25 +80,26 @@
             </nav>
         </aside>
 
-        <!-- MOBILE OVERLAY PARA O MENU LATERAL -->
+        <!-- OVERLAY DO MENU MOBILE -->
         <div id="mobile-overlay" class="overlay hidden" onclick="Nav.closeMenu()"></div>
 
-        <!-- CONTEÚDO PRINCIPAL -->
+        <!-- CONTEÚDO PRINCIPAL (TELAS) -->
         <main class="main-content">
             <header class="top-bar">
                 <h1 id="page-title">Agenda</h1>
                 <div class="user-pill">
                     <span id="header-user">Usuário</span>
-                    <div class="avatar" id="header-avatar">AV</div>
+                    <div class="avatar" id="header-avatar">US</div>
                 </div>
             </header>
 
             <div class="views-container">
+                <!-- 1. AGENDA -->
                 <section id="view-agenda" class="view active">
                     <div class="ios-calendar">
                         <div class="cal-header">
                             <button onclick="Render.changeWeek(-1)"><i class="ph ph-caret-left"></i></button>
-                            <h3 id="cal-month-year">Agosto 2026</h3>
+                            <h3 id="cal-month-year">Carregando...</h3>
                             <button onclick="Render.changeWeek(1)"><i class="ph ph-caret-right"></i></button>
                         </div>
                         <div class="cal-days" id="cal-days-row"></div>
@@ -103,31 +107,75 @@
                     <div id="agenda-list" class="data-list"></div>
                 </section>
                 
+                <!-- 2. COBRANÇAS -->
                 <section id="view-cobrancas" class="view"><div id="cobrancas-list" class="data-list"></div></section>
-                <section id="view-comandas" class="view"><div id="comandas-list" class="data-list"></div></section>
+                
+                <!-- 3. COMANDAS -->
+                <section id="view-comandas" class="view"><div id="comandas-list" class="data-grid"></div></section>
+                
+                <!-- 4. CLIENTES -->
                 <section id="view-clientes" class="view"><div id="clientes-list" class="data-grid"></div></section>
+                
+                <!-- 5. ANAMNESE (SUBPÁGINA) -->
+                <section id="view-anamnese" class="view">
+                    <div class="header-actions" style="display:flex; gap:15px; align-items:center; margin-bottom: 2rem;">
+                        <button class="btn-secondary" onclick="Nav.showView('clientes')" style="padding: 0.6rem 1rem; width: auto;"><i class="ph ph-arrow-left"></i> Voltar</button>
+                        <h2 id="anamnese-title" style="margin:0;">Anamnese</h2>
+                    </div>
+                    
+                    <div class="card" style="margin-bottom: 2rem;">
+                        <h3 style="margin-bottom: 1rem;">Nova Avaliação</h3>
+                        <form onsubmit="Actions.saveAnamnese(event)">
+                            <input type="hidden" id="fa-client-id">
+                            <div class="input-group"><label>Histórico Capilar (Químicas, Alergias)</label><textarea id="fa-hist" rows="2" required></textarea></div>
+                            <div class="input-group"><label>Hábitos (Shampoo, Secador, etc.)</label><textarea id="fa-hab" rows="2" required></textarea></div>
+                            <div class="input-group"><label>Objetivos da Cliente</label><textarea id="fa-obj" rows="2" required></textarea></div>
+                            <div class="input-group"><label>Observações do Profissional</label><textarea id="fa-obs" rows="2" required></textarea></div>
+                            <button type="submit" class="btn-primary">Salvar Ficha no Histórico</button>
+                        </form>
+                    </div>
+
+                    <h3>Histórico da Cliente</h3>
+                    <div id="anamnese-history-list" class="data-list" style="margin-top: 1rem;"></div>
+                </section>
+
+                <!-- 6. SERVIÇOS -->
                 <section id="view-servicos" class="view"><div id="servicos-list" class="data-grid"></div></section>
+                
+                <!-- 7. PRODUTOS -->
                 <section id="view-produtos" class="view"><div id="produtos-list" class="data-grid"></div></section>
+                
+                <!-- 8. COMISSÃO -->
                 <section id="view-comissao" class="view"><div id="comissao-content"></div></section>
-                <section id="view-mensagens" class="view"><div id="mensagens-list" class="data-grid"></div></section>
-                <section id="view-despesas" class="view"><div id="despesas-list" class="data-list"></div></section>
+                
+                <!-- 9. FUNCIONARIOS -->
                 <section id="view-funcionarios" class="view"><div id="funcionarios-list" class="data-grid"></div></section>
-                <section id="view-resumo-financeiro" class="view"><div id="resumo-content"></div></section>
-                <section id="view-configuracoes" class="view"><div id="config-content"></div></section>
+
+                <!-- TELAS EM CONSTRUÇÃO (Evita Erro no JS) -->
+                <section id="view-mensagens" class="view"><div class="card"><p>Aba de gestão de templates de mensagens (Em construção).</p></div></section>
+                <section id="view-despesas" class="view"><div class="card"><p>Módulo de Despesas (Em construção).</p></div></section>
+                <section id="view-resumo-financeiro" class="view"><div class="card"><p>Fluxo de Caixa (Em construção).</p></div></section>
+                <section id="view-performance" class="view"><div class="card"><p>Gráficos de Performance (Em construção).</p></div></section>
+                <section id="view-configuracoes" class="view"><div class="card"><p>Configurações do Estúdio (Em construção).</p></div></section>
             </div>
         </main>
 
-        <!-- BOTTOM NAV -->
+        <!-- BOTTOM NAV (MOBILE TIPO INSTAGRAM) -->
         <nav class="bottom-nav">
             <a href="#" class="b-item active" data-view="agenda"><i class="ph ph-calendar"></i><span>Agenda</span></a>
             <a href="#" class="b-item" data-view="comandas"><i class="ph ph-receipt"></i><span>Comandas</span></a>
-            <div class="fab-wrapper"><button class="fab-button" onclick="UI.handleFabClick()"><i class="ph ph-plus"></i></button></div>
+            
+            <!-- Botão de Ação Central (+) -->
+            <div class="fab-wrapper">
+                <button class="fab-button" onclick="UI.handleFabClick()"><i class="ph ph-plus"></i></button>
+            </div>
+            
             <a href="#" class="b-item" data-view="clientes"><i class="ph ph-users"></i><span>Clientes</span></a>
             <a href="#" class="b-item" onclick="Nav.toggleMenu()"><i class="ph ph-list"></i><span>Menu</span></a>
         </nav>
     </div>
 
-    <!-- CONTAINER PARA MODAIS -->
+    <!-- CONTAINER DE MODAIS DINÂMICOS -->
     <div id="modal-container" class="overlay hidden"></div>
 
     <script src="script.js"></script>

@@ -1,31 +1,87 @@
 /**
- * ESTÚDIO AMOR QUE CUIDA - JAVASCRIPT PROFISSIONAL
- * Integrado com Supabase Realtime Database
+ * ESTÚDIO AMOR QUE CUIDA - JAVASCRIPT CORRIGIDO
+ * Com fallback local caso Supabase não esteja configurado
  */
 
 // ==========================================
-// 1. CONFIGURAÇÃO SUPABASE
+// 1. CONFIGURAÇÃO SUPABASE (OPCIONAL)
 // ==========================================
-const SUPABASE_URL = 'https://seu-projeto.supabase.co'; // SUBSTITUA PELO SEU URL
-const SUPABASE_KEY = 'sua-chave-anon-publica';          // SUBSTITUA PELA SUA CHAVE
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const SUPABASE_URL = 'https://bjppgfssceayiryeffcm.supabase.co'; // Deixe vazio para usar modo local/teste
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18'; // Deixe vazio para usar modo local/teste
+
+let supabase = null;
+let USE_SUPABASE = false;
+
+if (SUPABASE_URL && SUPABASE_KEY && window.supabase) {
+    try {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        USE_SUPABASE = true;
+        console.log('✅ Supabase conectado');
+    } catch (e) {
+        console.warn('⚠️ Supabase não configurado, usando modo local');
+        USE_SUPABASE = false;
+    }
+} else {
+    console.log(' Modo Local/Teste ativo');
+}
 
 // ==========================================
-// 2. ESTADO DA APLICAÇÃO
+// 2. DADOS LOCAIS (FALLBACK PARA TESTES)
 // ==========================================
-const AppState = {
-    currentUser: null,
-    userRole: null, // 'owner' ou 'freelancer'
-    currentView: 'dashboard',
-    selectedDate: new Date().toISOString().split('T')[0],
-    data: {
-        appointments: [], clients: [], services: [], products: [], 
-        expenses: [], employees: [], comandas: [], messages: []
-    }
+const LocalData = {
+    users: [
+        { id: '1', username: 'andressa.vieira', role: 'owner', first_login: true, name: 'Andressa Vieira', password: '' },
+        { id: '2', username: 'admin.teste', role: 'owner', first_login: false, name: 'Admin Teste', password: '123456' },
+        { id: '3', username: 'maria.silva', role: 'freelancer', first_login: true, name: 'Maria Silva', password: '' },
+        { id: '4', username: 'joao.santos', role: 'freelancer', first_login: false, name: 'João Santos', password: '123456' }
+    ],
+    services: [
+        { id: 1, name: 'Corte Feminino', duration: 45, price: 80, cost: 20, active: true },
+        { id: 2, name: 'Coloração', duration: 90, price: 150, cost: 40, active: true },
+        { id: 3, name: 'Escova', duration: 30, price: 50, cost: 10, active: true },
+        { id: 4, name: 'Hidratação', duration: 45, price: 70, cost: 15, active: true }
+    ],
+    clients: [
+        { id: 1, name: 'Ana Paula Costa', whatsapp: '11999887766', last_visit: '2026-08-10', total_spent: 450 },
+        { id: 2, name: 'Beatriz Oliveira', whatsapp: '11988776655', last_visit: '2026-08-12', total_spent: 320 },
+        { id: 3, name: 'Carla Mendes', whatsapp: '11977665544', last_visit: '2026-08-11', total_spent: 280 }
+    ],
+    appointments: [
+        { id: 1, client_id: 1, service_id: 1, professional_id: '1', date: new Date().toISOString().split('T')[0], time: '09:00', status: 'confirmed', clients: { name: 'Ana Paula Costa' }, services: { name: 'Corte Feminino', price: 80 }, users: { name: 'Andressa Vieira' } },
+        { id: 2, client_id: 2, service_id: 2, professional_id: '3', date: new Date().toISOString().split('T')[0], time: '10:30', status: 'pending', clients: { name: 'Beatriz Oliveira' }, services: { name: 'Coloração', price: 150 }, users: { name: 'Maria Silva' } },
+        { id: 3, client_id: 3, service_id: 3, professional_id: '1', date: new Date().toISOString().split('T')[0], time: '14:00', status: 'confirmed', clients: { name: 'Carla Mendes' }, services: { name: 'Escova', price: 50 }, users: { name: 'Andressa Vieira' } }
+    ],
+    products: [
+        { id: 1, name: 'Shampoo Profissional 500ml', price: 45, stock: 12, min_stock: 5, cost: 25 },
+        { id: 2, name: 'Condicionador Profissional 500ml', price: 45, stock: 3, min_stock: 5, cost: 25 }
+    ],
+    expenses: [
+        { id: 1, description: 'Aluguel do Salão', category: 'Aluguel', value: 2500, date: '2026-08-01', payment_method: 'Transferência', status: 'paid' },
+        { id: 2, description: 'Produtos de Limpeza', category: 'Material', value: 150, date: '2026-08-05', payment_method: 'Cartão', status: 'paid' }
+    ],
+    employees: [
+        { id: '1', name: 'Andressa Vieira', specialty: 'Cabeleireira', commission: 40, color: '#B76E79', available: true },
+        { id: '3', name: 'Maria Silva', specialty: 'Colorista', commission: 35, color: '#F4C2C2', available: true }
+    ],
+    comandas: [
+        { id: 1, client_id: 1, total: 150, open_date: '2026-08-13', status: 'open', clients: { name: 'Ana Paula Costa' } },
+        { id: 2, client_id: 2, total: 80, open_date: '2026-08-13', status: 'open', clients: { name: 'Beatriz Oliveira' } }
+    ]
 };
 
 // ==========================================
-// 3. UTILITÁRIOS
+// 3. ESTADO DA APLICAÇÃO
+// ==========================================
+const AppState = {
+    currentUser: null,
+    userRole: null,
+    currentView: 'dashboard',
+    selectedDate: new Date().toISOString().split('T')[0],
+    data: { ...LocalData }
+};
+
+// ==========================================
+// 4. UTILITÁRIOS
 // ==========================================
 const Utils = {
     formatCurrency(value) {
@@ -50,7 +106,7 @@ const Utils = {
 };
 
 // ==========================================
-// 4. NAVEGAÇÃO E UI
+// 5. NAVEGAÇÃO E UI
 // ==========================================
 const Navigation = {
     showScreen(screenId) {
@@ -102,7 +158,6 @@ const Navigation = {
         const m = document.getElementById(modalId);
         if (m) {
             m.classList.remove('hidden');
-            // Pequeno delay para permitir a transição CSS
             setTimeout(() => m.classList.add('active'), 10);
         }
     },
@@ -117,7 +172,7 @@ const Navigation = {
 };
 
 // ==========================================
-// 5. AUTENTICAÇÃO (SUPABASE REAL)
+// 6. AUTENTICAÇÃO (COM FALLBACK LOCAL)
 // ==========================================
 const Auth = {
     tempUsername: null,
@@ -136,14 +191,17 @@ const Auth = {
             }
 
             try {
-                // BUSCA REAL NO BANCO
-                const { data, error } = await supabase
-                    .from('users')
-                    .select('*')
-                    .eq('username', username)
-                    .single();
+                let data = null;
+                
+                if (USE_SUPABASE) {
+                    const result = await supabase.from('users').select('*').eq('username', username).single();
+                    data = result.data;
+                } else {
+                    // Fallback local
+                    data = LocalData.users.find(u => u.username === username) || null;
+                }
 
-                if (error || !data) {
+                if (!data) {
                     this.showError(errorDiv, 'Usuário não encontrado ou desativado');
                     return;
                 }
@@ -163,7 +221,7 @@ const Auth = {
             }
         });
 
-        // Login Step 2: Criar Senha (Primeiro Acesso)
+        // Login Step 2: Criar Senha
         document.getElementById('create-password-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const newPass = document.getElementById('new-password').value;
@@ -180,30 +238,31 @@ const Auth = {
             }
 
             try {
-                // ATUALIZA SENHA NO BANCO
-                const { error } = await supabase
-                    .from('users')
-                    .update({ password: newPass, first_login: false })
-                    .eq('id', this.tempUserData.id);
+                if (USE_SUPABASE) {
+                    await supabase.from('users').update({ password: newPass, first_login: false }).eq('id', this.tempUserData.id);
+                } else {
+                    // Atualiza localmente
+                    const user = LocalData.users.find(u => u.id === this.tempUserData.id);
+                    if (user) {
+                        user.password = newPass;
+                        user.first_login = false;
+                    }
+                }
 
-                if (error) throw error;
-
-                // Atualiza localmente e loga
                 this.tempUserData.password = newPass;
                 this.tempUserData.first_login = false;
                 this.completeLogin(this.tempUserData);
             } catch (err) {
-                this.showError(errorDiv, 'Erro ao salvar senha. Tente novamente.');
+                this.showError(errorDiv, 'Erro ao salvar senha.');
             }
         });
 
-        // Login Step 3: Entrar com Senha Existente
+        // Login Step 3: Entrar com Senha
         document.getElementById('enter-password-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const password = document.getElementById('current-password').value;
             const errorDiv = document.getElementById('password-login-error');
 
-            // Validação local (em produção ideal seria hash no backend, mas mantendo lógica solicitada)
             if (password !== this.tempUserData.password) {
                 this.showError(errorDiv, 'Senha incorreta');
                 return;
@@ -220,11 +279,11 @@ const Auth = {
         AppState.currentUser = user;
         AppState.userRole = user.role;
         
-        // Transição suave: Esconde telas de auth, mostra app
+        // Transição suave
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById('main-app').classList.remove('hidden');
         
-        // Carrega dados iniciais
+        // Carrega dados
         Data.loadAll().then(() => {
             Navigation.showView('dashboard');
         });
@@ -235,12 +294,10 @@ const Auth = {
         AppState.userRole = null;
         AppState.currentView = 'dashboard';
         
-        // Limpa formulários
         ['username', 'current-password', 'new-password', 'confirm-password'].forEach(id => {
             const el = document.getElementById(id); if(el) el.value = '';
         });
 
-        // Volta para login
         document.getElementById('main-app').classList.add('hidden');
         Navigation.showScreen('login-screen');
     },
@@ -257,42 +314,44 @@ const Auth = {
 };
 
 // ==========================================
-// 6. GERENCIAMENTO DE DADOS (SUPABASE)
+// 7. GERENCIAMENTO DE DADOS
 // ==========================================
 const Data = {
     async loadAll() {
-        // Carrega todas as tabelas em paralelo
-        const [svc, apt, cli, prod, exp, emp, com] = await Promise.all([
-            supabase.from('services').select('*').eq('active', true),
-            supabase.from('appointments').select('*, clients(name, whatsapp), services(name, price), users(name)').order('date', {ascending: true}).order('time', {ascending: true}),
-            supabase.from('clients').select('*').order('name'),
-            supabase.from('products').select('*').order('name'),
-            supabase.from('expenses').select('*').order('date', {ascending: false}),
-            supabase.from('employees').select('*').order('name'),
-            supabase.from('comandas').select('*, clients(name)').eq('status', 'open')
-        ]);
+        if (USE_SUPABASE) {
+            // Busca real do Supabase
+            const [svc, apt, cli, prod, exp, emp, com] = await Promise.all([
+                supabase.from('services').select('*').eq('active', true),
+                supabase.from('appointments').select('*, clients(name, whatsapp), services(name, price), users(name)').order('date', {ascending: true}).order('time', {ascending: true}),
+                supabase.from('clients').select('*').order('name'),
+                supabase.from('products').select('*').order('name'),
+                supabase.from('expenses').select('*').order('date', {ascending: false}),
+                supabase.from('employees').select('*').order('name'),
+                supabase.from('comandas').select('*, clients(name)').eq('status', 'open')
+            ]);
 
-        AppState.data.services = svc.data || [];
-        AppState.data.appointments = apt.data || [];
-        AppState.data.clients = cli.data || [];
-        AppState.data.products = prod.data || [];
-        AppState.data.expenses = exp.data || [];
-        AppState.data.employees = emp.data || [];
-        AppState.data.comandas = com.data || [];
+            AppState.data.services = svc.data || [];
+            AppState.data.appointments = apt.data || [];
+            AppState.data.clients = cli.data || [];
+            AppState.data.products = prod.data || [];
+            AppState.data.expenses = exp.data || [];
+            AppState.data.employees = emp.data || [];
+            AppState.data.comandas = com.data || [];
+        } else {
+            // Usa dados locais (já estão em AppState.data)
+            console.log('📦 Usando dados locais para teste');
+        }
 
-        // Configura selects dinâmicos
         this.populateSelects();
     },
 
     populateSelects() {
-        // Select de Serviços no Modal
         const agServico = document.getElementById('ag-servico');
         if (agServico) {
             agServico.innerHTML = '<option value="">Selecione...</option>' + 
                 AppState.data.services.map(s => `<option value="${s.id}" data-price="${s.price}">${s.name} - ${Utils.formatCurrency(s.price)}</option>`).join('');
         }
 
-        // Select de Profissionais no Modal e Filtro Agenda
         const agProf = document.getElementById('ag-profissional');
         const filterProf = document.getElementById('professional-filter');
         
@@ -304,14 +363,13 @@ const Data = {
 };
 
 // ==========================================
-// 7. MÓDULOS DE VIEW (RENDERIZAÇÃO)
+// 8. MÓDULOS DE VIEW
 // ==========================================
 const Dashboard = {
     load() {
         const today = new Date().toISOString().split('T')[0];
         const todayAppts = AppState.data.appointments.filter(a => a.date === today);
         
-        // Calcula receita baseada nos serviços dos agendamentos de hoje
         const revenue = todayAppts.reduce((sum, apt) => sum + (parseFloat(apt.services?.price) || 0), 0);
         const pending = todayAppts.filter(a => a.status === 'pending').length;
 
@@ -319,16 +377,13 @@ const Dashboard = {
         document.getElementById('today-appointments').textContent = todayAppts.length;
         document.getElementById('pending-count').textContent = pending;
 
-        // Renderiza lista
         const container = document.getElementById('upcoming-appointments');
         let displayAppts = todayAppts;
         
-        // Freelancer vê só os dele
         if (AppState.userRole === 'freelancer') {
             displayAppts = displayAppts.filter(a => a.users?.name === AppState.currentUser.name);
         }
 
-        // Pega os 3 primeiros
         const nextThree = displayAppts.slice(0, 3);
 
         if (nextThree.length === 0) {
@@ -360,7 +415,6 @@ const Agenda = {
         const filterDiv = document.getElementById('agenda-filter');
         const select = document.getElementById('professional-filter');
         
-        // Proprietário vê filtro, freelancer não
         if (AppState.userRole === 'owner') {
             filterDiv.classList.remove('hidden');
             select.onchange = () => this.render();
@@ -380,7 +434,6 @@ const Agenda = {
         if (AppState.userRole === 'freelancer') {
             appts = appts.filter(a => a.users?.name === AppState.currentUser.name);
         } else if (profFilter !== 'all') {
-            // Busca nome do funcionário pelo ID selecionado
             const emp = AppState.data.employees.find(e => e.id == profFilter);
             if(emp) appts = appts.filter(a => a.users?.name === emp.name);
         }
@@ -439,11 +492,16 @@ const Comandas = {
     filter(text) { this.render(text); },
     async close(id) {
         if(!confirm('Deseja fechar esta comanda?')) return;
-        const { error } = await supabase.from('comandas').update({ status: 'closed' }).eq('id', id);
-        if(!error) {
-            await Data.loadAll();
-            this.render();
-        } else alert('Erro ao fechar comanda');
+        
+        if (USE_SUPABASE) {
+            await supabase.from('comandas').update({ status: 'closed' }).eq('id', id);
+        } else {
+            const c = AppState.data.comandas.find(x => x.id === id);
+            if(c) c.status = 'closed';
+        }
+        
+        await Data.loadAll();
+        this.render();
     }
 };
 
@@ -477,7 +535,6 @@ const Clientes = {
         const client = AppState.data.clients.find(c => c.id === id);
         if(client) {
             document.getElementById('cliente-detail-name').textContent = client.name;
-            // Mock history - em produção viria de uma tabela 'appointments_history'
             document.getElementById('cliente-history').innerHTML = `
                 <div class="history-item"><div class="history-date">10/08/2026</div><div class="history-service">Corte Feminino</div><div class="history-notes">Cliente satisfeita</div></div>
                 <div class="history-item"><div class="history-date">25/07/2026</div><div class="history-service">Coloração</div><div class="history-notes">Tom castanho claro</div></div>
@@ -500,7 +557,6 @@ const Servicos = {
             </div>
         `).join('') || '<p class="text-muted">Nenhum serviço cadastrado.</p>';
         
-        // Botão adicionar só para owner
         const btn = document.getElementById('add-servico-btn');
         if(btn) btn.classList.toggle('hidden', !Auth.checkOwnerPermissions());
     }
@@ -564,7 +620,6 @@ const Funcionarios = {
 
 const Relatorios = {
     load() {
-        // Setup Tabs
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.onclick = () => {
                 document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -574,7 +629,6 @@ const Relatorios = {
             };
         });
 
-        // Performance Data
         const totalRev = AppState.data.appointments.reduce((sum, a) => sum + (parseFloat(a.services?.price)||0), 0);
         const totalExp = AppState.data.expenses.reduce((sum, e) => sum + e.value, 0);
         
@@ -582,7 +636,6 @@ const Relatorios = {
         document.getElementById('total-expenses').textContent = Utils.formatCurrency(totalExp);
         document.getElementById('net-profit').textContent = Utils.formatCurrency(totalRev - totalExp);
 
-        // Top Clients
         const sortedClients = [...AppState.data.clients].sort((a,b) => b.total_spent - a.total_spent);
         document.getElementById('top-clients-list').innerHTML = sortedClients.map((c, i) => `
             <div class="ranking-item">
@@ -598,7 +651,6 @@ const Relatorios = {
 };
 
 const Mensagens = {
-    // Dados estáticos de templates (podem vir do banco futuramente)
     templates: [
         { id: 1, name: 'Confirmação', text: 'Olá! Confirmamos seu agendamento para {data} às {hora}. Serviço: {serviço}. Aguardamos você! 💕' },
         { id: 2, name: 'Lembrete 24h', text: 'Oi! Lembrando que amanhã você tem horário conosco às {hora}. Estamos ansiosas! ✨' },
@@ -619,11 +671,10 @@ const Mensagens = {
 };
 
 // ==========================================
-// 8. MODAIS E FORMULÁRIOS
+// 9. MODAIS E FORMULÁRIOS
 // ==========================================
 const Modals = {
     init() {
-        // Fechar modais
         document.querySelectorAll('.modal-close').forEach(btn => {
             btn.onclick = () => Navigation.closeModal(btn.closest('.modal').id);
         });
@@ -631,20 +682,18 @@ const Modals = {
             m.addEventListener('click', e => { if(e.target === m) Navigation.closeModal(m.id); });
         });
 
-        // Form Agendamento
         const form = document.getElementById('agendamento-form');
         if(form) {
             form.onsubmit = async (e) => {
                 e.preventDefault();
                 
-                const clientId = 1; // Em produção: buscar ou criar cliente
                 const serviceId = document.getElementById('ag-servico').value;
                 const profId = AppState.userRole === 'freelancer' 
                     ? AppState.currentUser.id 
                     : document.getElementById('ag-profissional').value;
                 
                 const payload = {
-                    client_id: clientId, // Simplificado para demo
+                    client_id: 1, // Simplificado para demo
                     service_id: serviceId,
                     professional_id: profId,
                     date: document.getElementById('ag-data').value,
@@ -652,20 +701,32 @@ const Modals = {
                     status: 'pending'
                 };
 
-                const { error } = await supabase.from('appointments').insert(payload);
-                if(error) {
-                    alert('Erro ao salvar: ' + error.message);
+                if (USE_SUPABASE) {
+                    const { error } = await supabase.from('appointments').insert(payload);
+                    if(error) {
+                        alert('Erro ao salvar: ' + error.message);
+                        return;
+                    }
                 } else {
-                    alert('Agendamento criado!');
-                    Navigation.closeModal('agendamento-modal');
-                    form.reset();
-                    await Data.loadAll(); // Recarrega dados
-                    Navigation.showView('agenda');
+                    // Adiciona localmente
+                    const newApt = {
+                        id: Date.now(),
+                        ...payload,
+                        clients: { name: document.getElementById('ag-cliente').value },
+                        services: AppState.data.services.find(s => s.id == serviceId),
+                        users: AppState.data.employees.find(e => e.id == profId)
+                    };
+                    AppState.data.appointments.push(newApt);
                 }
+
+                alert('Agendamento criado!');
+                Navigation.closeModal('agendamento-modal');
+                form.reset();
+                await Data.loadAll();
+                Navigation.showView('agenda');
             };
         }
 
-        // Auto-preencher profissional se for freelancer
         if(AppState.userRole === 'freelancer') {
             const group = document.getElementById('ag-profissional-group');
             if(group) group.classList.add('hidden');
@@ -674,19 +735,21 @@ const Modals = {
 };
 
 // ==========================================
-// 9. INICIALIZAÇÃO
+// 10. INICIALIZAÇÃO
 // ==========================================
 const App = {
     async init() {
         // Splash Screen
         Navigation.showScreen('splash-screen');
-        await new Promise(r => setTimeout(r, 1500)); // 1.5s branding
         
-        // Inicia Auth
+        // Delay de 1.5s para branding
+        await new Promise(r => setTimeout(r, 1500));
+        
+        // Inicia Auth e Modais
         Auth.init();
         Modals.init();
         
-        // Event Listeners Globais de Navegação
+        // Event Listeners de Navegação
         document.querySelectorAll('.nav-item').forEach(item => {
             item.onclick = (e) => {
                 e.preventDefault();
@@ -707,8 +770,10 @@ const App = {
         
         // Vai para tela de login após splash
         Navigation.showScreen('login-screen');
+        
+        console.log('✅ App inicializado com sucesso!');
     }
 };
 
-// Start
+// Start quando DOM estiver pronto
 document.addEventListener('DOMContentLoaded', () => App.init());

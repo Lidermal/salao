@@ -5,6 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="theme-color" content="#B76E79">
     <title>Estúdio Amor que Cuida by Andressa Vieira</title>
+    
+    <!-- Supabase Client Library -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -266,7 +270,7 @@
         <!-- BOTTOM NAVIGATION -->
         <nav class="bottom-nav">
             <button class="nav-item active" data-view="dashboard">
-                <span class="nav-icon"></span>
+                <span class="nav-icon">🏠</span>
                 <span class="nav-label">Home</span>
             </button>
             <button class="nav-item" data-view="agenda">
@@ -274,15 +278,15 @@
                 <span class="nav-label">Agenda</span>
             </button>
             <button class="nav-item" data-view="comandas">
-                <span class="nav-icon"></span>
+                <span class="nav-icon">📋</span>
                 <span class="nav-label">Comandas</span>
             </button>
             <button class="nav-item" data-view="clientes">
-                <span class="nav-icon"></span>
+                <span class="nav-icon">👥</span>
                 <span class="nav-label">Clientes</span>
             </button>
             <button class="nav-item" data-view="mais">
-                <span class="nav-icon">☰</span>
+                <span class="nav-icon"></span>
                 <span class="nav-label">Mais</span>
             </button>
         </nav>

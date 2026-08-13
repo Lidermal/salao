@@ -6,8 +6,8 @@
 // ==========================================
 // 1. CONFIGURAÇÃO SUPABASE (OPCIONAL)
 // ==========================================
-const SUPABASE_URL = 'https://bjppgfssceayiryeffcm.supabase.co'; // Deixe vazio para usar modo local/teste
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18'; // Deixe vazio para usar modo local/teste
+const SUPABASE_URL = ''; // Deixe vazio para usar modo local/teste
+const SUPABASE_KEY = ''; // Deixe vazio para usar modo local/teste
 
 let supabase = null;
 let USE_SUPABASE = false;

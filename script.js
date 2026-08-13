@@ -1,279 +1,346 @@
-const SUPABASE_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+// ESTÚDIO AMOR QUE CUIDA - JAVASCRIPT
 
-let currentUserAuth = null;
-let userProfile = null;
-let attemptUsername = "";
-let servicesCache = [];
+const AppState = {
+    currentUser: null,
+    userRole: null,
+    currentView: 'dashboard',
+    selectedDate: new Date().toISOString().split('T')[0],
+    data: { appointments: [], clients: [], services: [], products: [], expenses: [], employees: [], comandas: [], messages: [] }
+};
 
-document.addEventListener('DOMContentLoaded', () => {
-    setTimeout(async () => {
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-                currentUserAuth = session.user;
-                await loadProfileAndStartApp();
-            } else {
-                showScreen('screen-auth');
-            }
-        } catch (e) {
-            showScreen('screen-auth');
+const MockData = {
+    users: [
+        { username: 'andressa.vieira', role: 'owner', first_login: true, name: 'Andressa Vieira' },
+        { username: 'admin.teste', role: 'owner', first_login: false, password: '123456', name: 'Admin Teste' },
+        { username: 'maria.silva', role: 'freelancer', first_login: true, name: 'Maria Silva' },
+        { username: 'joao.santos', role: 'freelancer', first_login: false, password: '123456', name: 'João Santos' }
+    ],
+    services: [
+        { id: 1, name: 'Corte Feminino', duration: 45, price: 80, cost: 20, active: true },
+        { id: 2, name: 'Coloração', duration: 90, price: 150, cost: 40, active: true },
+        { id: 3, name: 'Escova', duration: 30, price: 50, cost: 10, active: true },
+        { id: 4, name: 'Hidratação', duration: 45, price: 70, cost: 15, active: true }
+    ],
+    clients: [
+        { id: 1, name: 'Ana Paula Costa', whatsapp: '11999887766', last_visit: '2026-08-10', total_spent: 450 },
+        { id: 2, name: 'Beatriz Oliveira', whatsapp: '11988776655', last_visit: '2026-08-12', total_spent: 320 },
+        { id: 3, name: 'Carla Mendes', whatsapp: '11977665544', last_visit: '2026-08-11', total_spent: 280 }
+    ],
+    appointments: [
+        { id: 1, client: 'Ana Paula Costa', whatsapp: '11999887766', service: 'Corte Feminino', date: '2026-08-13', time: '09:00', professional: 'Andressa Vieira', status: 'confirmed' },
+        { id: 2, client: 'Beatriz Oliveira', whatsapp: '11988776655', service: 'Coloração', date: '2026-08-13', time: '10:30', professional: 'Maria Silva', status: 'pending' },
+        { id: 3, client: 'Carla Mendes', whatsapp: '11977665544', service: 'Escova', date: '2026-08-13', time: '14:00', professional: 'Andressa Vieira', status: 'confirmed' }
+    ],
+    products: [
+        { id: 1, name: 'Shampoo Profissional 500ml', price: 45, stock: 12, min_stock: 5, cost: 25 },
+        { id: 2, name: 'Condicionador Profissional 500ml', price: 45, stock: 3, min_stock: 5, cost: 25 }
+    ],
+    expenses: [
+        { id: 1, description: 'Aluguel do Salão', category: 'Aluguel', value: 2500, date: '2026-08-01', payment_method: 'Transferência', status: 'paid' },
+        { id: 2, description: 'Produtos de Limpeza', category: 'Material', value: 150, date: '2026-08-05', payment_method: 'Cartão', status: 'paid' }
+    ],
+    employees: [
+        { id: 1, name: 'Andressa Vieira', specialty: 'Cabeleireira', commission: 40, color: '#B76E79', available: true },
+        { id: 2, name: 'Maria Silva', specialty: 'Colorista', commission: 35, color: '#F4C2C2', available: true }
+    ],
+    comandas: [
+        { id: 1, client: 'Ana Paula Costa', whatsapp: '11999887766', total: 150, open_date: '2026-08-13', status: 'open' },
+        { id: 2, client: 'Beatriz Oliveira', whatsapp: '11988776655', total: 80, open_date: '2026-08-13', status: 'open' }
+    ],
+    messageTemplates: [
+        { id: 1, name: 'Confirmação de Agendamento', text: 'Olá! Confirmamos seu agendamento para {data} às {hora}. Serviço: {serviço}. Aguardamos você!' },
+        { id: 2, name: 'Lembrete 24h', text: 'Oi! Lembrando que amanhã você tem horário conosco às {hora}. Estamos ansiosas para te atender!' },
+        { id: 3, name: 'Parabéns Aniversário', text: 'Feliz aniversário! Que seu dia seja especial como você! Venha nos visitar e ganhe 10% de desconto!' }
+    ]
+};
+
+const Utils = {
+    formatCurrency(value) { return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value); },
+    formatDate(dateString) { const d = new Date(dateString + 'T00:00:00'); return d.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }); },
+    validateWhatsApp(whatsapp) { const cleaned = whatsapp.replace(/\D/g, ''); return cleaned.length >= 10 && cleaned.length <= 11; },
+    generateId() { return Date.now() + Math.random().toString(36).substr(2, 9); },
+    debounce(func, wait) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func(...args), wait); }; }
+};
+
+const Navigation = {
+    showScreen(screenId) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById(screenId)?.classList.add('active'); },
+    showView(viewId) {
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+        document.getElementById(`${viewId}-view`)?.classList.add('active');
+        AppState.currentView = viewId;
+        this.updatePageTitle(viewId);
+        this.updateBottomNav(viewId);
+        this.loadDataForView(viewId);
+    },
+    updatePageTitle(viewId) {
+        const titles = { dashboard: 'Dashboard', agenda: 'Agenda', comandas: 'Comandas', clientes: 'Clientes', mensagens: 'Mensagens', servicos: 'Serviços', produtos: 'Produtos', despesas: 'Despesas', funcionarios: 'Funcionários', relatorios: 'Relatórios', configuracoes: 'Configurações' };
+        const el = document.getElementById('page-title'); if (el) el.textContent = titles[viewId] || 'Estúdio';
+    },
+    updateBottomNav(viewId) { document.querySelectorAll('.nav-item').forEach(item => { item.classList.toggle('active', item.dataset.view === viewId); }); },
+    loadDataForView(viewId) {
+        const loaders = { dashboard: Dashboard.load, agenda: Agenda.load, comandas: Comandas.load, clientes: Clientes.load, servicos: Servicos.load, produtos: Produtos.load, despesas: Despesas.load, funcionarios: Funcionarios.load, relatorios: Relatorios.load, mensagens: Mensagens.load };
+        loaders[viewId]?.();
+    },
+    openModal(modalId) { const m = document.getElementById(modalId); if (m) { m.classList.remove('hidden'); setTimeout(() => m.classList.add('active'), 10); } },
+    closeModal(modalId) { const m = document.getElementById(modalId); if (m) { m.classList.remove('active'); setTimeout(() => m.classList.add('hidden'), 300); } }
+};
+
+const Auth = {
+    tempUsername: null,
+    init() {
+        document.getElementById('login-form')?.addEventListener('submit', e => { e.preventDefault(); this.handleLogin(); });
+        document.getElementById('create-password-form')?.addEventListener('submit', e => { e.preventDefault(); this.handleCreatePassword(); });
+        document.getElementById('enter-password-form')?.addEventListener('submit', e => { e.preventDefault(); this.handleEnterPassword(); });
+        document.getElementById('logout-btn')?.addEventListener('click', () => this.logout());
+    },
+    handleLogin() {
+        const username = document.getElementById('username').value.trim().toLowerCase();
+        const errorDiv = document.getElementById('login-error');
+        if (!username) { this.showError(errorDiv, 'Digite seu usuário'); return; }
+        const user = MockData.users.find(u => u.username === username);
+        if (!user) { this.showError(errorDiv, 'Usuário não encontrado ou desativado'); return; }
+        this.tempUsername = username;
+        Navigation.showScreen(user.first_login ? 'create-password-screen' : 'enter-password-screen');
+        if (!user.first_login) document.getElementById('user-display-name').textContent = `Olá, ${user.name}`;
+    },
+    handleCreatePassword() {
+        const newPass = document.getElementById('new-password').value;
+        const confirmPass = document.getElementById('confirm-password').value;
+        const errorDiv = document.getElementById('password-error');
+        if (newPass.length < 6) { this.showError(errorDiv, 'Senha muito curta (mínimo 6 caracteres)'); return; }
+        if (newPass !== confirmPass) { this.showError(errorDiv, 'As senhas não coincidem'); return; }
+        const user = MockData.users.find(u => u.username === this.tempUsername);
+        if (user) { user.password = newPass; user.first_login = false; }
+        this.completeLogin(this.tempUsername);
+    },
+    handleEnterPassword() {
+        const password = document.getElementById('current-password').value;
+        const errorDiv = document.getElementById('password-login-error');
+        const user = MockData.users.find(u => u.username === this.tempUsername);
+        if (!user || user.password !== password) { this.showError(errorDiv, 'Senha incorreta'); return; }
+        this.completeLogin(this.tempUsername);
+    },
+    completeLogin(username) {
+        const user = MockData.users.find(u => u.username === username);
+        if (user) { AppState.currentUser = user; AppState.userRole = user.role; document.getElementById('main-app').classList.remove('hidden'); Navigation.showView('dashboard'); }
+    },
+    logout() {
+        AppState.currentUser = null; AppState.userRole = null; AppState.currentView = 'dashboard';
+        document.getElementById('main-app').classList.add('hidden');
+        ['username', 'current-password', 'new-password', 'confirm-password'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+        Navigation.showScreen('login-screen');
+    },
+    showError(element, message) { if (element) { element.textContent = message; element.classList.remove('hidden'); setTimeout(() => element.classList.add('hidden'), 3000); } },
+    checkOwnerPermissions() { return AppState.userRole === 'owner'; }
+};
+
+const Dashboard = {
+    load() {
+        const today = new Date().toISOString().split('T')[0];
+        const todayApts = MockData.appointments.filter(a => a.date === today);
+        const revenue = todayApts.reduce((sum, apt) => { const svc = MockData.services.find(s => s.name === apt.service); return sum + (svc ? svc.price : 0); }, 0);
+        const pending = todayApts.filter(a => a.status === 'pending').length;
+        document.getElementById('today-revenue').textContent = Utils.formatCurrency(revenue);
+        document.getElementById('today-appointments').textContent = todayApts.length;
+        document.getElementById('pending-count').textContent = pending;
+        
+        const container = document.getElementById('upcoming-appointments');
+        let apts = todayApts.filter(a => AppState.userRole === 'freelancer' ? a.professional === AppState.currentUser.name : true);
+        apts.sort((a, b) => a.time.localeCompare(b.time)).slice(0, 3);
+        container.innerHTML = apts.length ? apts.map(apt => `<div class="appointment-item"><div class="appointment-time">${apt.time}</div><div class="appointment-details"><div class="appointment-client">${apt.client}</div><div class="appointment-service">${apt.service}</div></div><span class="badge badge-${apt.status}">${apt.status === 'confirmed' ? 'Confirmado' : 'Pendente'}</span></div>`).join('') : '<p class="text-muted">Nenhum agendamento para hoje</p>';
+    }
+};
+
+const Agenda = {
+    load() {
+        const dateInput = document.getElementById('agenda-date');
+        if (dateInput) { dateInput.value = AppState.selectedDate; dateInput.addEventListener('change', e => { AppState.selectedDate = e.target.value; this.renderAppointments(); }); }
+        
+        const filterDiv = document.getElementById('agenda-filter');
+        const select = document.getElementById('professional-filter');
+        if (AppState.userRole === 'owner') {
+            filterDiv.classList.remove('hidden');
+            const professionals = [...new Set(MockData.appointments.map(a => a.professional))];
+            select.innerHTML = '<option value="all">Todos os Profissionais</option>' + professionals.map(p => `<option value="${p}">${p}</option>`).join('');
+            select.addEventListener('change', () => this.renderAppointments());
+        } else { filterDiv.classList.add('hidden'); }
+        this.renderAppointments();
+    },
+    renderAppointments() {
+        const container = document.getElementById('agenda-list');
+        const selectedDate = document.getElementById('agenda-date').value;
+        const selectedProf = document.getElementById('professional-filter')?.value || 'all';
+        let apts = MockData.appointments.filter(a => a.date === selectedDate);
+        if (AppState.userRole === 'freelancer') apts = apts.filter(a => a.professional === AppState.currentUser.name);
+        else if (selectedProf !== 'all') apts = apts.filter(a => a.professional === selectedProf);
+        apts.sort((a, b) => a.time.localeCompare(b.time));
+        container.innerHTML = apts.length ? apts.map(apt => `<div class="appointment-item"><div class="appointment-time">${apt.time}</div><div class="appointment-details"><div class="appointment-client">${apt.client}</div><div class="appointment-service">${apt.service} • ${apt.professional}</div></div><span class="badge badge-${apt.status}">${apt.status === 'confirmed' ? 'Confirmado' : 'Pendente'}</span></div>`).join('') : '<p class="text-muted">Nenhum agendamento para esta data</p>';
+    }
+};
+
+const Comandas = {
+    load() { this.renderComandas(); this.setupSearch('comanda-search', '.comanda-item'); },
+    renderComandas() {
+        const container = document.getElementById('comandas-list');
+        const openComandas = MockData.comandas.filter(c => c.status === 'open');
+        container.innerHTML = openComandas.length ? openComandas.map(c => `<div class="comanda-item"><div class="item-header"><div class="item-title">${c.client}</div><div class="item-value">${Utils.formatCurrency(c.total)}</div></div><div class="item-subtitle">📱 ${c.whatsapp}</div><div class="item-meta"><span>Aberta em: ${Utils.formatDate(c.open_date)}</span><button class="btn btn-secondary" onclick="Comandas.fecharComanda(${c.id})">Fechar</button></div></div>`).join('') : '<p class="text-muted">Nenhuma comanda aberta</p>';
+    },
+    setupSearch(inputId, itemSelector) {
+        const input = document.getElementById(inputId);
+        if (input) input.addEventListener('input', Utils.debounce(e => {
+            const query = e.target.value.toLowerCase();
+            document.querySelectorAll(itemSelector).forEach(item => { item.style.display = item.textContent.toLowerCase().includes(query) ? 'block' : 'none'; });
+        }, 300));
+    },
+    fecharComanda(id) { const c = MockData.comandas.find(x => x.id === id); if (c) { c.status = 'closed'; this.renderComandas(); alert(`Comanda de ${c.client} fechada!`); } }
+};
+
+const Clientes = {
+    load() { this.renderClientes(); Comandas.setupSearch('cliente-search', '.cliente-item'); },
+    renderClientes() {
+        const container = document.getElementById('clientes-list');
+        container.innerHTML = MockData.clients.length ? MockData.clients.map(c => `<div class="cliente-item" onclick="Clientes.showDetail(${c.id})"><div class="item-header"><div class="item-title">${c.name}</div><div class="item-value">${Utils.formatCurrency(c.total_spent)}</div></div><div class="item-subtitle">📱 ${c.whatsapp}</div><div class="item-meta"><span>Última visita: ${Utils.formatDate(c.last_visit)}</span></div></div>`).join('') : '<p class="text-muted">Nenhum cliente cadastrado</p>';
+    },
+    showDetail(clientId) {
+        const client = MockData.clients.find(c => c.id === clientId);
+        if (client) {
+            document.getElementById('cliente-detail-name').textContent = client.name;
+            document.getElementById('cliente-history').innerHTML = `<div class="history-item"><div class="history-date">${Utils.formatDate('2026-08-10')}</div><div class="history-service">Corte Feminino</div><div class="history-notes">Cliente satisfeita</div></div><div class="history-item"><div class="history-date">${Utils.formatDate('2026-07-25')}</div><div class="history-service">Coloração + Escova</div><div class="history-notes">Cor: Castanho claro</div></div>`;
+            Navigation.openModal('cliente-detail-modal');
         }
-    }, 1200);
+    }
+};
 
-    document.getElementById('btn-verify').addEventListener('click', verifyUserInDB);
-    document.getElementById('btn-create-pass').addEventListener('click', createPassAndLogin);
-    document.getElementById('btn-login').addEventListener('click', doLogin);
-    document.getElementById('btn-save-appt').addEventListener('click', saveAppointment);
-    document.getElementById('search-client').addEventListener('input', (e) => loadClientes(e.target.value));
+const Servicos = {
+    load() { this.renderServicos(); this.checkPermissions('add-servico-btn'); },
+    renderServicos() {
+        const container = document.getElementById('servicos-list');
+        container.innerHTML = MockData.services.length ? MockData.services.map(s => `<div class="servico-item"><div class="item-header"><div class="item-title">${s.name}</div><div class="item-value">${Utils.formatCurrency(s.price)}</div></div><div class="item-meta"><span>${s.duration} min</span><span>Custo: ${Utils.formatCurrency(s.cost)}</span><span>${s.active ? 'Ativo' : 'Inativo'}</span></div></div>`).join('') : '<p class="text-muted">Nenhum serviço cadastrado</p>';
+    },
+    checkPermissions(btnId) { const btn = document.getElementById(btnId); if (btn) btn.classList.toggle('hidden', !Auth.checkOwnerPermissions()); }
+};
 
-    document.querySelectorAll('.btn-logout').forEach(btn => {
-        btn.addEventListener('click', async () => {
-            await supabase.auth.signOut();
-            location.reload();
-        });
-    });
+const Produtos = {
+    load() { this.renderProdutos(); Servicos.checkPermissions('add-produto-btn'); },
+    renderProdutos() {
+        const container = document.getElementById('produtos-list');
+        container.innerHTML = MockData.products.length ? MockData.products.map(p => { const low = p.stock <= p.min_stock; return `<div class="produto-item"><div class="item-header"><div class="item-title">${p.name}</div><div class="item-value">${Utils.formatCurrency(p.price)}</div></div><div class="item-meta"><span>Estoque: ${p.stock} unid.</span><span>Custo: ${Utils.formatCurrency(p.cost)}</span>${low ? '<span style="color:var(--danger)">Estoque baixo!</span>' : ''}</div></div>`; }).join('') : '<p class="text-muted">Nenhum produto cadastrado</p>';
+    }
+};
 
-    document.querySelectorAll('.nav-item[data-target], .menu-link[data-target]').forEach(el => {
-        el.addEventListener('click', (e) => {
-            e.preventDefault();
-            const target = el.getAttribute('data-target');
-            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-            document.getElementById(target).classList.add('active');
-            document.querySelectorAll('.nav-item').forEach(n => {
-                n.classList.remove('active');
-                if(n.getAttribute('data-target') === target) n.classList.add('active');
+const Despesas = {
+    load() { this.renderDespesas(); Servicos.checkPermissions('add-despesa-btn'); },
+    renderDespesas() {
+        const container = document.getElementById('despesas-list');
+        container.innerHTML = MockData.expenses.length ? MockData.expenses.map(e => `<div class="despesa-item"><div class="item-header"><div class="item-title">${e.description}</div><div class="item-value">${Utils.formatCurrency(e.value)}</div></div><div class="item-subtitle">${e.category}</div><div class="item-meta"><span>${Utils.formatDate(e.date)}</span><span>${e.payment_method}</span><span>${e.status === 'paid' ? 'Pago' : 'Pendente'}</span></div></div>`).join('') : '<p class="text-muted">Nenhuma despesa registrada</p>';
+    }
+};
+
+const Funcionarios = {
+    load() { this.renderFuncionarios(); Servicos.checkPermissions('add-funcionario-btn'); },
+    renderFuncionarios() {
+        const container = document.getElementById('funcionarios-list');
+        container.innerHTML = MockData.employees.length ? MockData.employees.map(e => `<div class="funcionario-item" style="border-left:4px solid ${e.color}"><div class="item-header"><div class="item-title">${e.name}</div><div class="item-value">${e.commission}% comissão</div></div><div class="item-subtitle">${e.specialty}</div><div class="item-meta"><span>${e.available ? 'Disponível' : 'Indisponível'}</span></div></div>`).join('') : '<p class="text-muted">Nenhum funcionário cadastrado</p>';
+    }
+};
+
+const Relatorios = {
+    load() {
+        this.setupTabs();
+        const totalRevenue = MockData.appointments.reduce((sum, apt) => { const svc = MockData.services.find(s => s.name === apt.service); return sum + (svc ? svc.price : 0); }, 0);
+        const totalExpenses = MockData.expenses.reduce((sum, e) => sum + e.value, 0);
+        document.getElementById('total-revenue').textContent = Utils.formatCurrency(totalRevenue);
+        document.getElementById('total-expenses').textContent = Utils.formatCurrency(totalExpenses);
+        document.getElementById('net-profit').textContent = Utils.formatCurrency(totalRevenue - totalExpenses);
+        
+        const sorted = [...MockData.clients].sort((a, b) => b.total_spent - a.total_spent);
+        document.getElementById('top-clients-list').innerHTML = sorted.map((c, i) => `<div class="ranking-item"><div class="ranking-position">${i + 1}</div><div class="ranking-info"><div class="ranking-name">${c.name}</div><div class="ranking-stats">Última visita: ${Utils.formatDate(c.last_visit)}</div></div><div class="ranking-value">${Utils.formatCurrency(c.total_spent)}</div></div>`).join('');
+    },
+    setupTabs() {
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.report-content').forEach(c => c.classList.remove('active'));
+                btn.classList.add('active');
+                document.getElementById(`report-${btn.dataset.tab}`).classList.add('active');
             });
-            closeModal('modal-menu');
-            routerLoad(target);
         });
-    });
-
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('input-date-agenda').value = today;
-    document.getElementById('appt-date').value = today;
-});
-
-function showScreen(id) {
-    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
-    document.getElementById(id).classList.add('active');
-}
-
-function openModal(id) { document.getElementById(id).classList.add('active'); }
-function closeModal(id) { document.getElementById(id).classList.remove('active'); }
-
-function resetAuth() {
-    document.querySelectorAll('.auth-step').forEach(s => s.classList.remove('active'));
-    document.getElementById('auth-step-1').classList.add('active');
-}
-
-async function verifyUserInDB() {
-    const input = document.getElementById('input-username').value.trim().toLowerCase();
-    const msg = document.getElementById('msg-auth-1');
-    if (!input) { msg.innerText = "Digite o usuário."; return; }
-    attemptUsername = input;
-
-    const { data, error } = await supabase.from('profiles').select('*').eq('username', input).single();
-    if (error || !data) { msg.innerText = "Usuário não encontrado."; return; }
-
-    document.getElementById('auth-step-1').classList.remove('active');
-    if (data.first_login) {
-        document.getElementById('auth-step-new').classList.add('active');
-    } else {
-        document.getElementById('auth-step-login').classList.add('active');
     }
-}
+};
 
-async function createPassAndLogin() {
-    const pass = document.getElementById('input-new-pass').value;
-    if (pass.length < 6) { alert("Mínimo 6 caracteres."); return; }
-    const email = `${attemptUsername}@estudio.com`;
-
-    const { data: authData, error } = await supabase.auth.signInWithPassword({ email, password: '123456' });
-    if (error) { alert("Erro na senha padrão."); return; }
-
-    await supabase.auth.updateUser({ password: pass });
-    await supabase.from('profiles').update({ first_login: false }).eq('id', authData.user.id);
-    currentUserAuth = authData.user;
-    await loadProfileAndStartApp();
-}
-
-async function doLogin() {
-    const pass = document.getElementById('input-pass').value;
-    const email = `${attemptUsername}@estudio.com`;
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password: pass });
-    if (error) { document.getElementById('msg-auth-2').innerText = "Senha incorreta."; return; }
-
-    currentUserAuth = data.user;
-    await loadProfileAndStartApp();
-}
-
-async function loadProfileAndStartApp() {
-    const { data } = await supabase.from('profiles').select('*').eq('id', currentUserAuth.id).single();
-    userProfile = data;
-
-    const isOwner = (userProfile.role === 'proprietario' || userProfile.role === 'admin');
-    document.getElementById('badge-role').innerText = isOwner ? "Proprietário" : "Freelancer";
-    if (isOwner) document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
-
-    await loadServicesCache();
-    showScreen('screen-app');
-    loadDashboard();
-}
-
-async function loadServicesCache() {
-    const { data } = await supabase.from('services').select('*').eq('is_active', true);
-    servicesCache = data || [];
-    const sel = document.getElementById('appt-service');
-    sel.innerHTML = '<option value="">Selecione o Serviço...</option>';
-    servicesCache.forEach(s => sel.innerHTML += `<option value="${s.id}">${s.name} (${s.duration_minutes}min) - R$ ${s.price}</option>`);
-}
-
-function routerLoad(target) {
-    if (target === 'view-home') loadDashboard();
-    if (target === 'view-agenda') loadAgenda();
-    if (target === 'view-comandas') loadComandas();
-    if (target === 'view-cobrancas') loadCobrancas();
-    if (target === 'view-clientes') loadClientes();
-    if (target === 'view-mensagens') loadTemplates();
-    if (target === 'view-servicos') loadServicosAdmin();
-    if (target === 'view-produtos') loadProdutos();
-    if (target === 'view-despesas') loadDespesas();
-    if (target === 'view-funcionarios') loadFuncionarios();
-    if (target === 'view-relatorios') loadRelatorios();
-}
-
-// ================= MÓDULOS =================
-async function loadDashboard() {
-    const today = new Date().toISOString().split('T')[0];
-    let q = supabase.from('commands').select('total_amount').eq('status', 'paid').gte('closed_at', `${today}T00:00:00`);
-    if (userProfile.role !== 'admin' && userProfile.role !== 'proprietario') q = q.eq('professional_id', userProfile.id);
-    const { data: cmds } = await q;
-    const rev = cmds ? cmds.reduce((a,b)=> a + parseFloat(b.total_amount), 0) : 0;
-    document.getElementById('dash-rev').innerText = `R$ ${rev.toFixed(2)}`;
-    loadAgendaList('list-home-agenda', today, 3);
-}
-
-async function loadAgenda() {
-    const date = document.getElementById('input-date-agenda').value;
-    loadAgendaList('list-agenda', date, 50);
-}
-
-async function loadAgendaList(elementId, dateStr, limit) {
-    const container = document.getElementById(elementId);
-    container.innerHTML = '<p class="empty-state">Carregando...</p>';
-    
-    let query = supabase.from('appointments')
-        .select('*, client:profiles!client_id(full_name, phone), service:services(name)')
-        .gte('appointment_date', `${dateStr}T00:00:00`).lte('appointment_date', `${dateStr}T23:59:59`)
-        .order('appointment_date', {ascending: true}).limit(limit);
-
-    if (userProfile.role !== 'admin' && userProfile.role !== 'proprietario') {
-        query = query.eq('professional_id', userProfile.id);
+const Mensagens = {
+    load() {
+        const container = document.getElementById('templates-list');
+        container.innerHTML = MockData.messageTemplates.length ? MockData.messageTemplates.map(t => `<div class="template-item" onclick="Mensagens.copyTemplate(${t.id})"><div class="template-name">${t.name}</div><div class="template-preview">${t.text}</div></div>`).join('') : '<p class="text-muted">Nenhuma mensagem pré-definida</p>';
+    },
+    copyTemplate(id) {
+        const t = MockData.messageTemplates.find(x => x.id === id);
+        if (t) { navigator.clipboard.writeText(t.text).then(() => alert('Mensagem copiada!')).catch(() => console.error('Erro ao copiar')); }
     }
+};
 
-    const { data } = await query;
-    if (!data || data.length === 0) { container.innerHTML = '<p class="empty-state">Nenhum agendamento.</p>'; return; }
-
-    container.innerHTML = data.map(a => {
-        const time = new Date(a.appointment_date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-        return `<div class="card"><strong>${time}</strong> - ${a.client?.full_name || 'Cliente'} <br><small>${a.service?.name || 'Serviço'} | WhatsApp: ${a.client?.phone || '-'}</small></div>`;
-    }).join('');
-}
-
-async function saveAppointment() {
-    const name = document.getElementById('appt-client-name').value;
-    const phone = document.getElementById('appt-whatsapp').value;
-    const servId = document.getElementById('appt-service').value;
-    const date = document.getElementById('appt-date').value;
-    const time = document.getElementById('appt-time').value;
-
-    if (!name || !phone || !servId || !date || !time) { alert("Preencha todos os campos."); return; }
-
-    let clientId;
-    const { data: exist } = await supabase.from('profiles').select('id').eq('phone', phone).single();
-    if (exist) {
-        clientId = exist.id;
-    } else {
-        const { data: newC, error: errC } = await supabase.from('profiles').insert({ full_name: name, phone, role: 'cliente' }).select().single();
-        if (errC) { alert("Erro ao criar cliente."); return; }
-        clientId = newC.id;
+const Modals = {
+    init() {
+        document.querySelectorAll('.modal-close').forEach(btn => btn.addEventListener('click', () => Navigation.closeModal(btn.closest('.modal').id)));
+        document.querySelectorAll('.modal').forEach(m => m.addEventListener('click', e => { if (e.target === m) Navigation.closeModal(m.id); }));
+        
+        const form = document.getElementById('agendamento-form');
+        if (form) {
+            form.addEventListener('submit', e => {
+                e.preventDefault();
+                const cliente = document.getElementById('ag-cliente').value.trim();
+                const whatsapp = document.getElementById('ag-whatsapp').value.trim();
+                const servico = document.getElementById('ag-servico').value;
+                const data = document.getElementById('ag-data').value;
+                const hora = document.getElementById('ag-hora').value;
+                const profissional = document.getElementById('ag-profissional').value || AppState.currentUser.name;
+                
+                if (!cliente || !whatsapp || !servico || !data || !hora) { alert('Preencha todos os campos'); return; }
+                if (!Utils.validateWhatsApp(whatsapp)) { alert('WhatsApp inválido'); return; }
+                
+                MockData.appointments.push({ id: Utils.generateId(), client: cliente, whatsapp, service: servico, date: data, time: hora, professional, status: 'pending' });
+                alert('Agendamento criado!');
+                Navigation.closeModal('agendamento-modal');
+                form.reset();
+                if (AppState.currentView === 'agenda') Agenda.load();
+            });
+            
+            const servSelect = document.getElementById('ag-servico');
+            if (servSelect) servSelect.innerHTML = '<option value="">Selecione...</option>' + MockData.services.map(s => `<option value="${s.name}">${s.name} - ${Utils.formatCurrency(s.price)}</option>`).join('');
+            
+            const profSelect = document.getElementById('ag-profissional');
+            const profGroup = document.getElementById('ag-profissional-group');
+            if (profSelect && profGroup) {
+                if (AppState.userRole === 'freelancer') { profGroup.classList.add('hidden'); profSelect.value = AppState.currentUser.name; }
+                else { profGroup.classList.remove('hidden'); profSelect.innerHTML = '<option value="">Selecione...</option>' + MockData.employees.map(e => `<option value="${e.name}">${e.name}</option>`).join(''); }
+            }
+        }
     }
+};
 
-    const serv = servicesCache.find(s => s.id === servId);
-    const start = `${date}T${time}:00`;
-    const endDate = new Date(new Date(start).getTime() + (serv?.duration_minutes || 60)*60000).toISOString();
+const App = {
+    async init() {
+        await new Promise(r => { Navigation.showScreen('splash-screen'); setTimeout(r, 1200); });
+        Auth.init();
+        Modals.init();
+        
+        document.querySelectorAll('.nav-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const viewId = item.dataset.view;
+                viewId === 'mais' ? Navigation.openModal('menu-modal') : Navigation.showView(viewId);
+            });
+        });
+        
+        document.querySelectorAll('#menu-modal li').forEach(item => {
+            item.addEventListener('click', () => { Navigation.closeModal('menu-modal'); Navigation.showView(item.dataset.view); });
+        });
+        
+        document.getElementById('menu-btn')?.addEventListener('click', () => Navigation.openModal('menu-modal'));
+        Navigation.showScreen('login-screen');
+    }
+};
 
-    const { error } = await supabase.from('appointments').insert({
-        client_id: clientId, professional_id: userProfile.id, service_id: servId, appointment_date: start, end_date: endDate, status: 'pending'
-    });
-
-    if (error) alert(error.message);
-    else { alert("Agendado com sucesso!"); closeModal('modal-appt'); loadDashboard(); loadAgenda(); }
-}
-
-async function loadComandas() {
-    const { data } = await supabase.from('commands').select('*, client:profiles!client_id(full_name)').eq('status', 'open');
-    document.getElementById('list-comandas').innerHTML = data?.map(c => `<div class="card"><strong>${c.client?.full_name}</strong><br>Total: R$ ${c.total_amount} <button class="btn-primary mt-2" onclick="closeCommand('${c.id}')">Fechar Comanda</button></div>`).join('') || '<p class="empty-state">Nenhuma comanda aberta.</p>';
-}
-
-async function closeCommand(id) {
-    await supabase.from('commands').update({ status: 'paid', closed_at: new Date().toISOString() }).eq('id', id);
-    alert("Comanda fechada com sucesso!");
-    loadComandas();
-}
-
-async function loadCobrancas() {
-    const { data } = await supabase.from('commands').select('*, client:profiles!client_id(full_name)').eq('status', 'debt');
-    document.getElementById('list-cobrancas').innerHTML = data?.map(c => `<div class="card" style="border-left-color:var(--danger)"><strong>${c.client?.full_name}</strong><br>Débito: R$ ${c.total_amount}</div>`).join('') || '<p class="empty-state">Nenhum débito pendente.</p>';
-}
-
-async function loadClientes(filter = '') {
-    let q = supabase.from('profiles').select('*').eq('role', 'cliente').limit(20);
-    if(filter) q = q.ilike('full_name', `%${filter}%`);
-    const { data } = await q;
-    document.getElementById('list-clientes').innerHTML = data?.map(c => `<div class="card"><strong>${c.full_name}</strong><br>Tel: ${c.phone}</div>`).join('') || '<p class="empty-state">Nenhum cliente encontrado.</p>';
-}
-
-async function loadTemplates() {
-    const { data } = await supabase.from('message_templates').select('*');
-    document.getElementById('list-mensagens').innerHTML = data?.map(t => `<div class="card"><strong>${t.name}</strong><p style="font-size:0.85rem; color:var(--text-light); margin-top:5px;">${t.body}</p></div>`).join('') || '<p class="empty-state">Sem templates.</p>';
-}
-
-async function loadServicosAdmin() {
-    const { data } = await supabase.from('services').select('*');
-    document.getElementById('list-servicos').innerHTML = data?.map(s => `<div class="card"><strong>${s.name}</strong> - R$ ${s.price} (${s.duration_minutes} min)</div>`).join('') || '<p class="empty-state">Sem serviços.</p>';
-}
-
-async function loadProdutos() {
-    const { data } = await supabase.from('products').select('*');
-    document.getElementById('list-produtos').innerHTML = data?.map(p => `<div class="card"><strong>${p.name}</strong> - R$ ${p.sale_price} (Estoque: ${p.stock_qty})</div>`).join('') || '<p class="empty-state">Estoque vazio.</p>';
-}
-
-async function loadDespesas() {
-    const { data } = await supabase.from('expenses').select('*');
-    document.getElementById('list-despesas').innerHTML = data?.map(d => `<div class="card"><strong>${d.description}</strong> - R$ ${d.amount}</div>`).join('') || '<p class="empty-state">Sem despesas.</p>';
-}
-
-async function loadFuncionarios() {
-    const { data } = await supabase.from('profiles').select('*').neq('role', 'cliente');
-    document.getElementById('list-funcionarios').innerHTML = data?.map(f => `<div class="card"><strong>${f.full_name}</strong> (${f.role})</div>`).join('') || '<p class="empty-state">Sem equipe.</p>';
-}
-
-async function loadRelatorios() {
-    const { data: rev } = await supabase.from('commands').select('total_amount').eq('status', 'paid');
-    const { data: exp } = await supabase.from('expenses').select('amount').eq('is_paid', true);
-    const tRev = rev?.reduce((a,b)=>a+parseFloat(b.total_amount),0) || 0;
-    const tExp = exp?.reduce((a,b)=>a+parseFloat(b.amount),0) || 0;
-    document.getElementById('rep-rev').innerText = `R$ ${tRev.toFixed(2)}`;
-    document.getElementById('rep-exp').innerText = `R$ ${tExp.toFixed(2)}`;
-    document.getElementById('rep-profit').innerText = `R$ ${(tRev - tExp).toFixed(2)}`;
-
-    // Melhores Clientes
-    const { data: best } = await supabase.rpc('get_top_clients');
-    document.getElementById('list-best-clients').innerHTML = best?.map(b => `<div class="card"><strong>${b.full_name}</strong><br>Total Gasto: R$ ${b.total}</div>`).join('') || '<p class="empty-state">Sem dados de clientes ainda.</p>';
-}
-
-function openNewCommandModal() { alert("Para abrir comanda, selecione um agendamento concluído."); }
-function openServiceModal() { alert("Painel restrito de cadastro de serviços."); }
+document.addEventListener('DOMContentLoaded', () => App.init());
+window.Comandas = Comandas;
+window.Clientes = Clientes;
+window.Mensagens = Mensagens;

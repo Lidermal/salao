@@ -2,224 +2,154 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Estúdio Amor que Cuida - Sistema</title>
-    <!-- Supabase & PDF Libs -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Estúdio Amor que Cuida</title>
+    
+    <!-- Fix para o erro 404 do Favicon -->
+    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
+    
+    <!-- Bibliotecas (Supabase, PDF, Ícones) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    
+    <!-- Fontes Premium -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
 </head>
 <body>
 
-    <!-- AUTH SCREENS (Full Screen) -->
+    <!-- CAMADA DE AUTENTICAÇÃO -->
     <div id="auth-layer" class="auth-layer active">
+        <!-- Tela de Carregamento -->
         <section id="splash-screen" class="screen active">
             <div class="brand-box">
-                <i class="ph ph-scissors" style="font-size: 3rem; color: var(--primary);"></i>
+                <i class="ph ph-scissors brand-icon"></i>
                 <h1>Amor que Cuida</h1>
                 <p>by Andressa Vieira</p>
                 <div class="loader"></div>
             </div>
         </section>
 
+        <!-- Tela de Login -->
         <section id="login-screen" class="screen">
             <div class="login-card">
-                <h2>Acesso ao Sistema</h2>
+                <i class="ph ph-lock-key text-primary" style="font-size: 2.5rem; margin-bottom: 1rem;"></i>
+                <h2>Bem-vinda de volta</h2>
+                <p class="subtitle">Acesse o sistema do estúdio</p>
                 <form id="login-form">
-                    <div class="input-group"><label>Usuário</label><input type="text" id="username" required></div>
-                    <button type="submit" class="btn-primary">Continuar</button>
-                    <div id="login-error" class="error-msg hidden"></div>
-                </form>
-            </div>
-        </section>
-
-        <section id="create-pass-screen" class="screen">
-            <div class="login-card">
-                <h2>Crie sua Senha</h2>
-                <form id="create-pass-form">
-                    <div class="input-group"><label>Nova Senha</label><input type="password" id="new-pass" required></div>
-                    <div class="input-group"><label>Confirmar</label><input type="password" id="conf-pass" required></div>
-                    <button type="submit" class="btn-primary">Salvar</button>
-                    <div id="create-error" class="error-msg hidden"></div>
-                </form>
-            </div>
-        </section>
-
-        <section id="enter-pass-screen" class="screen">
-            <div class="login-card">
-                <h2 id="welcome-name">Bem-vinda</h2>
-                <form id="enter-pass-form">
-                    <div class="input-group"><label>Senha</label><input type="password" id="curr-pass" required></div>
-                    <button type="submit" class="btn-primary">Entrar</button>
-                    <div id="pass-error" class="error-msg hidden"></div>
+                    <div class="input-group">
+                        <label>Usuário</label>
+                        <input type="text" id="username" placeholder="Digite seu usuário" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Senha</label>
+                        <input type="password" id="password" placeholder="Digite sua senha" required>
+                    </div>
+                    <button type="submit" class="btn-primary" id="btn-login">Entrar</button>
+                    <div id="login-error" class="error-msg hidden">Usuário ou senha incorretos.</div>
                 </form>
             </div>
         </section>
     </div>
 
-    <!-- MAIN SYSTEM LAYOUT -->
+    <!-- ESTRUTURA PRINCIPAL DO SISTEMA -->
     <div id="system-layout" class="hidden">
         
-        <!-- SIDEBAR (DESKTOP ONLY) -->
-        <aside class="sidebar">
+        <!-- SIDEBAR (DESKTOP) & MENU DRAWER (MOBILE) -->
+        <aside class="sidebar" id="main-sidebar">
             <div class="sidebar-brand">
                 <i class="ph ph-scissors"></i>
                 <span>Amor que Cuida</span>
+                <button class="close-sidebar mobile-only" onclick="Nav.toggleMenu()"><i class="ph ph-x"></i></button>
             </div>
-            <nav class="sidebar-nav">
-                <a href="#" class="nav-link active" data-view="dashboard"><i class="ph ph-squares-four"></i> Dashboard</a>
-                <a href="#" class="nav-link" data-view="agenda"><i class="ph ph-calendar"></i> Agenda</a>
-                <a href="#" class="nav-link" data-view="clientes"><i class="ph ph-users"></i> Clientes</a>
+            
+            <nav class="sidebar-nav content-scroll">
+                <div class="nav-section">PRINCIPAL</div>
+                <a href="#" class="nav-link active" data-view="agenda"><i class="ph ph-calendar"></i> Agenda</a>
                 <a href="#" class="nav-link" data-view="comandas"><i class="ph ph-receipt"></i> Comandas</a>
-                <a href="#" class="nav-link" data-view="servicos"><i class="ph ph-scissors"></i> Serviços</a>
-                <a href="#" class="nav-link" data-view="produtos"><i class="ph ph-bag"></i> Produtos</a>
-                <a href="#" class="nav-link" data-view="despesas"><i class="ph ph-wallet"></i> Despesas</a>
-                <a href="#" class="nav-link" data-view="funcionarios"><i class="ph ph-briefcase"></i> Equipe</a>
-                <a href="#" class="nav-link" data-view="relatorios"><i class="ph ph-chart-line-up"></i> Relatórios</a>
-                <div class="spacer"></div>
-                <a href="#" class="nav-link logout" onclick="Auth.logout()"><i class="ph ph-sign-out"></i> Sair</a>
+                <a href="#" class="nav-link" data-view="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
+                
+                <div class="nav-section">CADASTROS</div>
+                <a href="#" class="nav-link" data-view="clientes"><i class="ph ph-users"></i> Clientes & Anamnese</a>
+                <a href="#" class="nav-link" data-view="servicos"><i class="ph ph-sparkle"></i> Serviços & Pacotes</a>
+                <a href="#" class="nav-link" data-view="produtos"><i class="ph ph-package"></i> Produto & Estoque</a>
+                
+                <div class="nav-section owner-only">GESTÃO EXCLUSIVA</div>
+                <a href="#" class="nav-link owner-only" data-view="despesas"><i class="ph ph-trend-down"></i> Despesas</a>
+                <a href="#" class="nav-link owner-only" data-view="funcionarios"><i class="ph ph-identification-card"></i> Funcionários</a>
+                <a href="#" class="nav-link owner-only" data-view="mensagens"><i class="ph ph-chat-circle-text"></i> Mensagens Prontas</a>
+                
+                <div class="nav-section">COMISSIONAMENTO</div>
+                <a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Minha Comissão</a>
+                
+                <div class="nav-section owner-only">INTELIGÊNCIA</div>
+                <a href="#" class="nav-link owner-only" data-view="performance"><i class="ph ph-chart-line-up"></i> Performance</a>
+                <a href="#" class="nav-link owner-only" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Resumo Financeiro</a>
+                <a href="#" class="nav-link owner-only" data-view="melhores-clientes"><i class="ph ph-crown"></i> Melhores Clientes</a>
+                
+                <div class="spacer" style="margin-top: 2rem;"></div>
+                <a href="#" class="nav-link" data-view="configuracoes"><i class="ph ph-gear"></i> Configurações</a>
+                <a href="#" class="nav-link logout" onclick="Auth.logout()"><i class="ph ph-sign-out"></i> Sair do Sistema</a>
             </nav>
         </aside>
 
-        <!-- CONTENT AREA -->
+        <!-- ÁREA DE CONTEÚDO -->
         <main class="main-content">
             <header class="top-bar">
-                <h1 id="page-title">Dashboard</h1>
+                <h1 id="page-title">Agenda</h1>
                 <div class="user-pill">
                     <span id="header-user">Usuário</span>
-                    <div class="avatar">AV</div>
+                    <div class="avatar" id="header-avatar">AV</div>
                 </div>
             </header>
 
-            <div class="content-scroll">
-                <!-- DASHBOARD -->
-                <section id="view-dashboard" class="view active">
-                    <div class="stats-row">
-                        <div class="stat-card"><i class="ph ph-currency-dollar"></i><div><h3>Receita Hoje</h3><p id="dash-rev">R$ 0</p></div></div>
-                        <div class="stat-card"><i class="ph ph-calendar-check"></i><div><h3>Agendamentos</h3><p id="dash-apts">0</p></div></div>
-                        <div class="stat-card"><i class="ph ph-hourglass"></i><div><h3>Pendentes</h3><p id="dash-pend">0</p></div></div>
+            <div class="views-container">
+                <!-- 13 TELAS DO SISTEMA -->
+                <section id="view-agenda" class="view active">
+                    <div class="header-actions">
+                        <h2>Sua Agenda</h2>
+                        <input type="date" class="input-date" id="filtro-data-agenda">
                     </div>
-                    <div class="card">
-                        <div class="card-header"><h3>Próximos Horários</h3></div>
-                        <div id="dash-list" class="list"></div>
+                    <div class="empty-state">
+                        <i class="ph ph-calendar-blank"></i>
+                        <p>Nenhum agendamento para hoje.</p>
+                        <button class="btn-primary" onclick="alert('Funcionalidade de Novo Agendamento em breve!')">Agendar Agora</button>
                     </div>
                 </section>
 
-                <!-- AGENDA -->
-                <section id="view-agenda" class="view">
-                    <div class="toolbar">
-                        <input type="date" id="agenda-date">
-                        <select id="agenda-prof" class="hidden"><option value="all">Todos</option></select>
-                        <button class="btn-primary" onclick="Modals.open('modal-agendamento')"><i class="ph ph-plus"></i> Novo</button>
-                    </div>
-                    <div id="agenda-list" class="list"></div>
-                </section>
-
-                <!-- CLIENTES -->
-                <section id="view-clientes" class="view">
-                    <div class="toolbar">
-                        <input type="text" id="search-cliente" placeholder="Buscar cliente...">
-                        <button class="btn-primary owner-only" onclick="Modals.open('modal-cliente')"><i class="ph ph-user-plus"></i> Novo Cliente</button>
-                    </div>
-                    <div id="clientes-list" class="grid-list"></div>
-                </section>
-
-                <!-- COMANDAS -->
-                <section id="view-comandas" class="view">
-                    <div class="toolbar"><input type="text" id="search-comanda" placeholder="Buscar comanda..."></div>
-                    <div id="comandas-list" class="list"></div>
-                </section>
-
-                <!-- SERVIÇOS -->
-                <section id="view-servicos" class="view">
-                    <div class="toolbar">
-                        <span>Serviços Cadastrados</span>
-                        <button class="btn-primary owner-only" onclick="Modals.open('modal-servico')"><i class="ph ph-plus"></i> Novo Serviço</button>
-                    </div>
-                    <div id="servicos-list" class="grid-list"></div>
-                </section>
-
-                <!-- PRODUTOS -->
-                <section id="view-produtos" class="view">
-                    <div class="toolbar">
-                        <span>Estoque</span>
-                        <button class="btn-primary owner-only" onclick="Modals.open('modal-produto')"><i class="ph ph-plus"></i> Novo Produto</button>
-                    </div>
-                    <div id="produtos-list" class="grid-list"></div>
-                </section>
-
-                <!-- DESPESAS -->
-                <section id="view-despesas" class="view">
-                    <div class="toolbar">
-                        <span>Controle de Saídas</span>
-                        <button class="btn-primary owner-only" onclick="Modals.open('modal-despesa')"><i class="ph ph-plus"></i> Nova Despesa</button>
-                    </div>
-                    <div id="despesas-list" class="list"></div>
-                </section>
-
-                 <!-- FUNCIONARIOS -->
-                 <section id="view-funcionarios" class="view">
-                    <div class="toolbar">
-                        <span>Equipe</span>
-                        <button class="btn-primary owner-only" onclick="Modals.open('modal-funcionario')"><i class="ph ph-plus"></i> Novo Membro</button>
-                    </div>
-                    <div id="funcionarios-list" class="grid-list"></div>
-                </section>
-
-                <!-- RELATÓRIOS -->
-                <section id="view-relatorios" class="view">
-                    <div class="toolbar">
-                        <div class="tabs">
-                            <button class="tab-btn active" data-tab="perf">Performance</button>
-                            <button class="tab-btn" data-tab="fin">Financeiro</button>
-                        </div>
-                        <button class="btn-secondary" onclick="Reports.generatePDF()"><i class="ph ph-file-pdf"></i> Exportar PDF</button>
-                    </div>
-                    <div id="report-content" class="card"></div>
-                </section>
+                <section id="view-cobrancas" class="view"><h2>Cobranças</h2><p>Controle de pagamentos pendentes e links de cobrança.</p></section>
+                <section id="view-comandas" class="view"><h2>Comandas</h2><p>Comandas abertas no salão no momento.</p></section>
+                <section id="view-mensagens" class="view"><h2>Mensagens Pré-definidas</h2><p>Gerencie atalhos de texto para o WhatsApp.</p></section>
+                <section id="view-clientes" class="view"><h2>Clientes & Anamnese</h2><p>Banco de dados de clientes e fichas de anamnese.</p></section>
+                <section id="view-servicos" class="view"><h2>Serviços & Pacotes</h2><p>Gerencie o catálogo e defina a comissão (até 100%).</p></section>
+                <section id="view-produtos" class="view"><h2>Produto & Estoque</h2><p>Controle de entrada e saída de produtos.</p></section>
+                <section id="view-despesas" class="view"><h2>Despesas</h2><p>Registro de contas a pagar, aluguel e compras.</p></section>
+                <section id="view-funcionarios" class="view"><h2>Funcionários</h2><p>Gerencie a equipe e taxas de comissionamento padrão.</p></section>
+                <section id="view-comissao" class="view"><h2>Comissão</h2><p>Acompanhamento de valores a receber por serviços prestados.</p></section>
+                <section id="view-performance" class="view"><h2>Performance</h2><p>Gráficos de desempenho do salão e da equipe.</p></section>
+                <section id="view-resumo-financeiro" class="view"><h2>Resumo Financeiro</h2><p>Fluxo de caixa detalhado (Entradas vs Saídas).</p></section>
+                <section id="view-melhores-clientes" class="view"><h2>Melhores Clientes</h2><p>Ranking de clientes que mais frequentam o estúdio.</p></section>
+                <section id="view-configuracoes" class="view"><h2>Configurações</h2><p>Ajustes do sistema e perfil.</p></section>
             </div>
         </main>
 
-        <!-- BOTTOM NAV (MOBILE ONLY) -->
+        <!-- BOTTOM NAV (TIPO INSTAGRAM PARA MOBILE) -->
         <nav class="bottom-nav">
-            <a href="#" class="b-item active" data-view="dashboard"><i class="ph ph-house"></i><span>Home</span></a>
-            <a href="#" class="b-item" data-view="agenda"><i class="ph ph-calendar"></i><span>Agenda</span></a>
+            <a href="#" class="b-item active" data-view="agenda"><i class="ph ph-calendar"></i><span>Agenda</span></a>
             <a href="#" class="b-item" data-view="comandas"><i class="ph ph-receipt"></i><span>Comandas</span></a>
+            
+            <!-- Botão Central de Ação -->
+            <div class="fab-wrapper">
+                <button class="fab-button" onclick="alert('Menu Rápido Aberto!')"><i class="ph ph-plus"></i></button>
+            </div>
+            
             <a href="#" class="b-item" data-view="clientes"><i class="ph ph-users"></i><span>Clientes</span></a>
-            <a href="#" class="b-item" data-view="mais"><i class="ph ph-list"></i><span>Mais</span></a>
+            <a href="#" class="b-item" onclick="Nav.toggleMenu()"><i class="ph ph-list"></i><span>Menu</span></a>
         </nav>
-    </div>
-
-    <!-- MODALS OVERLAY -->
-    <div id="modal-overlay" class="overlay hidden"></div>
-
-    <!-- MODAL AGENDAMENTO -->
-    <div id="modal-agendamento" class="modal bottom-sheet hidden">
-        <div class="modal-handle"></div>
-        <h3>Novo Agendamento</h3>
-        <form id="form-agendamento">
-            <div class="input-group"><label>Cliente</label><input type="text" id="ag-client" required></div>
-            <div class="input-group"><label>WhatsApp</label><input type="tel" id="ag-phone" required></div>
-            <div class="input-group"><label>Serviço</label><select id="ag-service" required></select></div>
-            <div class="row">
-                <div class="input-group"><label>Data</label><input type="date" id="ag-date" required></div>
-                <div class="input-group"><label>Hora</label><input type="time" id="ag-time" required></div>
-            </div>
-            <div class="input-group owner-only"><label>Profissional</label><select id="ag-prof"></select></div>
-            <div class="modal-actions">
-                <button type="button" class="btn-text" onclick="Modals.close()">Cancelar</button>
-                <button type="submit" class="btn-primary">Salvar</button>
-            </div>
-        </form>
-    </div>
-
-    <!-- MODAL GENÉRICO DE CADASTRO (Reutilizável) -->
-    <div id="modal-generic" class="modal bottom-sheet hidden">
-        <div class="modal-handle"></div>
-        <h3 id="modal-generic-title">Cadastro</h3>
-        <form id="form-generic"></form>
+        
+        <!-- Overlay para Menu Mobile -->
+        <div id="mobile-overlay" class="overlay hidden" onclick="Nav.toggleMenu()"></div>
     </div>
 
     <script src="script.js"></script>

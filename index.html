@@ -6,7 +6,6 @@
     <title>Estúdio Amor que Cuida</title>
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     
-    <!-- Supabase, PDF e Ícones -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -16,10 +15,9 @@
 </head>
 <body>
 
-    <!-- CUSTOM TOAST ALERT -->
     <div id="toast-container"></div>
 
-    <!-- AUTH LAYER -->
+    <!-- CAMADA DE AUTENTICAÇÃO -->
     <div id="auth-layer" class="auth-layer active">
         <section id="splash-screen" class="screen active">
             <div class="brand-box">
@@ -43,13 +41,14 @@
         </section>
     </div>
 
-    <!-- SYSTEM LAYOUT -->
+    <!-- ESTRUTURA PRINCIPAL -->
     <div id="system-layout" class="hidden">
         
+        <!-- SIDEBAR -->
         <aside class="sidebar" id="main-sidebar">
             <div class="sidebar-brand">
                 <i class="ph ph-scissors"></i><span>Amor que Cuida</span>
-                <button class="close-sidebar mobile-only" onclick="Nav.toggleMenu()"><i class="ph ph-x"></i></button>
+                <button class="close-sidebar mobile-only" onclick="Nav.closeMenu()"><i class="ph ph-x"></i></button>
             </div>
             
             <nav class="sidebar-nav content-scroll">
@@ -71,15 +70,17 @@
                 <div class="nav-section">FINANCEIRO</div>
                 <a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Comissão</a>
                 <a href="#" class="nav-link owner-only" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Resumo Financeiro</a>
-                <a href="#" class="nav-link owner-only" data-view="performance"><i class="ph ph-chart-line-up"></i> Performance</a>
                 
                 <div class="spacer" style="margin-top: 2rem;"></div>
-                <a href="#" class="nav-link" onclick="Modals.open('notificacoes')"><i class="ph ph-bell"></i> Notificações</a>
                 <a href="#" class="nav-link owner-only" data-view="configuracoes"><i class="ph ph-gear"></i> Configurações</a>
                 <a href="#" class="nav-link logout" onclick="Auth.logout()"><i class="ph ph-sign-out"></i> Sair</a>
             </nav>
         </aside>
 
+        <!-- MOBILE OVERLAY PARA O MENU LATERAL -->
+        <div id="mobile-overlay" class="overlay hidden" onclick="Nav.closeMenu()"></div>
+
+        <!-- CONTEÚDO PRINCIPAL -->
         <main class="main-content">
             <header class="top-bar">
                 <h1 id="page-title">Agenda</h1>
@@ -91,7 +92,6 @@
 
             <div class="views-container">
                 <section id="view-agenda" class="view active">
-                    <!-- Calendário iOS Style -->
                     <div class="ios-calendar">
                         <div class="cal-header">
                             <button onclick="Render.changeWeek(-1)"><i class="ph ph-caret-left"></i></button>
@@ -109,17 +109,15 @@
                 <section id="view-servicos" class="view"><div id="servicos-list" class="data-grid"></div></section>
                 <section id="view-produtos" class="view"><div id="produtos-list" class="data-grid"></div></section>
                 <section id="view-comissao" class="view"><div id="comissao-content"></div></section>
-                
-                <!-- Demais views simplificadas para espaço -->
                 <section id="view-mensagens" class="view"><div id="mensagens-list" class="data-grid"></div></section>
                 <section id="view-despesas" class="view"><div id="despesas-list" class="data-list"></div></section>
                 <section id="view-funcionarios" class="view"><div id="funcionarios-list" class="data-grid"></div></section>
-                <section id="view-performance" class="view"><div id="perf-content"></div></section>
                 <section id="view-resumo-financeiro" class="view"><div id="resumo-content"></div></section>
                 <section id="view-configuracoes" class="view"><div id="config-content"></div></section>
             </div>
         </main>
 
+        <!-- BOTTOM NAV -->
         <nav class="bottom-nav">
             <a href="#" class="b-item active" data-view="agenda"><i class="ph ph-calendar"></i><span>Agenda</span></a>
             <a href="#" class="b-item" data-view="comandas"><i class="ph ph-receipt"></i><span>Comandas</span></a>
@@ -127,11 +125,9 @@
             <a href="#" class="b-item" data-view="clientes"><i class="ph ph-users"></i><span>Clientes</span></a>
             <a href="#" class="b-item" onclick="Nav.toggleMenu()"><i class="ph ph-list"></i><span>Menu</span></a>
         </nav>
-        
-        <div id="mobile-overlay" class="overlay hidden" onclick="Nav.toggleMenu()"></div>
     </div>
 
-    <!-- MODAIS DINÂMICOS RENDERIZADOS PELO JS -->
+    <!-- CONTAINER PARA MODAIS -->
     <div id="modal-container" class="overlay hidden"></div>
 
     <script src="script.js"></script>

@@ -1,33 +1,33 @@
 /**
- * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO BLINDADA
- * Mecanismo de segurança anti-travamento na tela de splash
+ * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO CORRIGIDA DE VARIÁVEL
+ * Previne erro "Identifier already declared" e travamento no Splash
  */
 
 // --- MECANISMO DE SEGURANÇA (TIMER) ---
-// Se em 4 segundos a tela de login não aparecer, forçamos ela a aparecer
 let safetyTimer = setTimeout(() => {
-    console.warn('️ TIMEOUT DE SEGURANÇA: Forçando saída da tela de Splash');
+    console.warn('⚠️ TIMEOUT DE SEGURANÇA: Forçando saída da tela de Splash');
     const splash = document.getElementById('splash-screen');
     const login = document.getElementById('login-screen');
     if(splash) splash.classList.remove('active');
     if(login) login.classList.add('active');
-    alert('O sistema demorou para carregar. Verifique sua conexão com a internet.');
 }, 4000);
 
-// --- CONFIGURAÇÃO SUPABASE ---
+// --- CONFIGURAÇÃO SUPABASE (NOME DA VARIÁVEL ALTERADO PARA EVITAR CONFLITO) ---
 const SUPABASE_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
 
-let supabase = null;
+// Verifica se já existe para não crashar o script
+let supabaseClient = null;
 try {
-    if (window.supabase) {
-        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        console.log('✅ Supabase inicializado');
+    // Usa window.supabase (biblioteca global) para criar o client
+    if (typeof window.supabase !== 'undefined') {
+        supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        console.log('✅ Supabase inicializado com sucesso');
     } else {
-        throw new Error('Biblioteca Supabase não carregou');
+        throw new Error('Biblioteca Supabase não encontrada');
     }
 } catch (e) {
-    console.error('❌ Erro crítico Supabase:', e);
+    console.error('❌ Erro crítico ao iniciar Supabase:', e);
 }
 
 // --- ESTADO GLOBAL ---
@@ -48,7 +48,7 @@ const U = {
 // --- NAVEGAÇÃO ---
 const Nav = {
     showView(id) {
-        clearTimeout(safetyTimer); // Cancela o timer de segurança se tudo der certo
+        clearTimeout(safetyTimer); // Cancela timer se navegar corretamente
         App.view = id;
         document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
         const target = document.getElementById(`view-${id}`);
@@ -78,14 +78,14 @@ const Nav = {
 const Auth = {
     tempUser: null,
     init() {
-        // Transição Splash -> Login (Garantida)
+        // Transição garantida Splash -> Login
         setTimeout(() => {
             const splash = document.getElementById('splash-screen');
             const login = document.getElementById('login-screen');
             if(splash) splash.classList.remove('active');
             if(login) login.classList.add('active');
             clearTimeout(safetyTimer);
-        }, 1500); // 1.5s de branding
+        }, 1500);
 
         // Form Login
         const loginForm = document.getElementById('login-form');
@@ -96,7 +96,8 @@ const Auth = {
                 const err = document.getElementById('login-error');
                 
                 try {
-                    const {data, error} = await supabase.from('users').select('*').eq('username', u).single();
+                    if(!supabaseClient) throw new Error('Supabase não conectado');
+                    const {data, error} = await supabaseClient.from('users').select('*').eq('username', u).single();
                     
                     if(error || !data) { 
                         if(err) { err.textContent='Usuário não encontrado'; err.classList.remove('hidden'); }
@@ -116,7 +117,7 @@ const Auth = {
                     }
                 } catch(e) {
                     console.error(e);
-                    if(err) { err.textContent='Erro de conexão'; err.classList.remove('hidden'); }
+                    if(err) { err.textContent='Erro de conexão com servidor'; err.classList.remove('hidden'); }
                 }
             };
         }
@@ -131,11 +132,11 @@ const Auth = {
                 const err = document.getElementById('create-error');
                 
                 if(p1.length<6 || p1!==p2) { 
-                    if(err) { err.textContent='Senhas inválidas'; err.classList.remove('hidden'); }
+                    if(err) { err.textContent='Senhas inválidas ou diferentes'; err.classList.remove('hidden'); }
                     return; 
                 }
                 
-                await supabase.from('users').update({password:p1, first_login:false}).eq('id', this.tempUser.id);
+                await supabaseClient.from('users').update({password:p1, first_login:false}).eq('id', this.tempUser.id);
                 this.tempUser.password = p1; 
                 this.tempUser.first_login = false;
                 this.loginSuccess(this.tempUser);
@@ -183,10 +184,10 @@ const Auth = {
 // --- DADOS ---
 const Data = {
     async loadAll() {
-        if(!supabase) return;
+        if(!supabaseClient) return;
         try {
             const tables = ['services','appointments','clients','products','expenses','employees','comandas'];
-            const results = await Promise.all(tables.map(t => supabase.from(t).select('*')));
+            const results = await Promise.all(tables.map(t => supabaseClient.from(t).select('*')));
             
             App.data.services = results[0].data || [];
             App.data.appointments = results[1].data || [];
@@ -196,7 +197,7 @@ const Data = {
             App.data.employees = results[5].data || [];
             App.data.comandas = results[6].data || [];
 
-            // Enriquecer agendamentos
+            // Enriquecer agendamentos com nomes
             App.data.appointments = App.data.appointments.map(a => ({
                 ...a,
                 client_name: App.data.clients.find(c=>c.id===a.client_id)?.name || 'Cliente',
@@ -439,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if(formAg) {
         formAg.onsubmit = async (e) => {
             e.preventDefault();
-            if(!supabase) return alert('Supabase não conectado');
+            if(!supabaseClient) return alert('Supabase não conectado');
             
             const payload = {
                 client_id: App.data.clients[0]?.id || null, 
@@ -450,7 +451,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 status: 'pending'
             };
             
-            const {error} = await supabase.from('appointments').insert(payload);
+            const {error} = await supabaseClient.from('appointments').insert(payload);
             if(error) alert('Erro: '+error.message);
             else { 
                 alert('Agendado!'); 
@@ -468,7 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.nav-link, .b-item').forEach(i=>i.onclick=(e)=>{
         e.preventDefault(); 
         const v=i.dataset.view;
-        if(v==='mais') Nav.openModal('menu-modal'); // Se tiver menu modal
+        if(v==='mais') Nav.openModal('menu-modal'); 
         else Nav.showView(v);
     });
 });

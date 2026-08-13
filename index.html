@@ -4,24 +4,23 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Estúdio Amor que Cuida</title>
-    
-    <!-- Fix para o erro 404 do Favicon -->
     <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     
-    <!-- Bibliotecas (Supabase, PDF, Ícones) -->
+    <!-- Supabase, PDF e Ícones -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     
-    <!-- Fontes Premium -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-    <!-- CAMADA DE AUTENTICAÇÃO -->
+    <!-- CUSTOM TOAST ALERT -->
+    <div id="toast-container"></div>
+
+    <!-- AUTH LAYER -->
     <div id="auth-layer" class="auth-layer active">
-        <!-- Tela de Carregamento -->
         <section id="splash-screen" class="screen active">
             <div class="brand-box">
                 <i class="ph ph-scissors brand-icon"></i>
@@ -31,36 +30,25 @@
             </div>
         </section>
 
-        <!-- Tela de Login -->
         <section id="login-screen" class="screen">
             <div class="login-card">
                 <i class="ph ph-lock-key text-primary" style="font-size: 2.5rem; margin-bottom: 1rem;"></i>
-                <h2>Bem-vinda de volta</h2>
-                <p class="subtitle">Acesse o sistema do estúdio</p>
+                <h2>Acesso ao Sistema</h2>
                 <form id="login-form">
-                    <div class="input-group">
-                        <label>Usuário</label>
-                        <input type="text" id="username" placeholder="Digite seu usuário" required>
-                    </div>
-                    <div class="input-group">
-                        <label>Senha</label>
-                        <input type="password" id="password" placeholder="Digite sua senha" required>
-                    </div>
+                    <div class="input-group"><label>Usuário</label><input type="text" id="username" required></div>
+                    <div class="input-group"><label>Senha</label><input type="password" id="password" required></div>
                     <button type="submit" class="btn-primary" id="btn-login">Entrar</button>
-                    <div id="login-error" class="error-msg hidden">Usuário ou senha incorretos.</div>
                 </form>
             </div>
         </section>
     </div>
 
-    <!-- ESTRUTURA PRINCIPAL DO SISTEMA -->
+    <!-- SYSTEM LAYOUT -->
     <div id="system-layout" class="hidden">
         
-        <!-- SIDEBAR (DESKTOP) & MENU DRAWER (MOBILE) -->
         <aside class="sidebar" id="main-sidebar">
             <div class="sidebar-brand">
-                <i class="ph ph-scissors"></i>
-                <span>Amor que Cuida</span>
+                <i class="ph ph-scissors"></i><span>Amor que Cuida</span>
                 <button class="close-sidebar mobile-only" onclick="Nav.toggleMenu()"><i class="ph ph-x"></i></button>
             </div>
             
@@ -72,29 +60,26 @@
                 
                 <div class="nav-section">CADASTROS</div>
                 <a href="#" class="nav-link" data-view="clientes"><i class="ph ph-users"></i> Clientes & Anamnese</a>
-                <a href="#" class="nav-link" data-view="servicos"><i class="ph ph-sparkle"></i> Serviços & Pacotes</a>
-                <a href="#" class="nav-link" data-view="produtos"><i class="ph ph-package"></i> Produto & Estoque</a>
+                <a href="#" class="nav-link owner-only" data-view="servicos"><i class="ph ph-sparkle"></i> Serviços & Pacotes</a>
+                <a href="#" class="nav-link owner-only" data-view="produtos"><i class="ph ph-package"></i> Produto & Estoque</a>
                 
-                <div class="nav-section owner-only">GESTÃO EXCLUSIVA</div>
+                <div class="nav-section owner-only">GESTÃO</div>
                 <a href="#" class="nav-link owner-only" data-view="despesas"><i class="ph ph-trend-down"></i> Despesas</a>
                 <a href="#" class="nav-link owner-only" data-view="funcionarios"><i class="ph ph-identification-card"></i> Funcionários</a>
                 <a href="#" class="nav-link owner-only" data-view="mensagens"><i class="ph ph-chat-circle-text"></i> Mensagens Prontas</a>
                 
-                <div class="nav-section">COMISSIONAMENTO</div>
-                <a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Minha Comissão</a>
-                
-                <div class="nav-section owner-only">INTELIGÊNCIA</div>
-                <a href="#" class="nav-link owner-only" data-view="performance"><i class="ph ph-chart-line-up"></i> Performance</a>
+                <div class="nav-section">FINANCEIRO</div>
+                <a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Comissão</a>
                 <a href="#" class="nav-link owner-only" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Resumo Financeiro</a>
-                <a href="#" class="nav-link owner-only" data-view="melhores-clientes"><i class="ph ph-crown"></i> Melhores Clientes</a>
+                <a href="#" class="nav-link owner-only" data-view="performance"><i class="ph ph-chart-line-up"></i> Performance</a>
                 
                 <div class="spacer" style="margin-top: 2rem;"></div>
-                <a href="#" class="nav-link" data-view="configuracoes"><i class="ph ph-gear"></i> Configurações</a>
-                <a href="#" class="nav-link logout" onclick="Auth.logout()"><i class="ph ph-sign-out"></i> Sair do Sistema</a>
+                <a href="#" class="nav-link" onclick="Modals.open('notificacoes')"><i class="ph ph-bell"></i> Notificações</a>
+                <a href="#" class="nav-link owner-only" data-view="configuracoes"><i class="ph ph-gear"></i> Configurações</a>
+                <a href="#" class="nav-link logout" onclick="Auth.logout()"><i class="ph ph-sign-out"></i> Sair</a>
             </nav>
         </aside>
 
-        <!-- ÁREA DE CONTEÚDO -->
         <main class="main-content">
             <header class="top-bar">
                 <h1 id="page-title">Agenda</h1>
@@ -105,52 +90,49 @@
             </header>
 
             <div class="views-container">
-                <!-- 13 TELAS DO SISTEMA -->
                 <section id="view-agenda" class="view active">
-                    <div class="header-actions">
-                        <h2>Sua Agenda</h2>
-                        <input type="date" class="input-date" id="filtro-data-agenda">
+                    <!-- Calendário iOS Style -->
+                    <div class="ios-calendar">
+                        <div class="cal-header">
+                            <button onclick="Render.changeWeek(-1)"><i class="ph ph-caret-left"></i></button>
+                            <h3 id="cal-month-year">Agosto 2026</h3>
+                            <button onclick="Render.changeWeek(1)"><i class="ph ph-caret-right"></i></button>
+                        </div>
+                        <div class="cal-days" id="cal-days-row"></div>
                     </div>
-                    <div class="empty-state">
-                        <i class="ph ph-calendar-blank"></i>
-                        <p>Nenhum agendamento para hoje.</p>
-                        <button class="btn-primary" onclick="alert('Funcionalidade de Novo Agendamento em breve!')">Agendar Agora</button>
-                    </div>
+                    <div id="agenda-list" class="data-list"></div>
                 </section>
-
-                <section id="view-cobrancas" class="view"><h2>Cobranças</h2><p>Controle de pagamentos pendentes e links de cobrança.</p></section>
-                <section id="view-comandas" class="view"><h2>Comandas</h2><p>Comandas abertas no salão no momento.</p></section>
-                <section id="view-mensagens" class="view"><h2>Mensagens Pré-definidas</h2><p>Gerencie atalhos de texto para o WhatsApp.</p></section>
-                <section id="view-clientes" class="view"><h2>Clientes & Anamnese</h2><p>Banco de dados de clientes e fichas de anamnese.</p></section>
-                <section id="view-servicos" class="view"><h2>Serviços & Pacotes</h2><p>Gerencie o catálogo e defina a comissão (até 100%).</p></section>
-                <section id="view-produtos" class="view"><h2>Produto & Estoque</h2><p>Controle de entrada e saída de produtos.</p></section>
-                <section id="view-despesas" class="view"><h2>Despesas</h2><p>Registro de contas a pagar, aluguel e compras.</p></section>
-                <section id="view-funcionarios" class="view"><h2>Funcionários</h2><p>Gerencie a equipe e taxas de comissionamento padrão.</p></section>
-                <section id="view-comissao" class="view"><h2>Comissão</h2><p>Acompanhamento de valores a receber por serviços prestados.</p></section>
-                <section id="view-performance" class="view"><h2>Performance</h2><p>Gráficos de desempenho do salão e da equipe.</p></section>
-                <section id="view-resumo-financeiro" class="view"><h2>Resumo Financeiro</h2><p>Fluxo de caixa detalhado (Entradas vs Saídas).</p></section>
-                <section id="view-melhores-clientes" class="view"><h2>Melhores Clientes</h2><p>Ranking de clientes que mais frequentam o estúdio.</p></section>
-                <section id="view-configuracoes" class="view"><h2>Configurações</h2><p>Ajustes do sistema e perfil.</p></section>
+                
+                <section id="view-cobrancas" class="view"><div id="cobrancas-list" class="data-list"></div></section>
+                <section id="view-comandas" class="view"><div id="comandas-list" class="data-list"></div></section>
+                <section id="view-clientes" class="view"><div id="clientes-list" class="data-grid"></div></section>
+                <section id="view-servicos" class="view"><div id="servicos-list" class="data-grid"></div></section>
+                <section id="view-produtos" class="view"><div id="produtos-list" class="data-grid"></div></section>
+                <section id="view-comissao" class="view"><div id="comissao-content"></div></section>
+                
+                <!-- Demais views simplificadas para espaço -->
+                <section id="view-mensagens" class="view"><div id="mensagens-list" class="data-grid"></div></section>
+                <section id="view-despesas" class="view"><div id="despesas-list" class="data-list"></div></section>
+                <section id="view-funcionarios" class="view"><div id="funcionarios-list" class="data-grid"></div></section>
+                <section id="view-performance" class="view"><div id="perf-content"></div></section>
+                <section id="view-resumo-financeiro" class="view"><div id="resumo-content"></div></section>
+                <section id="view-configuracoes" class="view"><div id="config-content"></div></section>
             </div>
         </main>
 
-        <!-- BOTTOM NAV (TIPO INSTAGRAM PARA MOBILE) -->
         <nav class="bottom-nav">
             <a href="#" class="b-item active" data-view="agenda"><i class="ph ph-calendar"></i><span>Agenda</span></a>
             <a href="#" class="b-item" data-view="comandas"><i class="ph ph-receipt"></i><span>Comandas</span></a>
-            
-            <!-- Botão Central de Ação -->
-            <div class="fab-wrapper">
-                <button class="fab-button" onclick="alert('Menu Rápido Aberto!')"><i class="ph ph-plus"></i></button>
-            </div>
-            
+            <div class="fab-wrapper"><button class="fab-button" onclick="UI.handleFabClick()"><i class="ph ph-plus"></i></button></div>
             <a href="#" class="b-item" data-view="clientes"><i class="ph ph-users"></i><span>Clientes</span></a>
             <a href="#" class="b-item" onclick="Nav.toggleMenu()"><i class="ph ph-list"></i><span>Menu</span></a>
         </nav>
         
-        <!-- Overlay para Menu Mobile -->
         <div id="mobile-overlay" class="overlay hidden" onclick="Nav.toggleMenu()"></div>
     </div>
+
+    <!-- MODAIS DINÂMICOS RENDERIZADOS PELO JS -->
+    <div id="modal-container" class="overlay hidden"></div>
 
     <script src="script.js"></script>
 </body>

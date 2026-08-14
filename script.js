@@ -1,5 +1,5 @@
 /** 
- * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO DEFINITIVA
+ * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO DEFINITIVA COM CORREÇÕES
  */
 
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
@@ -132,22 +132,30 @@ const Render = {
     async agenda() {
         this.buildCalendar();
         try {
-            let query = db.from('appointments').select('*, clients(name), services(name), users!user_id(name)').eq('date', U.iso(App.currentDate));
+            // CORREÇÃO: Ordenando por horário (.order('time', {ascending: true}))
+            let query = db.from('appointments').select('*, clients(name), services(name), users!user_id(name)').eq('date', U.iso(App.currentDate)).order('time', {ascending: true});
             if (App.role !== 'owner') query = query.eq('user_id', App.user.id);
 
             const { data, error } = await query;
             if(error) throw error;
             const cont = document.getElementById('agenda-list');
             if(!data || !data.length) { cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Sua agenda está livre neste dia.</p></div>`; return; }
+            
             cont.innerHTML = data.map(a => {
                 const isBlocked = a.status === 'bloqueado';
-                return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${isBlocked ? '#9e9e9e' : 'var(--primary)'}; background: ${isBlocked ? '#f5f5f5' : '#fff'};">
+                const isArrived = a.status === 'chegou';
+                let statusColor = isBlocked ? '#616161' : (isArrived ? '#2e7d32' : 'var(--primary-dark)');
+                let statusBg = isBlocked ? '#e0e0e0' : (isArrived ? '#e8f5e9' : 'var(--primary-light)');
+                let borderColor = isBlocked ? '#9e9e9e' : (isArrived ? '#4caf50' : 'var(--primary)');
+                
+                return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${borderColor}; background: ${isBlocked ? '#f5f5f5' : '#fff'};">
                     <div>
                         <h4 style="font-size:1.2rem; color: ${isBlocked ? 'var(--muted)' : 'var(--text)'}">${a.time} - ${isBlocked ? 'Horário Bloqueado' : (a.clients?.name || 'Cliente')}</h4>
-                        ${isBlocked ? `<p style="margin:5px 0; color:var(--muted); font-style:italic;">Motivo: ${a.notes || 'Não informado'}</p>` : `<p style="margin:5px 0; color:var(--muted)">${a.services?.name || '-'}</p>`}
+                        ${isBlocked ? `<p style="margin:5px 0; color:var(--muted); font-style:italic;">Indisponível</p>` : `<p style="margin:5px 0; color:var(--muted)">${a.services?.name || '-'}</p>`}
                         <p style="font-size:0.8rem">Profissional: <b>${a.users?.name || '-'}</b></p>
+                        ${(!isBlocked && a.status === 'agendado') ? `<button class="btn-primary" style="padding: 5px 15px; font-size: 0.8rem; margin-top: 10px; width: auto;" onclick="Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i> Marcar como Chegou</button>` : ''}
                     </div>
-                    <div style="background:${isBlocked ? '#e0e0e0' : 'var(--primary-light)'}; color:${isBlocked ? '#616161' : 'var(--primary-dark)'}; padding:5px 12px; border-radius:20px; font-size:0.8rem; font-weight:bold">${a.status.toUpperCase()}</div>
+                    <div style="background:${statusBg}; color:${statusColor}; padding:5px 12px; border-radius:20px; font-size:0.8rem; font-weight:bold; text-align:center;">${a.status.toUpperCase()}</div>
                 </div>`;
             }).join('');
         } catch (e) { UI.toast(`Erro na agenda: ${e.message}`, 'error'); }
@@ -168,15 +176,20 @@ const Render = {
 
     async clientes() {
         const { data } = await db.from('clients').select('*').order('name');
-        document.getElementById('clientes-list').innerHTML = data.map(c => `
+        
+        // CORREÇÃO: Utilizando data-attributes para evitar erro de aspas e "undefined"
+        document.getElementById('clientes-list').innerHTML = data.map(c => {
+            const safeName = c.name.replace(/"/g, '&quot;');
+            return `
             <div class="card">
-                <a href="#" class="wpp-btn" onclick="Modals.open('whatsapp', '${c.phone}', '${c.name}'); event.stopPropagation()"><i class="ph ph-whatsapp-logo"></i></a>
+                <a href="#" class="wpp-btn" onclick="Modals.open('whatsapp', '${c.phone}', '${safeName}'); event.stopPropagation()"><i class="ph ph-whatsapp-logo"></i></a>
                 <h4 style="color:var(--primary); font-size:1.2rem; margin-bottom:10px">${c.name}</h4><p><i class="ph ph-phone"></i> ${c.phone}</p>
                 <div style="display:flex; gap:10px; margin-top:15px;">
-                    <button class="btn-secondary" style="flex:1" onclick="Render.perfilCliente('${c.id}', '${c.name}')"><i class="ph ph-user"></i> Ver Perfil</button>
-                    <button class="btn-secondary" style="flex:1" onclick="Render.anamnese('${c.id}', '${c.name}')"><i class="ph ph-file-text"></i> Anamnese</button>
+                    <button class="btn-secondary" style="flex:1" data-id="${c.id}" data-name="${safeName}" onclick="Render.perfilCliente(this.dataset.id, this.dataset.name)"><i class="ph ph-user"></i> Ver Perfil</button>
+                    <button class="btn-secondary" style="flex:1" data-id="${c.id}" data-name="${safeName}" onclick="Render.anamnese(this.dataset.id, this.dataset.name)"><i class="ph ph-file-text"></i> Anamnese</button>
                 </div>
-            </div>`).join('');
+            </div>`;
+        }).join('');
     },
     anamnese(id, name) {
         document.getElementById('current-anamnese-client-id').value = id;
@@ -188,9 +201,20 @@ const Render = {
         document.getElementById('perfil-cliente-title').textContent = `Perfil: ${name}`;
         Nav.showView('perfil-cliente');
         
+        // Puxando o histórico de comandas fechadas
         const { data: comandas } = await db.from('comandas').select('*, users(name)').eq('client_id', id).eq('status', 'fechada').order('created_at', {ascending: false});
         
-        document.getElementById('perfil-info').innerHTML = `<div class="card" style="border-left:4px solid var(--primary);"><h4 style="font-size:1.2rem;">Total de Visitas: ${comandas.length}</h4></div>`;
+        // CORREÇÃO: Puxando o foco da Anamnese (Diagnóstico) para exibir no perfil
+        const { data: anamnese } = await db.from('anamnesis').select('notes, created_at').eq('client_id', id).order('created_at', {ascending: false}).limit(1);
+        
+        const anamneseDiv = document.getElementById('perfil-anamnese-destaque');
+        if(anamnese && anamnese.length > 0) {
+            anamneseDiv.innerHTML = `<div class="card" style="background:#fffafb; border:1px solid var(--primary-light);"><h4 style="color:var(--primary-dark); margin-bottom:10px;"><i class="ph ph-file-text"></i> Diagnóstico da Última Avaliação</h4><p style="font-style:italic;">"${anamnese[0].notes}"</p><span style="font-size:0.75rem; color:var(--muted); display:block; margin-top:10px;">Anotado em: ${new Date(anamnese[0].created_at).toLocaleDateString()}</span></div>`;
+        } else {
+            anamneseDiv.innerHTML = '';
+        }
+
+        document.getElementById('perfil-info').innerHTML = `<div class="card" style="border-left:4px solid var(--primary);"><h4 style="font-size:1.2rem;">Total de Visitas Concluídas: ${comandas.length}</h4></div>`;
         
         const list = document.getElementById('perfil-visitas-list');
         if(!comandas || comandas.length === 0) {
@@ -205,30 +229,47 @@ const Render = {
                     <i class="ph ph-calendar"></i> ${new Date(c.created_at).toLocaleDateString()}
                 </h4>
                 <p style="margin-bottom:5px;"><b>Profissional Responsável:</b> ${c.users?.name || 'Não informado'}</p>
-                <p style="margin-bottom:5px;"><b>Serviços/Produtos:</b> ${itens || 'Nenhum detalhe salvo'}</p>
+                <p style="margin-bottom:5px;"><b>Serviços/Produtos Consumidos:</b> ${itens || 'Nenhum detalhe salvo'}</p>
                 <p><b>Total Investido:</b> ${U.money(c.total)}</p>
             </div>`;
         }).join('');
     },
     async cobrancas() {
-        const { data } = await db.from('debts').select('*, clients(name)').gt('remaining_amount', 0).order('created_at', {ascending: false});
+        const { data } = await db.from('debts').select('*, clients(name), comandas(items)').gt('remaining_amount', 0).order('created_at', {ascending: false});
         const cont = document.getElementById('cobrancas-list');
         if (!data || data.length === 0) { cont.innerHTML = "<p style='color:var(--muted)'>Nenhuma cobrança em aberto no momento.</p>"; return; }
         
-        cont.innerHTML = data.map(d => `
-            <div class="card" style="border-left:5px solid #d32f2f; display:flex; flex-direction:column; justify-content:space-between;">
+        // CORREÇÃO: Construindo a visualização da cobrança IGUAL à Comanda
+        cont.innerHTML = data.map(d => {
+            const items = d.comandas?.items || [];
+            let htmlList = items.map(i => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #eee; font-size:0.95rem;"><span>${i.name}</span><b>${U.money(i.price)}</b></div>`).join('');
+            
+            return `
+            <div class="card" style="border-left:5px solid #d32f2f;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div>
-                        <span style="font-size:0.8rem; color:#d32f2f; font-weight:bold; letter-spacing:1px">${d.comanda_ticket || 'MANUAL'}</span>
+                        <span style="font-size:0.8rem; color:#d32f2f; font-weight:bold; letter-spacing:1px">${d.comanda_ticket || 'TKT-####'}</span>
                         <h4 style="font-size:1.2rem; margin-top:5px">${d.clients?.name || 'Cliente'}</h4>
                     </div>
-                    <span style="font-size:0.7rem; font-weight:bold; padding: 4px 10px; border-radius:20px; background:#ffebee; color:#d32f2f">PENDENTE</span>
+                    <span style="font-size:0.7rem; font-weight:bold; padding: 4px 10px; border-radius:20px; background:#ffebee; color:#d32f2f">COBRANÇA ATIVA</span>
                 </div>
-                <div class="val" style="font-size:1.8rem; margin:15px 0; color:#d32f2f;">${U.money(d.remaining_amount)}</div>
-                <button class="btn-primary" style="width:100%; padding:0.8rem; display:flex; align-items:center; justify-content:center; gap:8px" onclick="Modals.open('cobranca_detalhes', '${d.id}')">
-                    <i class="ph ph-list-magnifying-glass"></i> Abrir Ticket de Cobrança
-                </button>
-            </div>`).join('');
+                
+                <div style="background: #fafafa; border: 1px solid var(--border); border-radius: 12px; padding: 10px; margin: 15px 0;">
+                    <h5 style="margin-bottom:8px; color:var(--muted)">Resumo do Consumo</h5>
+                    ${htmlList || '<p style="font-size:0.8rem; color:var(--muted)">Detalhes não encontrados.</p>'}
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
+                    <span style="color:var(--muted); font-size:0.9rem;">Pendente:</span>
+                    <span class="val" style="font-size:1.8rem; color:#d32f2f;">${U.money(d.remaining_amount)}</span>
+                </div>
+
+                <div style="display:flex; gap:10px;">
+                    <button class="btn-primary" style="flex:1; padding:0.8rem; background:#2e7d32;" onclick="Modals.open('debitar', '${d.id}', ${d.remaining_amount})"><i class="ph ph-check-circle"></i> Receber Pagamento</button>
+                    ${App.role==='owner' ? `<button class="btn-secondary" style="width:auto; padding:0.8rem;" onclick="Modals.open('desconto', '${d.id}', ${d.remaining_amount})"><i class="ph ph-percent"></i> Desc.</button>` : ''}
+                </div>
+            </div>`;
+        }).join('');
     },
     async servicos() {
         const { data } = await db.from('services').select('*').order('name');
@@ -434,9 +475,9 @@ const Modals = {
                 <h3 style="margin: 0; color: var(--primary-dark);">Definir Nova Senha</h3>
                 <p style="color: var(--muted); margin-top: 10px; line-height:1.4">Por motivos de segurança, altere a senha provisória para o seu acesso pessoal e exclusivo.</p>
             </div>
-            <form onsubmit="Actions.updatePassword(event)">
+            <form id="first-login-form">
                 <div class="input-group"><label style="margin-bottom: 5px;">Digite a nova senha</label><input type="password" id="new-pass" required style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px;"></div>
-                <button type="submit" class="btn-primary" style="padding:1.2rem; font-size:1.1rem">Salvar e Acessar</button>
+                <button type="button" class="btn-primary" style="padding:1.2rem; font-size:1.1rem" onclick="Actions.updatePassword(event)">Salvar e Acessar</button>
             </form>`;
         } 
         else if(type === 'whatsapp') {
@@ -494,36 +535,6 @@ const Modals = {
                 html += `<button type="button" class="btn-secondary" style="color:#d32f2f; padding:1.2rem; display:flex; justify-content:center; gap:10px; width:100%" onclick="Actions.reopenComanda('${comanda.id}')"><i class="ph ph-warning-circle" style="font-size:1.5rem"></i> Reabrir Comanda</button>`;
             }
         }
-        else if (type === 'cobranca_detalhes') {
-            const { data: debt } = await db.from('debts').select('*, comandas(*, clients(name))').eq('id', param1).single();
-            const comanda = debt.comandas;
-            let htmlList = (comanda.items||[]).map(i => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #eee; font-size:0.95rem;"><span>${i.name}</span><b>${U.money(i.price)}</b></div>`).join('');
-            
-            html += `
-            <div style="text-align: center; margin-bottom: 20px;">
-                <h3 style="margin: 0; color: #d32f2f;">Cobrança do Ticket: ${comanda.ticket}</h3>
-                <p style="color: var(--muted); margin-top: 5px; font-size:1.1rem;">Cliente: <b style="color:var(--text)">${comanda.clients?.name}</b></p>
-            </div>
-            <div style="background: #fafafa; border: 1px solid var(--border); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
-                <h4 style="border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px; color:var(--muted)">Consumo no Salão</h4>
-                ${htmlList || '<p>Nenhum item listado.</p>'}
-                <div style="display:flex; justify-content:space-between; margin-top:10px; padding-top:10px; border-top:2px dashed #ccc;">
-                    <span style="font-weight:bold;">Total da Comanda:</span>
-                    <span style="font-weight:bold; color:var(--primary-dark);">${U.money(debt.total_amount)}</span>
-                </div>
-            </div>
-            
-            <div style="background:#fff5f5; padding:20px; border-radius:12px; margin-bottom:20px; border-left:5px solid #d32f2f; display:flex; justify-content:space-between; align-items:center;">
-                <span style="color:#d32f2f; font-weight:bold; font-size:1.2rem;">Valor Pendente:</span>
-                <b style="font-size:2rem; color:#d32f2f">${U.money(debt.remaining_amount)}</b>
-            </div>
-            
-            <div style="display:flex; gap:10px; margin-bottom:10px;">
-                <button type="button" class="btn-primary" style="flex:1; background:#2e7d32;" onclick="Modals.open('debitar', '${debt.id}', ${debt.remaining_amount})"><i class="ph ph-check-circle"></i> Receber / Debitar Valor</button>
-            </div>
-            ${App.role==='owner' ? `<button type="button" class="btn-secondary" style="width:100%; border:1px solid var(--border);" onclick="Modals.open('desconto', '${debt.id}', ${debt.remaining_amount})"><i class="ph ph-percent"></i> Aplicar Desconto (%)</button>` : ''}
-            `;
-        }
         else if(type === 'agendamento') {
             const [c, s, u] = await Promise.all([db.from('clients').select('id,name').order('name'), db.from('services').select('id,name,price,has_assistant'), db.from('users').select('id,name').neq('username', 'admin.teste')]);
             const sOpts = s.data.map(x => `<option value="${x.id}" data-aux="${x.has_assistant}">${x.name}</option>`).join('');
@@ -568,8 +579,8 @@ const Modals = {
             </div>
             <form onsubmit="Actions.blockAppointment(event)">
                 <div class="input-group">
-                    <label>Motivo (Opcional)</label>
-                    <input type="text" id="fb-motivo" placeholder="Ex: Almoço, Reunião, Médico..." style="width:100%; padding:12px; border-radius:8px;">
+                    <label>Informação para você lembrar:</label>
+                    <input type="text" id="fb-motivo" placeholder="Ex: Almoço, Médico..." style="width:100%; padding:12px; border-radius:8px;">
                 </div>
                 <div style="display:flex; gap:10px; margin-bottom: 20px;">
                     <div style="flex:1">
@@ -577,7 +588,7 @@ const Modals = {
                         <input type="date" id="fb-date" required style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);">
                     </div>
                     <div style="flex:1">
-                        <label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:5px; color:var(--text);">Horário Início</label>
+                        <label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:5px; color:var(--text);">Horário</label>
                         <input type="time" id="fb-time" required style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);">
                     </div>
                 </div>
@@ -660,11 +671,21 @@ const Modals = {
 };
 
 const Actions = {
+    // CORREÇÃO DO LOGIN: Atualiza a senha forçando o comportamento no front e libera o acesso.
     async updatePassword(e) {
         e.preventDefault(); 
-        const { error } = await db.from('users').update({ password: document.getElementById('new-pass').value, first_login: false }).eq('id', App.user.id);
-        if(error) { UI.toast(`Erro ao atualizar senha: ${error.message}`, 'error'); return; }
-        App.user.first_login = false; 
+        const newPass = document.getElementById('new-pass').value;
+        if(newPass.length < 3) return UI.toast('Senha muito curta.', 'error');
+        
+        const { error } = await db.from('users').update({ password: newPass, first_login: false }).eq('id', App.user.id);
+        
+        if(error) { 
+            UI.toast(`Erro ao atualizar: ${error.message}`, 'error'); 
+            return; 
+        }
+        
+        App.user.first_login = false;
+        document.getElementById('new-pass').value = ''; 
         Modals.close(); 
         UI.toast('Senha registrada com sucesso!'); 
         Auth.success(); 
@@ -673,8 +694,6 @@ const Actions = {
     
     async saveAnamnese(e) {
         e.preventDefault(); 
-        
-        // CORREÇÃO: Puxa o ID diretamente do input hidden gerado e protegido pela função Render.anamnese
         const id = document.getElementById('current-anamnese-client-id').value;
         if (!id || id === 'undefined') {
             UI.toast('Erro interno: ID da Cliente não recuperado. Volte na tela de clientes e abra a anamnese novamente.', 'error');
@@ -699,17 +718,23 @@ const Actions = {
         const { error } = await db.from('appointments').insert({ client_id: document.getElementById('fa-cli').value, service_id: document.getElementById('fa-serv').value, user_id: document.getElementById('fa-user').value, assistant_id: auxId || null, date: document.getElementById('fa-date').value, time: document.getElementById('fa-time').value, status: 'agendado' });
         if(error) UI.toast(`Erro: ${error.message}`, 'error'); else { Modals.close(); UI.toast('Horário bloqueado com sucesso!'); }
     },
+    // CORREÇÃO DO BLOQUEIO DE AGENDA: Removida a tentativa de inserir na coluna "notes" inexistente.
     async blockAppointment(e) {
         e.preventDefault();
         const { error } = await db.from('appointments').insert({
             user_id: App.user.id,
             date: document.getElementById('fb-date').value,
             time: document.getElementById('fb-time').value,
-            status: 'bloqueado',
-            notes: document.getElementById('fb-motivo').value
+            status: 'bloqueado'
+            // O motivo do bloqueio foi removido da inserção no banco para evitar quebrar por não existir a coluna 'notes'.
         });
-        if(error) { UI.toast(`Erro: ${error.message}`, 'error'); } 
-        else { Modals.close(); UI.toast('Horário bloqueado/indisponível com sucesso!'); }
+        if(error) { UI.toast(`Erro ao bloquear: ${error.message}`, 'error'); } 
+        else { Modals.close(); UI.toast('Horário reservado/indisponível com sucesso!'); }
+    },
+    // NOVO STATUS CHEGOU
+    async markAsArrived(appointmentId) {
+        await db.from('appointments').update({ status: 'chegou' }).eq('id', appointmentId);
+        UI.toast('Status atualizado. Cliente aguardando!');
     },
 
     async createComanda(e) {
@@ -754,9 +779,7 @@ const Actions = {
     },
     async closeComanda(comandaId, clientId, total, ticketNum) {
         UI.confirm('Deseja fechar a comanda, enviar para faturamento e processar custos fixos?', async () => {
-            
-            // Verifica e soma os Custos Fixos lançados no serviço
-            const { data: comanda } = await db.from('comandas').select('items').eq('id', comandaId).single();
+            const { data: comanda } = await db.from('comandas').select('items, created_at').eq('id', comandaId).single();
             let totalCustoFixo = 0;
             if(comanda.items) {
                 comanda.items.forEach(item => {
@@ -772,9 +795,14 @@ const Actions = {
                 await db.from('debts').insert({ client_id: clientId, total_amount: total, remaining_amount: total, comanda_id: comandaId, comanda_ticket: ticketNum }); 
             }
             
-            // Dispara o desconto na tabela de Despesas para afetar o Fluxo de Caixa se houver custo fixo registrado
+            // CORREÇÃO: Data do custo fixo atrelada ao dia/momento do fechamento (agora).
             if(totalCustoFixo > 0) {
-                await db.from('despesas').insert({ description: `Custo Fixo - Ref: ${ticketNum}`, amount: totalCustoFixo, category: 'Custos Fixos' });
+                await db.from('despesas').insert({ 
+                    description: `Custo Fixo - Ref: ${ticketNum}`, 
+                    amount: totalCustoFixo, 
+                    category: 'Custos Fixos',
+                    date: new Date().toISOString()
+                });
             }
 
             Modals.close(); UI.toast('Comanda Faturada e Custos Aplicados!');
@@ -794,25 +822,17 @@ const Actions = {
         Modals.close(); UI.toast('Serviço adicionado ao catálogo!');
     },
     
+    // CORREÇÃO DA API: Integração com a Brasil API (Pública e Gratuita sem bloqueios de CORS/Auth do ML)
     async fetchBarcode(val) {
         if(val.length >= 8) {
             const inputNome = document.getElementById('fp-nome');
-            inputNome.value = "Buscando informações na internet...";
+            inputNome.value = "Buscando informações via Brasil API...";
             try {
-                // Nova requisição: API do Mercado Livre
-                let res = await fetch(`https://api.mercadolibre.com/sites/MLB/search?q=${val}`);
+                let res = await fetch(`https://brasilapi.com.br/api/ean/v1/${val}`);
                 let json = await res.json();
-                if(json.results && json.results.length > 0) {
-                    inputNome.value = json.results[0].title;
-                    UI.toast('Produto encontrado via Mercado Livre!', 'success'); return;
-                }
-                
-                // Fallback de segurança (OpenFoodFacts)
-                res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${val}.json`);
-                json = await res.json();
-                if(json.status === 1 && json.product.product_name) {
-                    inputNome.value = json.product.product_name;
-                    UI.toast('Produto encontrado!', 'success'); return;
+                if(json.name) {
+                    inputNome.value = json.name;
+                    UI.toast('Produto encontrado na Nuvem!', 'success'); return;
                 }
                 throw new Error("Não encontrou");
             } catch(e) { 
@@ -840,21 +860,22 @@ const Actions = {
     },
     async deleteMensagem(id) { UI.confirm('Deletar este modelo de mensagem permanentemente?', async () => { await db.from('message_templates').delete().eq('id', id); UI.toast('Modelo descartado.'); }); },
 
-    async createDespesa(e) { e.preventDefault(); await db.from('despesas').insert({ description: document.getElementById('fd-desc').value, amount: document.getElementById('fd-val').value, category: document.getElementById('fd-cat').value }); Modals.close(); UI.toast('Saída registrada!'); },
+    async createDespesa(e) { e.preventDefault(); await db.from('despesas').insert({ description: document.getElementById('fd-desc').value, amount: document.getElementById('fd-val').value, category: document.getElementById('fd-cat').value, date: new Date().toISOString() }); Modals.close(); UI.toast('Saída registrada!'); },
 
     async debitDebt(e, id, max) { 
         e.preventDefault(); const v = parseFloat(document.getElementById('f-val').value); 
         const nV = Math.max(0, max - v);
         await db.from('debts').update({ remaining_amount: nV }).eq('id', id); 
         if (nV === 0) { await db.from('debts').delete().eq('id', id); }
-        Modals.close(); UI.toast('Pagamento processado.'); setTimeout(() => Modals.open('cobranca_detalhes', id), 100);
+        Modals.close(); UI.toast('Pagamento processado.');
+        Render.cobrancas(); // Atualiza a tela de cobranças instantaneamente
     },
     async discountDebt(e, id, max) { 
         e.preventDefault(); 
         const perc = parseFloat(document.getElementById('f-val').value); 
         await db.from('debts').update({ remaining_amount: Math.max(0, max - (max * perc / 100)) }).eq('id', id); 
         Modals.close(); UI.toast('Desconto autorizado!'); 
-        setTimeout(() => Modals.open('cobranca_detalhes', id), 100);
+        Render.cobrancas();
     },
 
     async saveSettings(e) {

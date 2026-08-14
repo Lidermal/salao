@@ -135,7 +135,7 @@ const Render = {
             const cont = document.getElementById('agenda-list');
             if(!data || !data.length) { cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Sua agenda está livre neste dia.</p></div>`; return; }
             cont.innerHTML = data.map(a => `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid var(--primary)">
-                <div><h4 style="font-size:1.2rem">${a.time} - ${a.clients?.name || 'Cliente'}</h4><p style="margin:5px 0; color:var(--muted)">${a.services?.name || '-'}</p><p style="font-size:0.8rem">Prof: <b>${a.users?.name || '-'}</b></p></div>
+                <div><h4 style="font-size:1.2rem">${a.time} - ${a.clients?.name || 'Cliente'}</h4><p style="margin:5px 0; color:var(--muted)">${a.services?.name || '-'}</p><p style="font-size:0.8rem">Profissional: <b>${a.users?.name || '-'}</b></p></div>
                 <div style="background:var(--primary-light); color:var(--primary-dark); padding:5px 12px; border-radius:20px; font-size:0.8rem; font-weight:bold">${a.status.toUpperCase()}</div>
             </div>`).join('');
         } catch (e) { UI.toast(`Erro na agenda: ${e.message}`, 'error'); }

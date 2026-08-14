@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Estúdio Amor que Cuida</title>
-    <link rel="icon" href="data:;base64,iVBORw0KGgo=">
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
@@ -15,9 +14,9 @@
 </head>
 <body>
 
-    <!-- SISTEMA DE ALERTAS E CONFIRMAÇÕES CUSTOMIZADOS -->
+    <!-- ALERTAS E CONFIRMAÇÕES -->
     <div id="toast-container"></div>
-    <div id="custom-confirm" class="overlay hidden">
+    <div id="custom-confirm" class="overlay hidden" style="z-index: 999999;">
         <div class="modal" style="max-width: 400px; text-align: center;">
             <h3 id="confirm-title" style="margin-bottom: 1rem;">Atenção</h3>
             <p id="confirm-msg" style="margin-bottom: 2rem; color: var(--muted);"></p>
@@ -28,7 +27,7 @@
         </div>
     </div>
 
-    <!-- CAMADA DE AUTENTICAÇÃO -->
+    <!-- TELA DE LOGIN / AUTENTICAÇÃO -->
     <div id="auth-layer" class="auth-layer active">
         <section id="login-screen" class="screen active">
             <div class="login-card">
@@ -43,31 +42,32 @@
         </section>
     </div>
 
-    <!-- ESTRUTURA PRINCIPAL -->
+    <!-- SISTEMA PRINCIPAL -->
     <div id="system-layout" class="hidden">
-        
         <aside class="sidebar" id="main-sidebar">
             <div class="sidebar-brand">
                 <i class="ph ph-scissors"></i><span id="brand-name">Amor que Cuida</span>
                 <button class="close-sidebar mobile-only" onclick="Nav.closeMenu()"><i class="ph ph-x"></i></button>
             </div>
             <nav class="sidebar-nav content-scroll">
-                <div class="nav-section">PRINCIPAL</div>
+                <div class="nav-section">ATENDIMENTO</div>
                 <a href="#" class="nav-link active" data-view="agenda"><i class="ph ph-calendar"></i> Agenda</a>
                 <a href="#" class="nav-link" data-view="comandas"><i class="ph ph-receipt"></i> Comandas</a>
                 <a href="#" class="nav-link" data-view="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
-                
-                <div class="nav-section">CADASTROS</div>
                 <a href="#" class="nav-link" data-view="clientes"><i class="ph ph-users"></i> Clientes</a>
-                <a href="#" class="nav-link owner-only" data-view="servicos"><i class="ph ph-sparkle"></i> Serviços</a>
-                <a href="#" class="nav-link owner-only" data-view="produtos"><i class="ph ph-package"></i> Produtos</a>
                 
-                <div class="nav-section owner-only">GESTÃO & INTELIGÊNCIA</div>
-                <a href="#" class="nav-link owner-only" data-view="despesas"><i class="ph ph-trend-down"></i> Despesas</a>
-                <a href="#" class="nav-link owner-only" data-view="mensagens"><i class="ph ph-chat-circle-text"></i> Mensagens</a>
-                <a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Comissão</a>
-                <a href="#" class="nav-link owner-only" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Financeiro</a>
-                <a href="#" class="nav-link owner-only" data-view="performance"><i class="ph ph-chart-line-up"></i> Performance</a>
+                <div class="nav-section owner-only">ESTOQUE & SERVIÇOS</div>
+                <a href="#" class="nav-link owner-only" data-view="servicos"><i class="ph ph-sparkle"></i> Catálogo de Serviços</a>
+                <a href="#" class="nav-link owner-only" data-view="produtos"><i class="ph ph-package"></i> Controle de Produtos</a>
+                
+                <div class="nav-section owner-only">GESTÃO FINANCEIRA</div>
+                <a href="#" class="nav-link owner-only" data-view="despesas"><i class="ph ph-trend-down"></i> Controle de Despesas</a>
+                <a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Comissionamento</a>
+                <a href="#" class="nav-link owner-only" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Fluxo de Caixa</a>
+                
+                <div class="nav-section owner-only">INTELIGÊNCIA</div>
+                <a href="#" class="nav-link owner-only" data-view="performance"><i class="ph ph-chart-line-up"></i> Painel de Performance</a>
+                <a href="#" class="nav-link owner-only" data-view="mensagens"><i class="ph ph-chat-circle-text"></i> Mensagens Prontas</a>
                 
                 <div class="spacer" style="margin-top: 2rem;"></div>
                 <a href="#" class="nav-link owner-only" data-view="configuracoes"><i class="ph ph-gear"></i> Configurações</a>
@@ -80,8 +80,6 @@
         <main class="main-content">
             <header class="top-bar">
                 <h1 id="page-title">Agenda</h1>
-                <!-- Botão Adicionar para Desktop -->
-                <button class="btn-primary desktop-only" style="width: auto; padding: 0.6rem 1.5rem; margin-right: 15px;" onclick="UI.handleFabClick()">+ Adicionar / Novo</button>
                 <div class="user-pill"><span id="header-user">Usuário</span><div class="avatar" id="header-avatar">US</div></div>
             </header>
 
@@ -92,46 +90,81 @@
                         <div class="cal-days" id="cal-days-row"></div>
                     </div>
                     <div id="agenda-list" class="data-list"></div>
+                    <button class="btn-primary desktop-only" style="margin-top:20px" onclick="Modals.open('agendamento')">+ Novo Agendamento</button>
                 </section>
                 
-                <!-- Demais Containers (Preenchidos pelo JS Realtime) -->
-                <section id="view-cobrancas" class="view"><div id="cobrancas-list" class="data-list"></div></section>
-                <section id="view-comandas" class="view"><div id="comandas-list" class="data-grid"></div></section>
-                <section id="view-clientes" class="view"><div id="clientes-list" class="data-grid"></div></section>
+                <section id="view-cobrancas" class="view"><div id="cobrancas-list" class="data-grid"></div></section>
+                
+                <section id="view-comandas" class="view">
+                    <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('comanda')">+ Gerar Nova Comanda</button>
+                    <div id="comandas-list" class="data-grid"></div>
+                </section>
+                
+                <section id="view-clientes" class="view">
+                    <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('cliente')">+ Cadastrar Cliente</button>
+                    <div id="clientes-list" class="data-grid"></div>
+                </section>
+                
                 <section id="view-anamnese" class="view">
-                    <div class="header-actions" style="display:flex; gap:15px; margin-bottom:2rem;">
-                        <button class="btn-secondary" onclick="Nav.showView('clientes')" style="width: auto;"><i class="ph ph-arrow-left"></i> Voltar</button>
-                        <h2 id="anamnese-title">Anamnese</h2>
+                    <div class="header-actions" style="display:flex; gap:15px; margin-bottom:2rem; align-items:center;">
+                        <button class="btn-secondary" onclick="Nav.showView('clientes')" style="width: auto; padding:0.5rem 1rem"><i class="ph ph-arrow-left"></i> Voltar</button>
+                        <h2 id="anamnese-title">Ficha de Avaliação</h2>
                         <input type="hidden" id="current-anamnese-client-id">
                     </div>
-                    <button class="btn-primary" onclick="Modals.open('nova_anamnese')" style="margin-bottom: 1rem;">+ Nova Avaliação</button>
+                    <button class="btn-primary" onclick="Modals.open('nova_anamnese')" style="margin-bottom: 1.5rem; width:auto; padding:0.8rem 1.5rem">+ Nova Avaliação Clínica</button>
                     <div id="anamnese-history-list" class="data-list"></div>
                 </section>
-                <section id="view-servicos" class="view"><div id="servicos-list" class="data-grid"></div></section>
-                <section id="view-produtos" class="view"><div id="produtos-list" class="data-grid"></div></section>
-                <section id="view-mensagens" class="view"><div id="mensagens-list" class="data-grid"></div></section>
+
+                <section id="view-servicos" class="view">
+                    <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('servico')">+ Cadastrar Serviço</button>
+                    <div id="servicos-list" class="data-grid"></div>
+                </section>
+                
+                <section id="view-produtos" class="view">
+                    <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('produto')">+ Registrar Produto</button>
+                    <div id="produtos-list" class="data-grid"></div>
+                </section>
+                
+                <section id="view-mensagens" class="view">
+                    <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('mensagem')">+ Criar Template</button>
+                    <div id="mensagens-list" class="data-grid"></div>
+                </section>
                 
                 <!-- DASHBOARDS -->
                 <section id="view-despesas" class="view">
-                    <canvas id="chart-despesas" style="width:100%; max-height:250px; margin-bottom:1rem"></canvas>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:1rem">
+                        <h2>Gestão de Custos</h2>
+                        <button class="btn-primary desktop-only" style="width:auto; padding:0.6rem 1.2rem" onclick="Modals.open('despesa')">+ Lançar Despesa</button>
+                    </div>
+                    <canvas id="chart-despesas" style="width:100%; max-height:250px; margin-bottom:2rem"></canvas>
                     <div id="despesas-list" class="data-list"></div>
                 </section>
+
                 <section id="view-comissao" class="view"><div id="comissao-dashboard"></div></section>
+                
                 <section id="view-resumo-financeiro" class="view">
-                    <div id="resumo-cards" class="data-grid" style="margin-bottom:1rem"></div>
-                    <div class="card" style="margin-bottom:1rem"><h3>Extrato Detalhado</h3><div id="extrato-list" class="data-list" style="margin-top:10px;"></div></div>
+                    <div id="resumo-cards" class="data-grid" style="margin-bottom:2rem"></div>
+                    <div class="card" style="margin-bottom:1rem">
+                        <h3 style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:10px">Extrato Detalhado</h3>
+                        <div id="extrato-list" class="data-list"></div>
+                    </div>
                 </section>
+                
                 <section id="view-performance" class="view">
-                    <div id="perf-kpis" class="data-grid" style="margin-bottom:1rem"></div>
-                    <canvas id="chart-performance" style="width:100%; max-height:250px; margin-bottom:1rem"></canvas>
+                    <div id="perf-kpis" class="data-grid" style="margin-bottom:1.5rem"></div>
+                    <div class="card" style="margin-bottom:1.5rem">
+                        <h3 style="margin-bottom:10px">Top 5 Serviços Realizados</h3>
+                        <canvas id="chart-performance" style="width:100%; max-height:250px;"></canvas>
+                    </div>
                     <div id="performance-ranking" class="data-grid"></div>
                 </section>
+                
                 <section id="view-configuracoes" class="view">
                     <div class="card">
                         <form onsubmit="Actions.saveSettings(event)">
                             <div class="input-group"><label>Nome do Estúdio</label><input type="text" id="cfg-name" required></div>
-                            <div class="input-group"><label>Número Oficial (WhatsApp) p/ Disparos</label><input type="text" id="cfg-phone" placeholder="Ex: 558699999999" required></div>
-                            <button class="btn-primary" type="submit">Salvar Alterações</button>
+                            <div class="input-group"><label>Número Oficial para WhatsApp (Apenas Números com DDD)</label><input type="text" id="cfg-phone" placeholder="Ex: 558699999999" required></div>
+                            <button class="btn-primary" type="submit">Salvar Configurações</button>
                         </form>
                     </div>
                 </section>
@@ -147,7 +180,9 @@
         </nav>
     </div>
 
-    <div id="modal-container" class="overlay hidden"></div>
+    <!-- CONTAINER DE POP-UPS -->
+    <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
+    
     <script src="script.js"></script>
 </body>
 </html>

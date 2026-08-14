@@ -14,6 +14,16 @@
 </head>
 <body>
 
+    <!-- TELA DE CARREGAMENTO (SPLASH SCREEN) -->
+    <div id="splash-screen" style="position: fixed; inset: 0; background: var(--primary); z-index: 9999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; transition: opacity 0.5s;">
+        <i class="ph ph-scissors" style="font-size: 5rem; margin-bottom: 1rem; animation: pulse 1.5s infinite;"></i>
+        <h1 style="color: white; font-size: 2.8rem; margin-bottom: 0.5rem; text-align:center; font-family: 'Playfair Display', serif;">Estúdio Amor Que Cuida</h1>
+        <p style="font-size: 1.2rem; font-weight: 300; letter-spacing: 2px;">by Andressa Vieira</p>
+    </div>
+    <style>
+        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+    </style>
+
     <!-- ALERTAS E CONFIRMAÇÕES -->
     <div id="toast-container"></div>
     <div id="custom-confirm" class="overlay hidden" style="z-index: 999999;">

@@ -1,23 +1,25 @@
-:root { --primary: #B76E79; --primary-dark: #9a5a63; --primary-light: #f7e9eb; --bg: #FDFDFD; --surface: #FFFFFF; --text: #2C2C2C; --muted: #8E8E93; --border: #F0F0F0; --radius: 20px; --shadow: 0 8px 30px rgba(0,0,0,0.04); --shadow-fab: 0 4px 15px rgba(183, 110, 121, 0.4); }
+:root { --primary: #B76E79; --primary-dark: #9a5a63; --primary-light: #f7e9eb; --bg: #FDFDFD; --surface: #FFFFFF; --text: #2C2C2C; --muted: #8E8E93; --border: #F0F0F0; --radius: 16px; --shadow: 0 4px 20px rgba(0,0,0,0.05); --shadow-fab: 0 4px 15px rgba(183, 110, 121, 0.4); }
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Lato', sans-serif; outline: none; -webkit-tap-highlight-color: transparent; }
 body { background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
 h1, h2, h3 { font-family: 'Playfair Display', serif; color: var(--primary-dark); }
 .hidden { display: none !important; } .text-primary { color: var(--primary); }
 ::-webkit-scrollbar { width: 5px; height: 5px; } ::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 10px; }
 
-#toast-container { position: fixed; top: 20px; right: 20px; z-index: 100000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+#toast-container { position: fixed; top: 20px; right: 20px; z-index: 1000000; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
 .toast { background: var(--surface); color: var(--text); padding: 1rem 1.5rem; border-radius: 12px; box-shadow: var(--shadow); border-left: 4px solid var(--primary); font-weight: 600; animation: slideInRight 0.3s ease, fadeOut 0.3s ease 3s forwards; pointer-events: auto; display: flex; align-items:center; gap:10px; }
 .toast.success { border-color: #2e7d32; } .toast.error { border-color: #d32f2f; }
 
-.auth-layer { position: fixed; inset: 0; z-index: 99999; background: var(--surface); display: flex; justify-content: center; align-items: center; }
+.auth-layer { position: fixed; inset: 0; z-index: 999999; background: var(--surface); display: flex; justify-content: center; align-items: center; }
 .screen { display: none; width: 100%; height: 100%; flex-direction: column; justify-content: center; align-items: center; padding: 2rem; }
 .screen.active { display: flex; animation: fadeIn 0.5s ease-out; }
 .login-card { background: var(--surface); padding: 3rem 2rem; border-radius: var(--radius); box-shadow: var(--shadow); width: 100%; max-width: 400px; text-align: center; border: 1px solid var(--border); }
 
-.input-group { margin-bottom: 1.2rem; text-align: left; } .input-group label { display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; }
+.input-group { margin-bottom: 1.2rem; text-align: left; width: 100%; } .input-group label { display: block; font-size: 0.85rem; font-weight: 700; margin-bottom: 0.5rem; color: var(--text); }
 .input-group input, .input-group select, .input-group textarea { width: 100%; padding: 1rem; border: 1px solid var(--border); border-radius: 12px; font-size: 1rem; background: #fafafa; transition: 0.3s; }
-.btn-primary { width: 100%; padding: 1.2rem; border: none; border-radius: 12px; background: var(--primary); color: white; font-weight: 700; font-size: 1rem; cursor: pointer; box-shadow: var(--shadow-fab); }
-.btn-secondary { background: #f0f0f0; border: none; padding: 1.2rem; border-radius: 12px; font-weight: 700; cursor: pointer; width:100%; color: var(--text); }
+.btn-primary { width: 100%; padding: 1.2rem; border: none; border-radius: 12px; background: var(--primary); color: white; font-weight: 700; font-size: 1rem; cursor: pointer; box-shadow: var(--shadow-fab); transition: 0.2s;}
+.btn-primary:active { transform: scale(0.98); }
+.btn-secondary { background: #f0f0f0; border: none; padding: 1.2rem; border-radius: 12px; font-weight: 700; cursor: pointer; width:100%; color: var(--text); transition: 0.2s; }
+.btn-secondary:hover { background: #e4e4e4; }
 
 #system-layout { display: flex; width: 100%; height: 100vh; position: relative; }
 .sidebar { width: 280px; background: var(--surface); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 1000; }
@@ -36,18 +38,17 @@ h1, h2, h3 { font-family: 'Playfair Display', serif; color: var(--primary-dark);
 .view { display: none; animation: fadeIn 0.4s ease; } .view.active { display: block; }
 .data-list { display: flex; flex-direction: column; gap: 1rem; } .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
 .card { background: var(--surface); padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); position: relative; }
-.card h4 { font-size: 1.15rem; margin-bottom: 0.5rem; color: var(--text); } .card p { color: var(--muted); font-size: 0.9rem; margin-bottom: 0.5rem; }
-.card .val { font-family: 'Playfair Display'; color: var(--primary); font-size: 1.3rem; font-weight: 700; }
 .wpp-btn { position: absolute; top: 1.5rem; right: 1.5rem; width: 45px; height: 45px; border-radius: 50%; background: #25D366; color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
 
 .ios-calendar { background: var(--surface); padding: 1.2rem; border-radius: var(--radius); margin-bottom: 1.5rem; box-shadow: var(--shadow); border: 1px solid var(--border); }
 .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; color: var(--primary-dark); }
 .cal-header button { background: var(--primary-light); border: none; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: var(--primary); cursor: pointer; }
 .cal-days { display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 0.5rem; }
-.cal-day { flex: 0 0 calc(100% / 7 - 0.5rem); display: flex; flex-direction: column; align-items: center; padding: 0.8rem 0; border-radius: 16px; cursor: pointer; }
+.cal-day { flex: 0 0 calc(100% / 7 - 0.5rem); display: flex; flex-direction: column; align-items: center; padding: 0.8rem 0; border-radius: 12px; cursor: pointer; }
 .cal-day.active { background: var(--primary); color: white; }
 
-.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 10000; display: flex; justify-content: center; align-items: center; padding: 1rem; }
+/* CORREÇÃO DO Z-INDEX DO OVERLAY */
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 100000; display: flex; justify-content: center; align-items: center; padding: 1rem; }
 .modal { background: var(--surface); padding: 2rem; border-radius: var(--radius); width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow); position: relative; }
 .modal-close { position: absolute; top: 1.5rem; right: 1.5rem; background: var(--bg); border: none; width: 35px; height: 35px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; }
 

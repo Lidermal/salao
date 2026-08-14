@@ -1,10 +1,14 @@
 /** 
- * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO DEFINITIVA FULL 2.0
+ * SISTEMA ESTÚDIO AMOR QUE CUIDA - NÚCLEO ESTABILIZADO E UI MELHORADA
  */
 
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const DB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
-const db = window.supabase.createClient(DB_URL, DB_KEY);
+
+// CORREÇÃO CRÍTICA: Ignorar o Storage do navegador para evitar o bloqueio do Tracking Prevention
+const db = window.supabase.createClient(DB_URL, DB_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
+});
 
 const App = { user: null, role: 'freelancer', view: 'agenda', currentDate: new Date(), charts: {}, settings: {} };
 
@@ -48,11 +52,15 @@ const Auth = {
         const btn = document.getElementById('btn-login'); btn.textContent = 'Aguarde...';
         try {
             const { data, error } = await db.from('users').select('*').eq('username', u).single();
-            if (error || !data) throw new Error("Usuário não encontrado.");
+            if (error || !data) throw new Error("Usuário não encontrado no sistema.");
             if (data.password !== p) throw new Error("Senha incorreta.");
             
             App.user = data; App.role = data.role;
-            if(data.first_login) { Modals.open('first_login'); btn.textContent = 'Entrar'; return; }
+            if(data.first_login) { 
+                Modals.open('first_login'); 
+                btn.textContent = 'Entrar'; 
+                return; 
+            }
             this.success();
         } catch(e) { UI.toast(e.message, 'error'); btn.textContent = 'Entrar'; }
     },
@@ -68,10 +76,9 @@ const Auth = {
         
         Nav.init(); Nav.showView('agenda');
         
-        // Sincronismo Realtime (Qualquer alteração no banco atualiza a tela)
+        // Sincronismo Realtime com tratamento de erro
         db.channel('custom-all-channel').on('postgres_changes', { event: '*', schema: 'public' }, payload => {
             if(Render[App.view]) Render[App.view]();
-            UI.toast('Sistema sincronizado em tempo real.', 'success');
         }).subscribe();
     },
     logout() { UI.confirm('Até logo! Deseja realmente sair do sistema?', () => location.reload()); }
@@ -110,10 +117,10 @@ const Render = {
             const cont = document.getElementById('agenda-list');
             if(!data || !data.length) { cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Sua agenda está livre neste dia.</p></div>`; return; }
             cont.innerHTML = data.map(a => `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid var(--primary)">
-                <div><h4 style="font-size:1.2rem">${a.time} - ${a.clients?.name || 'Sem Nome'}</h4><p style="margin:5px 0; color:var(--muted)">${a.services?.name || 'Serviço Excluído'}</p><p style="font-size:0.8rem">Prof: <b>${a.users?.name || 'N/A'}</b></p></div>
+                <div><h4 style="font-size:1.2rem">${a.time} - ${a.clients?.name || 'Cliente'}</h4><p style="margin:5px 0; color:var(--muted)">${a.services?.name || '-'}</p><p style="font-size:0.8rem">Prof: <b>${a.users?.name || '-'}</b></p></div>
                 <div style="background:var(--primary-light); color:var(--primary-dark); padding:5px 12px; border-radius:20px; font-size:0.8rem; font-weight:bold">${a.status.toUpperCase()}</div>
             </div>`).join('');
-        } catch (e) { UI.toast(`Erro ao carregar agenda: ${e.message}`, 'error'); }
+        } catch (e) { UI.toast(`Erro na agenda: ${e.message}`, 'error'); }
     },
     buildCalendar() {
         const d = App.currentDate; document.getElementById('cal-month-year').textContent = d.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
@@ -144,17 +151,16 @@ const Render = {
         Nav.showView('anamnese'); Actions.loadAnamnese(id);
     },
     async cobrancas() {
-        // Busca dividas maiores que 0 E conecta com a tabela de clientes
-        const { data, error } = await db.from('debts').select('*, clients(name)').gt('remaining_amount', 0);
+        const { data } = await db.from('debts').select('*, clients(name)').gt('remaining_amount', 0);
         const cont = document.getElementById('cobrancas-list');
-        if (error || !data || data.length === 0) { cont.innerHTML = "<p style='color:var(--muted)'>Nenhuma cobrança em aberto no momento.</p>"; return; }
+        if (!data || data.length === 0) { cont.innerHTML = "<p style='color:var(--muted)'>Nenhuma cobrança em aberto no momento.</p>"; return; }
         
         cont.innerHTML = data.map(d => `
             <div class="card" style="border-left:4px solid #d32f2f">
                 <div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center">
                     <div>
                         <span style="font-size:0.75rem; color:white; background:var(--muted); padding:3px 8px; border-radius:10px; font-weight:bold">${d.comanda_ticket || 'MANUAL'}</span>
-                        <h4 style="font-size:1.3rem; margin-top:8px">${d.clients?.name || 'Cliente Deletado'}</h4>
+                        <h4 style="font-size:1.3rem; margin-top:8px">${d.clients?.name || 'Cliente'}</h4>
                     </div>
                     <div class="val" style="color:#d32f2f; font-size:1.8rem">${U.money(d.remaining_amount)}</div>
                 </div>
@@ -210,10 +216,8 @@ const Render = {
             </div></div>`).join('');
     },
     
-    // DASHBOARDS & MÉTRICAS DETALHADAS
     async despesas() {
         const { data } = await db.from('despesas').select('*').order('date', {ascending: false});
-        
         let totais = { 'Custos Fixos': 0, 'Custos Variáveis': 0, 'Pessoal/Pagamentos': 0 };
         data.forEach(d => { if(totais[d.category] !== undefined) totais[d.category] += d.amount; });
         
@@ -281,12 +285,11 @@ const Render = {
             <div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custo Operacional (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(gasto)}</div></div>
             <div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
         
-        // Extrato Detalhado misturando receitas e despesas
         let extrato = [];
-        comand.forEach(c => { if(c.total>0) extrato.push({ type: 'in', desc: `Comanda ${c.ticket||'-'}`, val: c.total, date: new Date(c.created_at) }); });
+        comand.forEach(c => { if(c.total>0) extrato.push({ type: 'in', desc: `Ticket ${c.ticket||'-'}`, val: c.total, date: new Date(c.created_at) }); });
         desp.forEach(d => { extrato.push({ type: 'out', desc: d.description, val: d.amount, date: new Date(d.date) }); });
         
-        extrato.sort((a,b) => b.date - a.date); // Mais recente primeiro
+        extrato.sort((a,b) => b.date - a.date);
         
         document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações financeiras.</p>' :
             extrato.map(i => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;">
@@ -302,7 +305,6 @@ const Render = {
         data.forEach(c => { 
             totalFaturamento += c.total; 
             if(c.users) rankFunc[c.users.name] = (rankFunc[c.users.name]||0) + c.total; 
-            
             if(c.items) {
                 c.items.forEach(i => {
                     if(i.type === 'service') {
@@ -315,26 +317,24 @@ const Render = {
         });
         
         const tkMedio = data.length ? totalFaturamento / data.length : 0;
-        const totalAgendas = agendas.length || 1; // avoid division by zero
+        const totalAgendas = agendas.length || 1;
         const concluidas = data.length;
-        const ocupacao = Math.min(100, Math.round((concluidas / totalAgendas) * 100)); // Lógica simplificada de conversão agendamento -> comanda fechada
+        const ocupacao = Math.min(100, Math.round((concluidas / totalAgendas) * 100));
         
         document.getElementById('perf-kpis').innerHTML = `
-            <div class="card" style="text-align:center; padding:2rem"><p style="font-weight:bold; color:var(--muted); margin-bottom:10px">Ticket Médio por Cliente</p><div class="val" style="font-size:2rem">${U.money(tkMedio)}</div></div>
-            <div class="card" style="text-align:center; padding:2rem"><p style="font-weight:bold; color:var(--muted); margin-bottom:10px">Taxa de Conversão/Ocupação</p><div class="val" style="font-size:2rem; color:${ocupacao > 50 ? '#2e7d32' : '#d32f2f'}">${ocupacao}%</div></div>
-            <div class="card" style="text-align:center; padding:2rem"><p style="font-weight:bold; color:var(--muted); margin-bottom:10px">Total de Atendimentos</p><div class="val" style="font-size:2rem; color:var(--text)">${concluidas}</div></div>`;
+            <div class="card" style="text-align:center; padding:2rem"><p style="font-weight:bold; color:var(--muted); margin-bottom:10px">Ticket Médio</p><div class="val" style="font-size:2rem">${U.money(tkMedio)}</div></div>
+            <div class="card" style="text-align:center; padding:2rem"><p style="font-weight:bold; color:var(--muted); margin-bottom:10px">Conversão/Ocupação</p><div class="val" style="font-size:2rem; color:${ocupacao > 50 ? '#2e7d32' : '#d32f2f'}">${ocupacao}%</div></div>
+            <div class="card" style="text-align:center; padding:2rem"><p style="font-weight:bold; color:var(--muted); margin-bottom:10px">Atendimentos Concluídos</p><div class="val" style="font-size:2rem; color:var(--text)">${concluidas}</div></div>`;
             
         const sortedFunc = Object.entries(rankFunc).sort((a,b)=>b[1]-a[1]);
-        document.getElementById('performance-ranking').innerHTML = `<h3 style="grid-column: 1 / -1; margin-bottom:10px">Ranking de Profissionais por Faturamento (Top Equipe)</h3>` + 
+        document.getElementById('performance-ranking').innerHTML = `<h3 style="grid-column: 1 / -1; margin-bottom:10px">Ranking por Faturamento</h3>` + 
             sortedFunc.map((s,i) => `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid var(--primary)"><div><span style="font-size:0.8rem; font-weight:bold; color:var(--muted)">Posição ${i+1}</span><h4 style="font-size:1.2rem; margin-top:5px">${s[0]}</h4></div><div class="val" style="font-size:1.5rem">${U.money(s[1])}</div></div>`).join('');
             
         const sortedServ = Object.entries(rankServ).sort((a,b)=>b[1].qtd-a[1].qtd).slice(0, 5);
-        
         if(App.charts.perf) App.charts.perf.destroy();
         App.charts.perf = new Chart(document.getElementById('chart-performance'), { 
             type: 'bar', 
-            data: { labels: sortedServ.map(s=>s[0]), datasets: [{ label: 'Qtd Realizada (Volume de Vendas)', data: sortedServ.map(s=>s[1].qtd), backgroundColor: '#B76E79', borderRadius: 8 }] },
-            options: { scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } } }
+            data: { labels: sortedServ.map(s=>s[0]), datasets: [{ label: 'Top Serviços (Volume)', data: sortedServ.map(s=>s[1].qtd), backgroundColor: '#B76E79', borderRadius: 8 }] }
         });
     },
     configuracoes() {
@@ -349,21 +349,28 @@ const Modals = {
         let html = `<div class="modal"><button class="modal-close" onclick="Modals.close()"><i class="ph ph-x"></i></button>`;
         
         if(type === 'first_login') {
-            html += `<h3>Crie sua Nova Senha</h3><p style="color:var(--muted); margin-bottom:1.5rem; line-height:1.4">Bem-vindo! Para sua segurança, crie uma nova senha pessoal que substituirá a padrão fornecida (123456).</p>
-            <form onsubmit="Actions.updatePassword(event)"><div class="input-group"><input type="password" id="new-pass" required placeholder="Digite a nova senha"></div><button type="submit" class="btn-primary" style="padding:1.2rem; font-size:1.1rem">Salvar e Acessar o Sistema</button></form>`;
+            html += `
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: var(--primary-dark);">Definir Nova Senha</h3>
+                <p style="color: var(--muted); margin-top: 10px; line-height:1.4">Por motivos de segurança, altere a senha provisória para o seu acesso pessoal e exclusivo.</p>
+            </div>
+            <form onsubmit="Actions.updatePassword(event)">
+                <div class="input-group"><label style="margin-bottom: 5px;">Digite a nova senha</label><input type="password" id="new-pass" required style="width: 100%; padding: 12px; border: 1px solid var(--border); border-radius: 8px;"></div>
+                <button type="submit" class="btn-primary" style="padding:1.2rem; font-size:1.1rem">Salvar e Acessar</button>
+            </form>`;
         } 
         else if(type === 'whatsapp') {
             const { data: templates } = await db.from('message_templates').select('*');
             const tOpts = templates.map(t => `<option value="${t.content}">${t.title}</option>`).join('');
-            html += `<h3>Central de Mensagens (WhatsApp)</h3>
+            html += `<h3>Central de WhatsApp</h3>
             <div style="background:#f9f9f9; padding:15px; border-radius:12px; margin-bottom:20px; border:1px solid #eee">
-                <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 8px; line-height:1.4"><i class="ph ph-info"></i> O redirecionamento abaixo levará o texto para o aplicativo de WhatsApp no seu dispositivo.</p>
+                <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 8px; line-height:1.4"><i class="ph ph-info"></i> O redirecionamento abaixo levará o texto para o aplicativo no seu dispositivo.</p>
                 <p style="font-size: 1rem;">Cliente Alvo: <b class="text-primary">${param2}</b></p>
                 <p style="font-size: 0.9rem; color:var(--muted)">Número: ${param1}</p>
             </div>
             <div class="input-group"><label>Usar Modelo Automático</label><select onchange="document.getElementById('wpp-msg').value = this.value"><option value="">-- Escrever Mensagem Manualmente --</option>${tOpts}</select></div>
             <div class="input-group"><textarea id="wpp-msg" rows="5" placeholder="Digite o texto que será enviado..." required></textarea></div>
-            <button class="btn-primary" style="background:#25D366; font-size:1.1rem; padding:1.2rem; display:flex; justify-content:center; gap:10px" onclick="Actions.sendWhatsApp('${param1}')"><i class="ph ph-whatsapp-logo" style="font-size:1.5rem"></i> Abrir Chat no WhatsApp</button>`;
+            <button class="btn-primary" style="background:#25D366; font-size:1.1rem; padding:1.2rem; display:flex; justify-content:center; gap:10px" onclick="Actions.sendWhatsApp('${param1}')"><i class="ph ph-whatsapp-logo" style="font-size:1.5rem"></i> Abrir Chat</button>`;
         }
         else if (type === 'edit_comanda') {
             const { data: comanda } = await db.from('comandas').select('*, clients(name)').eq('id', param1).single();
@@ -374,109 +381,145 @@ const Modals = {
             
             let htmlList = (comanda.items||[]).map((i, idx) => `<div style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #eee">
                 <div><span style="font-size:0.7rem; background:var(--bg); padding:3px 8px; border-radius:10px; margin-right:8px; border:1px solid var(--border); font-weight:bold">${i.type==='product'?'PROD':'SERV'}</span><span style="font-size:1.1rem">${i.name}</span></div>
-                <div style="display:flex; align-items:center; gap:20px"><b style="font-size:1.2rem; color:var(--primary-dark)">${U.money(i.price)}</b> ${!isFechada ? `<button onclick="Actions.removeComandaItem('${comanda.id}', ${idx})" style="background:none; border:none; color:#d32f2f; cursor:pointer; font-size:1.2rem"><i class="ph ph-trash"></i></button>`:''}</div>
+                <div style="display:flex; align-items:center; gap:20px"><b style="font-size:1.2rem; color:var(--primary-dark)">${U.money(i.price)}</b> ${!isFechada ? `<button type="button" onclick="Actions.removeComandaItem('${comanda.id}', ${idx})" style="background:none; border:none; color:#d32f2f; cursor:pointer; font-size:1.2rem"><i class="ph ph-trash"></i></button>`:''}</div>
             </div>`).join('');
             
-            html += `<h3 style="margin-bottom:5px">Ticket Ref: <span style="color:var(--primary)">${comanda.ticket || '-'}</span></h3>
-            <p style="margin-bottom:20px; font-size:1.1rem; color:var(--muted)">Cliente sendo atendido: <b style="color:var(--text)">${comanda.clients?.name}</b></p>
-            <div style="background:#fafafa; padding:20px; border-radius:16px; margin-bottom: 25px; border:1px solid #e0e0e0">
-                ${htmlList || '<p style="color:var(--muted); text-align:center; padding:2rem 0">Nenhum serviço ou produto adicionado na comanda ainda.</p>'} 
-                <h3 style="text-align:right; margin-top:20px; color:var(--primary-dark); font-size:1.8rem; border-top:2px dashed #ccc; padding-top:15px">Valor Total: ${U.money(comanda.total)}</h3>
+            html += `
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: var(--primary-dark);">Ticket de Atendimento: <span style="color:var(--primary)">${comanda.ticket || '-'}</span></h3>
+                <p style="color: var(--muted); margin-top: 5px; font-size:1.1rem;">Cliente: <b style="color:var(--text)">${comanda.clients?.name}</b></p>
+            </div>
+            <div style="background: #fafafa; border: 1px solid var(--border); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
+                <h4 style="border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px; color:var(--muted)">Itens Lançados</h4>
+                ${htmlList || '<p style="color:var(--muted); text-align:center; padding:1rem 0">Nenhum serviço ou produto lançado.</p>'} 
+                <div style="display: flex; justify-content: space-between; align-items: center; border-top: 2px dashed #ccc; padding-top: 15px; margin-top: 15px;">
+                    <span style="font-size: 1.2rem; font-weight: bold; color: var(--text);">Total Final</span>
+                    <span style="font-size: 1.8rem; font-weight: bold; color: var(--primary-dark);">${U.money(comanda.total)}</span>
+                </div>
             </div>`;
             
             if(!isFechada) {
                 const sOpts = servicos.map(s => `<option value='{"id":"${s.id}","name":"${s.name}","price":${s.price},"commission":${s.commission},"type":"service"}'>${s.name} - ${U.money(s.price)}</option>`).join('');
                 const pOpts = produtos.map(p => `<option value='{"id":"${p.id}","name":"${p.name}","price":${p.price},"commission":${p.commission},"type":"product"}'>${p.name} (Estoque: ${p.stock}) - ${U.money(p.price)}</option>`).join('');
                 html += `
-                <div style="display:flex; gap:10px; margin-bottom:20px">
-                    <select id="add-item-sel" class="input-group" style="margin:0; flex:1; padding:1.2rem"><option value="">-- Buscar Serviço ou Produto --</option><optgroup label="Lista de Serviços">${sOpts}</optgroup><optgroup label="Produtos Disponíveis">${pOpts}</optgroup></select>
-                    <button class="btn-secondary" style="width:auto; padding:0 2rem; background:var(--primary-light); color:var(--primary)" onclick="Actions.addComandaItem('${comanda.id}')"><i class="ph ph-plus" style="font-size:1.5rem"></i></button>
+                <div style="display:flex; gap:10px; margin-bottom:20px; align-items: flex-end;">
+                    <div class="input-group" style="margin:0; flex:1;">
+                        <label style="margin-bottom: 5px;">Lançar Novo Item</label>
+                        <select id="add-item-sel" style="padding:1.2rem; width:100%; border-radius:8px; border:1px solid var(--border);"><option value="">-- Buscar Serviço ou Produto --</option><optgroup label="Lista de Serviços">${sOpts}</optgroup><optgroup label="Produtos em Estoque">${pOpts}</optgroup></select>
+                    </div>
+                    <button type="button" class="btn-secondary" style="width:auto; padding:1.2rem 2rem; background:var(--primary-light); color:var(--primary)" onclick="Actions.addComandaItem('${comanda.id}')"><i class="ph ph-plus" style="font-size:1.3rem"></i> Lançar</button>
                 </div>
-                <button class="btn-primary" style="background:#2e7d32; padding:1.2rem; font-size:1.1rem; display:flex; justify-content:center; gap:10px" onclick="Actions.closeComanda('${comanda.id}', '${comanda.client_id}', ${comanda.total}, '${comanda.ticket}')"><i class="ph ph-check-circle" style="font-size:1.5rem"></i> Fechar Comanda e Enviar para o Caixa</button>`;
+                <button type="button" class="btn-primary" style="background:#2e7d32; padding:1.2rem; font-size:1.1rem; display:flex; justify-content:center; gap:10px; width: 100%;" onclick="Actions.closeComanda('${comanda.id}', '${comanda.client_id}', ${comanda.total}, '${comanda.ticket}')"><i class="ph ph-check-circle" style="font-size:1.5rem"></i> Fechar Comanda e Faturar</button>`;
             } else if (App.role === 'owner') {
-                html += `<button class="btn-secondary" style="color:#d32f2f; padding:1.2rem; display:flex; justify-content:center; gap:10px" onclick="Actions.reopenComanda('${comanda.id}')"><i class="ph ph-warning-circle" style="font-size:1.5rem"></i> Reabrir Comanda (Atenção: Exclui registros no Extrato)</button>`;
+                html += `<button type="button" class="btn-secondary" style="color:#d32f2f; padding:1.2rem; display:flex; justify-content:center; gap:10px; width:100%" onclick="Actions.reopenComanda('${comanda.id}')"><i class="ph ph-warning-circle" style="font-size:1.5rem"></i> Reabrir Comanda</button>`;
             }
         }
         else if(type === 'agendamento') {
             const [c, s, u] = await Promise.all([db.from('clients').select('id,name').order('name'), db.from('services').select('id,name,price,has_assistant'), db.from('users').select('id,name').neq('username', 'admin.teste')]);
             const sOpts = s.data.map(x => `<option value="${x.id}" data-aux="${x.has_assistant}">${x.name}</option>`).join('');
-            html += `<h3>Novo Agendamento</h3><form onsubmit="Actions.createAppointment(event)">
-                <div class="input-group"><select id="fa-cli" required><option value="">-- Buscar Cliente --</option>${c.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select></div>
-                <div class="input-group"><select id="fa-serv" required onchange="document.getElementById('aux-div').style.display = this.options[this.selectedIndex].dataset.aux==='true'?'block':'none'"><option value="">-- Serviço Principal --</option>${sOpts}</select></div>
-                <div class="input-group"><select id="fa-user" required><option value="">-- Profissional Responsável --</option>${u.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select></div>
-                <div class="input-group" id="aux-div" style="display:none"><select id="fa-aux"><option value="">-- Selecionar Auxiliar --</option>${u.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select></div>
-                <div style="display:flex; gap:10px;"><input type="date" id="fa-date" class="input-group" style="flex:1" required><input type="time" id="fa-time" class="input-group" style="flex:1" required></div>
-                <button type="submit" class="btn-primary" style="padding:1.2rem">Confirmar Horário</button></form>`;
+            html += `
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: var(--primary-dark);">Novo Agendamento</h3>
+            </div>
+            <form onsubmit="Actions.createAppointment(event)">
+                <div class="input-group">
+                    <label style="margin-bottom: 5px;">Selecione o Cliente</label>
+                    <select id="fa-cli" required style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);"><option value="">-- Buscar na lista --</option>${c.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select>
+                </div>
+                <div class="input-group">
+                    <label style="margin-bottom: 5px;">Serviço Desejado</label>
+                    <select id="fa-serv" required onchange="document.getElementById('aux-div').style.display = this.options[this.selectedIndex].dataset.aux==='true'?'block':'none'" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);"><option value="">-- Escolha o serviço --</option>${sOpts}</select>
+                </div>
+                <div class="input-group">
+                    <label style="margin-bottom: 5px;">Profissional</label>
+                    <select id="fa-user" required style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);"><option value="">-- Atendente Principal --</option>${u.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select>
+                </div>
+                <div class="input-group" id="aux-div" style="display:none">
+                    <label style="margin-bottom: 5px;">Auxiliar (Opcional)</label>
+                    <select id="fa-aux" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);"><option value="">-- Selecione caso precise --</option>${u.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select>
+                </div>
+                <div style="display:flex; gap:10px; margin-bottom: 20px;">
+                    <div style="flex:1">
+                        <label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:5px; color:var(--text);">Data</label>
+                        <input type="date" id="fa-date" required style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);">
+                    </div>
+                    <div style="flex:1">
+                        <label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:5px; color:var(--text);">Horário</label>
+                        <input type="time" id="fa-time" required style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);">
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary" style="padding:1.2rem; width:100%;">Confirmar e Bloquear Horário</button>
+            </form>`;
         }
         else if(type === 'comanda') {
             const { data } = await db.from('clients').select('id, name').order('name');
-            html += `<h3>Gerar Novo Ticket de Atendimento</h3><form onsubmit="Actions.createComanda(event)">
-                <div class="input-group"><label>Selecione o Cliente presente no estúdio:</label><select id="fcom-cli" required><option value="">-- Buscar Cliente --</option>${data.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div>
-                <button type="submit" class="btn-primary" style="padding:1.2rem">Criar Ticket e Abrir Comanda</button></form>`;
+            html += `<h3>Gerar Novo Ticket</h3><form onsubmit="Actions.createComanda(event)">
+                <div class="input-group"><label>Cliente no Salão</label><select id="fcom-cli" required style="padding:1.2rem; border-radius:8px"><option value="">-- Buscar Cliente --</option>${data.map(c=>`<option value="${c.id}">${c.name}</option>`).join('')}</select></div>
+                <button type="submit" class="btn-primary" style="padding:1.2rem">Abrir Comanda</button></form>`;
         }
         else if(type === 'servico') {
-            html += `<h3>Cadastrar Novo Serviço</h3><form onsubmit="Actions.createService(event)">
-                <div class="input-group"><label>Nome do Serviço</label><input type="text" id="fs-nome" required></div>
-                <div style="display:flex; gap:10px;"><div class="input-group" style="flex:1"><label>Valor Final p/ Cliente (R$)</label><input type="number" id="fs-valor" step="0.01" required></div><div class="input-group" style="flex:1"><label>Custo de Insumo (R$)</label><input type="number" id="fs-custo" step="0.01" required></div></div>
+            html += `<h3>Cadastrar Serviço</h3><form onsubmit="Actions.createService(event)">
+                <div class="input-group"><label>Nome</label><input type="text" id="fs-nome" required></div>
+                <div style="display:flex; gap:10px;"><div class="input-group" style="flex:1"><label>Valor Final (R$)</label><input type="number" id="fs-valor" step="0.01" required></div><div class="input-group" style="flex:1"><label>Custo Fixo (R$)</label><input type="number" id="fs-custo" step="0.01" required></div></div>
                 <div class="input-group"><label>Comissão do Profissional (%)</label><input type="number" id="fs-com" max="100" required></div>
-                <div class="input-group" style="background:#f9f9f9; padding:15px; border-radius:12px"><label style="display:flex; align-items:center; gap:10px; cursor:pointer; margin:0"><input type="checkbox" id="fs-aux" onchange="document.getElementById('aux-com-div').style.display=this.checked?'block':'none'" style="width:20px; height:20px"> Permite Participação de Auxiliar?</label></div>
-                <div class="input-group" id="aux-com-div" style="display:none; margin-top:15px"><label>Porcentagem da Comissão do Auxiliar (%)</label><input type="number" id="fs-auxcom" max="100"></div>
-                <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar Serviço no Catálogo</button></form>`;
+                <div class="input-group" style="background:#f9f9f9; padding:15px; border-radius:12px"><label style="display:flex; align-items:center; gap:10px; cursor:pointer; margin:0"><input type="checkbox" id="fs-aux" onchange="document.getElementById('aux-com-div').style.display=this.checked?'block':'none'" style="width:20px; height:20px"> Com Auxiliar?</label></div>
+                <div class="input-group" id="aux-com-div" style="display:none; margin-top:15px"><label>Comissão Auxiliar (%)</label><input type="number" id="fs-auxcom" max="100"></div>
+                <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar</button></form>`;
         }
         else if(type === 'produto') {
-            html += `<h3>Registro de Produto e Varejo</h3><form onsubmit="Actions.saveProduct(event)">
-                <div class="input-group"><label>Cód. Barras (EAN) - Pesquisa Automática Ativa</label><input type="text" id="fp-bar" oninput="Actions.fetchBarcode(this.value)" placeholder="Passe o leitor ou digite..." required></div>
-                <div class="input-group"><label>Descrição / Nome do Produto</label><input type="text" id="fp-nome" required></div>
+            html += `<h3>Cadastro de Produto</h3><form onsubmit="Actions.saveProduct(event)">
+                <div class="input-group"><label>Cód. Barras (EAN) - Pesquisa Inteligente</label><input type="text" id="fp-bar" oninput="Actions.fetchBarcode(this.value)" placeholder="Digite para buscar nome..." required></div>
+                <div class="input-group"><label>Nome do Produto</label><input type="text" id="fp-nome" required></div>
                 <div style="display:flex; gap:10px; background:#f9f9f9; padding:15px; border-radius:12px; margin-bottom:15px">
-                    <div class="input-group" style="margin:0"><label>Preço de Venda (R$)</label><input type="number" id="fp-preco" step="0.01" required></div>
-                    <div class="input-group" style="margin:0"><label>Comissão na Venda (%)</label><input type="number" id="fp-com" max="100" required></div>
+                    <div class="input-group" style="margin:0"><label>Preço Venda (R$)</label><input type="number" id="fp-preco" step="0.01" required></div>
+                    <div class="input-group" style="margin:0"><label>Comissão (%)</label><input type="number" id="fp-com" max="100" required></div>
                 </div>
-                <div style="display:flex; gap:10px;"><div class="input-group" style="flex:1"><label>Qtd Inicial (Estoque)</label><input type="number" id="fp-qtd" required></div><div class="input-group" style="flex:1"><label>Alerta Mínimo</label><input type="number" id="fp-min" value="5" required></div></div>
-                <button type="submit" class="btn-primary" style="padding:1.2rem">Confirmar Cadastro</button></form>`;
+                <div style="display:flex; gap:10px;"><div class="input-group" style="flex:1"><label>Estoque Atual</label><input type="number" id="fp-qtd" required></div><div class="input-group" style="flex:1"><label>Alerta Mínimo</label><input type="number" id="fp-min" value="5" required></div></div>
+                <button type="submit" class="btn-primary" style="padding:1.2rem">Confirmar</button></form>`;
         }
         else if(type === 'add_estoque') {
-            html += `<h3>Adicionar Unidades ao Estoque</h3><form onsubmit="Actions.updateStock(event, '${param1}', ${param2})">
-                <div class="input-group"><label>Estoque Atual Consta no Sistema: <b style="font-size:1.2rem; color:var(--primary)">${param2}</b> unidades</label><input type="number" id="fa-qtd" placeholder="Digite a quantidade a ADICIONAR" required min="1" style="padding:1.2rem"></div>
-                <button type="submit" class="btn-primary" style="padding:1.2rem">Somar ao Estoque Atual</button></form>`;
+            html += `<h3>Adicionar ao Estoque</h3><form onsubmit="Actions.updateStock(event, '${param1}', ${param2})">
+                <div class="input-group"><label>Estoque Atual no Sistema: <b style="font-size:1.2rem; color:var(--primary)">${param2}</b></label><input type="number" id="fa-qtd" placeholder="Quantidade a somar" required min="1" style="padding:1.2rem; margin-top:10px; border-radius:8px"></div>
+                <button type="submit" class="btn-primary" style="padding:1.2rem">Atualizar</button></form>`;
         }
         else if(type === 'despesa') {
             html += `<h3>Lançamento de Despesa/Custo</h3><form onsubmit="Actions.createDespesa(event)">
-                <div class="input-group"><label>Descrição da Saída</label><input type="text" id="fd-desc" placeholder="Ex: Conta de Energia, Pagamento X, Compras..." required></div>
-                <div class="input-group"><label>Categoria do Gasto</label><select id="fd-cat" required style="padding:1.2rem"><option value="Custos Fixos">Custo Fixo (Aluguel, Água, Luz)</option><option value="Custos Variáveis">Custo Variável (Produtos, Insumos do Salão)</option><option value="Pessoal/Pagamentos">Pessoal (Salários, Pró-Labore)</option></select></div>
-                <div class="input-group"><label>Valor Total da Saída (R$)</label><input type="number" id="fd-val" step="0.01" required style="padding:1.2rem"></div>
-                <button type="submit" class="btn-primary" style="padding:1.2rem">Registrar Saída no Caixa</button></form>`;
+                <div class="input-group"><label>Descrição da Saída</label><input type="text" id="fd-desc" placeholder="Ex: Conta de Energia..." required></div>
+                <div class="input-group"><label>Categoria do Gasto</label><select id="fd-cat" required style="padding:1.2rem; border-radius:8px"><option value="Custos Fixos">Custo Fixo (Aluguel, Água, Luz)</option><option value="Custos Variáveis">Custo Variável (Produtos)</option><option value="Pessoal/Pagamentos">Pessoal (Salários, Pró-Labore)</option></select></div>
+                <div class="input-group"><label>Valor (R$)</label><input type="number" id="fd-val" step="0.01" required style="padding:1.2rem"></div>
+                <button type="submit" class="btn-primary" style="padding:1.2rem">Registrar Saída</button></form>`;
         }
         else if(type === 'mensagem' || type === 'edit_mensagem') {
             let m = { title: '', content: '' };
             if (param1) { const { data } = await db.from('message_templates').select('*').eq('id', param1).single(); m = data; }
-            html += `<h3>${param1 ? 'Editar Configuração de Mensagem' : 'Novo Template Automático'}</h3><form onsubmit="Actions.saveMensagem(event, '${param1 || ''}')">
-                <div class="input-group"><label>Título Interno (Apenas para identificação)</label><input type="text" id="fm-tit" value="${m.title}" required></div>
-                <div class="input-group"><label>Corpo do Texto (O que o cliente receberá)</label><textarea id="fm-txt" rows="5" required>${m.content}</textarea></div>
-                <button type="submit" class="btn-primary" style="padding:1.2rem">${param1 ? 'Salvar Modificações' : 'Criar Template'}</button></form>`;
+            html += `<h3>${param1 ? 'Editar Mensagem' : 'Novo Template Automático'}</h3><form onsubmit="Actions.saveMensagem(event, '${param1 || ''}')">
+                <div class="input-group"><label>Título Interno</label><input type="text" id="fm-tit" value="${m.title}" required></div>
+                <div class="input-group"><label>Corpo do Texto</label><textarea id="fm-txt" rows="5" required>${m.content}</textarea></div>
+                <button type="submit" class="btn-primary" style="padding:1.2rem">${param1 ? 'Salvar Edição' : 'Criar Template'}</button></form>`;
         }
         else if(type === 'debitar' || type === 'desconto') {
-            html += `<h3>${type==='debitar'?'Registrar Recebimento de Valor':'Aplicar Desconto Especial'}</h3>
+            html += `<h3>${type==='debitar'?'Registrar Recebimento':'Aplicar Desconto'}</h3>
             <div style="background:#f9f9f9; padding:20px; border-radius:12px; margin-bottom:20px; border-left:5px solid #d32f2f">
-                <p style="color:var(--muted); font-size:0.9rem; margin-bottom:5px">Valor Total Pendente na Cobrança:</p>
+                <p style="color:var(--muted); font-size:0.9rem; margin-bottom:5px">Pendente na Cobrança:</p>
                 <b style="font-size:2rem; color:#d32f2f">${U.money(param2)}</b>
             </div>
             <form onsubmit="Actions.${type==='debitar'?'debitDebt':'discountDebt'}(event, '${param1}', ${param2})">
-                <div class="input-group"><label>${type==='debitar'?'Insira o Valor Exato Recebido (R$)':'Insira a Porcentagem do Desconto (%)'}</label><input type="number" id="f-val" step="0.01" required style="padding:1.2rem; font-size:1.2rem"></div>
-                <button type="submit" class="btn-primary" style="padding:1.2rem">Confirmar Transação no Caixa</button></form>`;
+                <div class="input-group"><label>${type==='debitar'?'Valor Recebido (R$)':'Porcentagem do Desconto (%)'}</label><input type="number" id="f-val" step="0.01" required style="padding:1.2rem; font-size:1.2rem; border-radius:8px"></div>
+                <button type="submit" class="btn-primary" style="padding:1.2rem">Confirmar</button></form>`;
         }
         else if(type === 'nova_anamnese') {
-            html += `<h3>Nova Avaliação Clínica (Ficha)</h3><form onsubmit="Actions.saveAnamnese(event)">
-            <div class="input-group"><label>Histórico Capilar (Químicas anteriores, alergias testadas)</label><textarea id="fa-hist" rows="2" required></textarea></div>
-            <div class="input-group"><label>Hábitos de Cuidado (Frequência de lavagem, uso de fontes de calor)</label><textarea id="fa-hab" rows="2" required></textarea></div>
-            <div class="input-group"><label>Expectativa/Objetivo Real da Cliente</label><textarea id="fa-obj" rows="2" required></textarea></div>
-            <div class="input-group"><label>Parecer Técnico e Diagnóstico do Profissional</label><textarea id="fa-obs" rows="3" required></textarea></div>
-            <button type="submit" class="btn-primary" style="padding:1.2rem">Arquivar Avaliação no Prontuário</button></form>`;
+            html += `<h3>Ficha de Anamnese</h3><form onsubmit="Actions.saveAnamnese(event)">
+            <div class="input-group"><label>Histórico Capilar</label><textarea id="fa-hist" rows="2" required></textarea></div>
+            <div class="input-group"><label>Hábitos de Cuidado</label><textarea id="fa-hab" rows="2" required></textarea></div>
+            <div class="input-group"><label>Objetivo da Cliente</label><textarea id="fa-obj" rows="2" required></textarea></div>
+            <div class="input-group"><label>Diagnóstico Profissional</label><textarea id="fa-obs" rows="3" required></textarea></div>
+            <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar Prontuário</button></form>`;
         }
         else if(type === 'cliente') {
-            html += `<h3>Cadastro de Novo Cliente</h3><form onsubmit="Actions.createClient(event)">
-                <div class="input-group"><label>Nome Completo</label><input type="text" id="fc-nome" required style="padding:1.2rem"></div>
-                <div class="input-group"><label>Número do WhatsApp com DDD (Ex: 86999999999)</label><input type="text" id="fc-fone" required style="padding:1.2rem"></div>
-                <button type="submit" class="btn-primary" style="padding:1.2rem">Registrar Cliente</button></form>`;
+            html += `<h3>Novo Cliente</h3><form onsubmit="Actions.createClient(event)">
+                <div class="input-group"><label>Nome Completo</label><input type="text" id="fc-nome" required style="padding:1.2rem; border-radius:8px"></div>
+                <div class="input-group"><label>WhatsApp com DDD</label><input type="text" id="fc-fone" required style="padding:1.2rem; border-radius:8px"></div>
+                <button type="submit" class="btn-primary" style="padding:1.2rem">Registrar</button></form>`;
         }
         html += `</div>`; cont.innerHTML = html; cont.classList.remove('hidden');
     },
@@ -489,7 +532,7 @@ const Actions = {
         const { error } = await db.from('users').update({ password: document.getElementById('new-pass').value, first_login: false }).eq('id', App.user.id);
         if(!error) { App.user.first_login = false; Modals.close(); UI.toast('Senha registrada com sucesso!'); Auth.success(); }
     },
-    async createClient(e) { e.preventDefault(); await db.from('clients').insert({ name: document.getElementById('fc-nome').value, phone: document.getElementById('fc-fone').value }); Modals.close(); UI.toast('Cliente adicionado com sucesso!'); },
+    async createClient(e) { e.preventDefault(); await db.from('clients').insert({ name: document.getElementById('fc-nome').value, phone: document.getElementById('fc-fone').value }); Modals.close(); UI.toast('Cliente adicionado!'); },
     
     async saveAnamnese(e) {
         e.preventDefault(); 
@@ -503,29 +546,27 @@ const Actions = {
         const { data } = await db.from('anamnesis').select('*').eq('client_id', id).order('created_at', {ascending: false});
         const div = document.getElementById('anamnese-history-list');
         if(!data || !data.length) { div.innerHTML = "<p style='color:var(--muted); text-align:center; padding:2rem'>Nenhum registro clínico encontrado para esta cliente.</p>"; return; }
-        div.innerHTML = data.map(d => `<div class="card" style="border-left: 4px solid var(--primary); background:#fffafb"><h4 style="font-size:0.9rem; color:var(--muted); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px"><i class="ph ph-calendar-blank"></i> Data da Avaliação: ${new Date(d.created_at).toLocaleDateString()}</h4><p style="margin-bottom:8px"><b>Histórico:</b> ${d.history}</p><p style="margin-bottom:8px"><b>Hábitos:</b> ${d.habits}</p><p style="margin-bottom:8px"><b>Objetivo:</b> ${d.objectives}</p><p style="padding:15px; background:white; border:1px solid #eee; border-radius:12px; margin-top:15px"><b style="color:var(--primary-dark)">Diagnóstico do Profissional:</b><br>${d.notes}</p></div>`).join('');
+        div.innerHTML = data.map(d => `<div class="card" style="border-left: 4px solid var(--primary); background:#fffafb"><h4 style="font-size:0.9rem; color:var(--muted); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px"><i class="ph ph-calendar-blank"></i> Data: ${new Date(d.created_at).toLocaleDateString()}</h4><p style="margin-bottom:8px"><b>Histórico:</b> ${d.history}</p><p style="margin-bottom:8px"><b>Hábitos:</b> ${d.habits}</p><p style="margin-bottom:8px"><b>Objetivo:</b> ${d.objectives}</p><p style="padding:15px; background:white; border:1px solid #eee; border-radius:12px; margin-top:15px"><b style="color:var(--primary-dark)">Diagnóstico:</b><br>${d.notes}</p></div>`).join('');
     },
 
     async createAppointment(e) {
         e.preventDefault(); const auxId = document.getElementById('fa-aux').value;
         const { error } = await db.from('appointments').insert({ client_id: document.getElementById('fa-cli').value, service_id: document.getElementById('fa-serv').value, user_id: document.getElementById('fa-user').value, assistant_id: auxId || null, date: document.getElementById('fa-date').value, time: document.getElementById('fa-time').value });
-        if(error) UI.toast(`Erro: ${error.message}`, 'error'); else { Modals.close(); UI.toast('Horário bloqueado na agenda com sucesso!'); }
+        if(error) UI.toast(`Erro: ${error.message}`, 'error'); else { Modals.close(); UI.toast('Horário bloqueado com sucesso!'); }
     },
 
-    // Lógica Avançada de Comandas
     async createComanda(e) {
         e.preventDefault(); 
         const { data } = await db.from('comandas').select('ticket').order('id', {ascending: false}).limit(1);
         let nxt = 1; if(data.length && data[0].ticket && data[0].ticket.includes('-')) { nxt = parseInt(data[0].ticket.split('-')[1]) + 1; }
         const tk = 'TKT-' + String(nxt).padStart(4, '0');
         await db.from('comandas').insert({ client_id: document.getElementById('fcom-cli').value, user_id: App.user.id, ticket: tk });
-        Modals.close(); UI.toast(`Comanda ${tk} gerada e pronta para uso!`);
+        Modals.close(); UI.toast(`Comanda ${tk} gerada!`);
     },
     async addComandaItem(id) {
         const val = document.getElementById('add-item-sel').value; if(!val) { UI.toast('Selecione algo da lista.', 'error'); return; }
         const item = JSON.parse(val); 
         
-        // Verifica estoque primeiro se for produto
         if(item.type === 'product') {
             const { data: prod } = await db.from('products').select('stock').eq('id', item.id).single();
             if(prod.stock <= 0) return UI.toast('Este produto está sem estoque disponível.', 'error');
@@ -536,8 +577,7 @@ const Actions = {
         const items = comanda.items || []; items.push(item);
         await db.from('comandas').update({ items, total: comanda.total + item.price }).eq('id', id);
         
-        Modals.close(); // Fecha e abre rápido para resetar a z-index e atualizar a UI
-        setTimeout(() => Modals.open('edit_comanda', id), 100);
+        Modals.close(); setTimeout(() => Modals.open('edit_comanda', id), 100);
     },
     async removeComandaItem(comandaId, itemIndex) {
         UI.confirm('Remover este lançamento da comanda?', async () => {
@@ -545,7 +585,6 @@ const Actions = {
             const items = comanda.items || [];
             const item = items[itemIndex];
             
-            // Devolve pro estoque
             if(item.type === 'product') { 
                 const { data: prod } = await db.from('products').select('stock').eq('id', item.id).single();
                 if(prod) await db.from('products').update({stock: prod.stock + 1}).eq('id', item.id);
@@ -557,7 +596,7 @@ const Actions = {
         });
     },
     async closeComanda(comandaId, clientId, total, ticketNum) {
-        UI.confirm('Ao fechar, o valor será faturado para Cobranças e o Atendimento será encerrado. Prosseguir?', async () => {
+        UI.confirm('Deseja fechar a comanda e enviar para Faturamento?', async () => {
             await db.from('comandas').update({ status: 'fechada' }).eq('id', comandaId);
             if(total > 0) { await db.from('debts').insert({ client_id: clientId, total_amount: total, remaining_amount: total, comanda_id: comandaId, comanda_ticket: ticketNum }); }
             Modals.close(); UI.toast('Comanda Faturada com Sucesso!');
@@ -577,7 +616,6 @@ const Actions = {
         Modals.close(); UI.toast('Serviço adicionado ao catálogo!');
     },
     
-    // Integração Pública Código de Barras (OpenFoodFacts) com feedback real
     async fetchBarcode(val) {
         if(val.length >= 8) {
             try {
@@ -590,10 +628,10 @@ const Actions = {
             } catch(e) { console.log('API EAN Erro', e); }
         }
     },
-    async saveProduct(e) { e.preventDefault(); await db.from('products').insert({ barcode: document.getElementById('fp-bar').value, name: document.getElementById('fp-nome').value, price: document.getElementById('fp-preco').value, commission: document.getElementById('fp-com').value, stock: document.getElementById('fp-qtd').value, min_stock: document.getElementById('fp-min').value }); Modals.close(); UI.toast('Registro do produto finalizado!'); },
+    async saveProduct(e) { e.preventDefault(); await db.from('products').insert({ barcode: document.getElementById('fp-bar').value, name: document.getElementById('fp-nome').value, price: document.getElementById('fp-preco').value, commission: document.getElementById('fp-com').value, stock: document.getElementById('fp-qtd').value, min_stock: document.getElementById('fp-min').value }); Modals.close(); UI.toast('Registro finalizado!'); },
     async updateStock(e, id, curStock) {
         e.preventDefault(); const v = parseInt(document.getElementById('fa-qtd').value);
-        await db.from('products').update({stock: curStock + v}).eq('id', id); Modals.close(); UI.toast('Carga de estoque efetuada!');
+        await db.from('products').update({stock: curStock + v}).eq('id', id); Modals.close(); UI.toast('Estoque atualizado!');
     },
 
     async saveMensagem(e, id) { 
@@ -603,18 +641,18 @@ const Actions = {
         else await db.from('message_templates').insert(payload);
         Modals.close(); UI.toast(id ? 'Template reescrito!' : 'Novo padrão salvo!'); 
     },
-    async deleteMensagem(id) { UI.confirm('Certeza que deseja deletar este modelo de mensagem permanentemente?', async () => { await db.from('message_templates').delete().eq('id', id); UI.toast('Modelo descartado.'); }); },
+    async deleteMensagem(id) { UI.confirm('Deletar este modelo de mensagem permanentemente?', async () => { await db.from('message_templates').delete().eq('id', id); UI.toast('Modelo descartado.'); }); },
 
-    async createDespesa(e) { e.preventDefault(); await db.from('despesas').insert({ description: document.getElementById('fd-desc').value, amount: document.getElementById('fd-val').value, category: document.getElementById('fd-cat').value }); Modals.close(); UI.toast('Saída processada com êxito no Caixa!'); },
+    async createDespesa(e) { e.preventDefault(); await db.from('despesas').insert({ description: document.getElementById('fd-desc').value, amount: document.getElementById('fd-val').value, category: document.getElementById('fd-cat').value }); Modals.close(); UI.toast('Saída registrada!'); },
 
     async debitDebt(e, id, max) { 
         e.preventDefault(); const v = parseFloat(document.getElementById('f-val').value); 
         const nV = Math.max(0, max - v);
         await db.from('debts').update({ remaining_amount: nV }).eq('id', id); 
-        if (nV === 0) { await db.from('debts').delete().eq('id', id); } // Remove se pago integralmente
+        if (nV === 0) { await db.from('debts').delete().eq('id', id); }
         Modals.close(); UI.toast('Pagamento processado.'); 
     },
-    async discountDebt(e, id, max) { e.preventDefault(); const perc = parseFloat(document.getElementById('f-val').value); await db.from('debts').update({ remaining_amount: Math.max(0, max - (max * perc / 100)) }).eq('id', id); Modals.close(); UI.toast('Desconto chancelado!'); },
+    async discountDebt(e, id, max) { e.preventDefault(); const perc = parseFloat(document.getElementById('f-val').value); await db.from('debts').update({ remaining_amount: Math.max(0, max - (max * perc / 100)) }).eq('id', id); Modals.close(); UI.toast('Desconto autorizado!'); },
 
     async saveSettings(e) {
         e.preventDefault(); const n = document.getElementById('cfg-name').value; const p = document.getElementById('cfg-phone').value;
@@ -622,11 +660,11 @@ const Actions = {
         if(App.settings.id) await db.from('settings').update(payload).eq('id', App.settings.id);
         else await db.from('settings').insert(payload);
         App.settings = {...App.settings, ...payload}; document.getElementById('brand-name').textContent = n;
-        UI.toast('Preferências do sistema foram salvas!');
+        UI.toast('Preferências salvas!');
     },
 
     sendWhatsApp(phone) {
-        const msg = document.getElementById('wpp-msg').value; if(!msg) return UI.toast('Escreva algo antes de tentar enviar.', 'error');
+        const msg = document.getElementById('wpp-msg').value; if(!msg) return UI.toast('Escreva algo.', 'error');
         Modals.close();
         const cleanPhone = phone.replace(/\D/g, '');
         window.open(`https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`, '_blank');

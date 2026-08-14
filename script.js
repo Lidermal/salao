@@ -1,20 +1,30 @@
 /** 
- * SISTEMA ESTÚDIO AMOR QUE CUIDA - NÚCLEO ESTABILIZADO E UI MELHORADA
+ * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO 4.0 DEFINITIVA
+ * (Splash, EAN Auto, Extrato Bancário, Anamnese e Login Corrigidos)
  */
 
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const DB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
 
-// CORREÇÃO CRÍTICA: Ignorar o Storage do navegador para evitar o bloqueio do Tracking Prevention
+// Ignora o Storage do navegador para evitar o bloqueio do Tracking Prevention
 const db = window.supabase.createClient(DB_URL, DB_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
 });
 
-const App = { user: null, role: 'freelancer', view: 'agenda', currentDate: new Date(), charts: {}, settings: {} };
+const App = { 
+    user: null, 
+    role: 'freelancer', 
+    view: 'agenda', 
+    currentDate: new Date(), 
+    charts: {}, 
+    settings: {},
+    currentClientId: null // CORREÇÃO: Memória travada para o ID do Cliente na Anamnese
+};
 
 const U = {
     money: v => new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'}).format(v||0),
-    iso: d => { const tzOffset = d.getTimezoneOffset() * 60000; return (new Date(d.getTime() - tzOffset)).toISOString().split('T')[0]; }
+    iso: d => { const tzOffset = d.getTimezoneOffset() * 60000; return (new Date(d.getTime() - tzOffset)).toISOString().split('T')[0]; },
+    date: d => new Date(d).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
 };
 
 const UI = {
@@ -50,19 +60,28 @@ const Auth = {
         const u = document.getElementById('username').value.trim(); 
         const p = document.getElementById('password').value;
         const btn = document.getElementById('btn-login'); btn.textContent = 'Aguarde...';
+        
         try {
-            const { data, error } = await db.from('users').select('*').eq('username', u).single();
-            if (error || !data) throw new Error("Usuário não encontrado no sistema.");
+            // CORREÇÃO DE LOGIN: maybeSingle() impede que a API falhe feio se o usuário não existir
+            const { data, error } = await db.from('users').select('*').eq('username', u).maybeSingle();
+            
+            if (error) throw new Error(`Falha no banco de dados: ${error.message}`);
+            if (!data) throw new Error("Usuário não cadastrado no sistema.");
             if (data.password !== p) throw new Error("Senha incorreta.");
             
-            App.user = data; App.role = data.role;
+            App.user = data; 
+            App.role = data.role;
+            
             if(data.first_login) { 
                 Modals.open('first_login'); 
                 btn.textContent = 'Entrar'; 
                 return; 
             }
             this.success();
-        } catch(e) { UI.toast(e.message, 'error'); btn.textContent = 'Entrar'; }
+        } catch(e) { 
+            UI.toast(e.message, 'error'); 
+            btn.textContent = 'Entrar'; 
+        }
     },
     async success() {
         document.getElementById('auth-layer').classList.add('hidden'); 
@@ -76,12 +95,11 @@ const Auth = {
         
         Nav.init(); Nav.showView('agenda');
         
-        // Sincronismo Realtime com tratamento de erro
         db.channel('custom-all-channel').on('postgres_changes', { event: '*', schema: 'public' }, payload => {
             if(Render[App.view]) Render[App.view]();
         }).subscribe();
     },
-    logout() { UI.confirm('Até logo! Deseja realmente sair do sistema?', () => location.reload()); }
+    logout() { UI.confirm('Até logo! Deseja sair do sistema?', () => location.reload()); }
 };
 
 const Nav = {
@@ -112,7 +130,7 @@ const Render = {
     async agenda() {
         this.buildCalendar();
         try {
-            const { data, error } = await db.from('appointments').select('*, clients(name), services(name), users(name)').eq('date', U.iso(App.currentDate));
+            const { data, error } = await db.from('appointments').select('*, clients(name), services(name), users!user_id(name)').eq('date', U.iso(App.currentDate));
             if(error) throw error;
             const cont = document.getElementById('agenda-list');
             if(!data || !data.length) { cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Sua agenda está livre neste dia.</p></div>`; return; }
@@ -146,6 +164,8 @@ const Render = {
             </div>`).join('');
     },
     anamnese(id, name) {
+        // CORREÇÃO: Trava o ID na memória do app para não perder ao abrir modais
+        App.currentClientId = id; 
         document.getElementById('current-anamnese-client-id').value = id;
         document.getElementById('anamnese-title').textContent = `Ficha de: ${name}`;
         Nav.showView('anamnese'); Actions.loadAnamnese(id);
@@ -273,28 +293,48 @@ const Render = {
         }
         document.getElementById('comissao-dashboard').innerHTML = html;
     },
+    
     async 'resumo-financeiro'() {
-        const [ {data:comand}, {data:desp} ] = await Promise.all([db.from('comandas').select('total, ticket, created_at').eq('status', 'fechada'), db.from('despesas').select('description, amount, date')]);
+        const [ {data:comand}, {data:desp} ] = await Promise.all([
+            db.from('comandas').select('total, ticket, created_at').eq('status', 'fechada'), 
+            db.from('despesas').select('description, amount, date')
+        ]);
         
         const receita = comand.reduce((acc, c) => acc + c.total, 0); 
         const gasto = desp.reduce((acc, d) => acc + d.amount, 0); 
         const lucro = receita - gasto;
         
         document.getElementById('resumo-cards').innerHTML = `
-            <div class="card" style="border-bottom:4px solid #2e7d32"><h4>Faturamento Bruto (Entradas)</h4><div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(receita)}</div></div>
+            <div class="card" style="border-bottom:4px solid #2e7d32"><h4>Faturamento (Entradas)</h4><div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(receita)}</div></div>
             <div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custo Operacional (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(gasto)}</div></div>
             <div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
         
         let extrato = [];
-        comand.forEach(c => { if(c.total>0) extrato.push({ type: 'in', desc: `Ticket ${c.ticket||'-'}`, val: c.total, date: new Date(c.created_at) }); });
+        comand.forEach(c => { if(c.total>0) extrato.push({ type: 'in', desc: `Comanda ${c.ticket||'-'}`, val: c.total, date: new Date(c.created_at) }); });
         desp.forEach(d => { extrato.push({ type: 'out', desc: d.description, val: d.amount, date: new Date(d.date) }); });
+        
+        extrato.sort((a,b) => a.date - b.date);
+        
+        let saldoAtual = 0;
+        extrato = extrato.map(item => {
+            saldoAtual += item.type === 'in' ? item.val : -item.val;
+            return { ...item, saldo: saldoAtual };
+        });
         
         extrato.sort((a,b) => b.date - a.date);
         
-        document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações financeiras.</p>' :
-            extrato.map(i => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;">
-                <div><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.8rem; text-transform:uppercase">${i.type==='in'?'Receita':'Despesa'}</b><p style="margin-top:3px">${i.desc}</p><span style="font-size:0.75rem; color:var(--muted)">${U.date(i.date)}</span></div>
-                <span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.2rem">${i.type==='in'?'+':'-'}${U.money(i.val)}</span>
+        document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações financeiras no período.</p>' :
+            extrato.map(i => `
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;">
+                <div style="flex:1">
+                    <b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Pagamento'}</b>
+                    <p style="margin-top:5px; font-weight:600; font-size:1.1rem">${i.desc}</p>
+                    <span style="font-size:0.8rem; color:var(--muted)">${U.date(i.date)}</span>
+                </div>
+                <div style="text-align:right">
+                    <span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.3rem; display:block">${i.type==='in'?'+':'-'} ${U.money(i.val)}</span>
+                    <span style="font-size:0.85rem; color:var(--muted); font-weight:bold">Saldo: ${U.money(i.saldo)}</span>
+                </div>
             </div>`).join('');
     },
     async performance() {
@@ -467,15 +507,15 @@ const Modals = {
                 <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar</button></form>`;
         }
         else if(type === 'produto') {
-            html += `<h3>Cadastro de Produto</h3><form onsubmit="Actions.saveProduct(event)">
-                <div class="input-group"><label>Cód. Barras (EAN) - Pesquisa Inteligente</label><input type="text" id="fp-bar" oninput="Actions.fetchBarcode(this.value)" placeholder="Digite para buscar nome..." required></div>
-                <div class="input-group"><label>Nome do Produto</label><input type="text" id="fp-nome" required></div>
+            html += `<h3>Novo Produto Automático</h3><form onsubmit="Actions.saveProduct(event)">
+                <div class="input-group"><label>Cód. Barras (EAN) - Busca Nuvem</label><input type="text" id="fp-bar" oninput="Actions.fetchBarcode(this.value)" placeholder="Digite ou passe o leitor..." required></div>
+                <div class="input-group"><label>Descrição do Produto</label><input type="text" id="fp-nome" readonly required placeholder="O sistema vai preencher isso..." style="background:#e9ecef; cursor:not-allowed; border: 1px dashed #ccc;"></div>
                 <div style="display:flex; gap:10px; background:#f9f9f9; padding:15px; border-radius:12px; margin-bottom:15px">
                     <div class="input-group" style="margin:0"><label>Preço Venda (R$)</label><input type="number" id="fp-preco" step="0.01" required></div>
                     <div class="input-group" style="margin:0"><label>Comissão (%)</label><input type="number" id="fp-com" max="100" required></div>
                 </div>
                 <div style="display:flex; gap:10px;"><div class="input-group" style="flex:1"><label>Estoque Atual</label><input type="number" id="fp-qtd" required></div><div class="input-group" style="flex:1"><label>Alerta Mínimo</label><input type="number" id="fp-min" value="5" required></div></div>
-                <button type="submit" class="btn-primary" style="padding:1.2rem">Confirmar</button></form>`;
+                <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar Produto</button></form>`;
         }
         else if(type === 'add_estoque') {
             html += `<h3>Adicionar ao Estoque</h3><form onsubmit="Actions.updateStock(event, '${param1}', ${param2})">
@@ -530,16 +570,28 @@ const Actions = {
     async updatePassword(e) {
         e.preventDefault(); 
         const { error } = await db.from('users').update({ password: document.getElementById('new-pass').value, first_login: false }).eq('id', App.user.id);
-        if(!error) { App.user.first_login = false; Modals.close(); UI.toast('Senha registrada com sucesso!'); Auth.success(); }
+        if(error) { UI.toast(`Erro ao atualizar senha: ${error.message}`, 'error'); return; }
+        App.user.first_login = false; 
+        Modals.close(); 
+        UI.toast('Senha registrada com sucesso!'); 
+        Auth.success(); 
     },
     async createClient(e) { e.preventDefault(); await db.from('clients').insert({ name: document.getElementById('fc-nome').value, phone: document.getElementById('fc-fone').value }); Modals.close(); UI.toast('Cliente adicionado!'); },
     
     async saveAnamnese(e) {
         e.preventDefault(); 
-        const id = document.getElementById('current-anamnese-client-id').value;
+        
+        // CORREÇÃO DA ANAMNESE: Puxa da memória travada. Se falhar, avisa na hora.
+        const id = App.currentClientId;
+        if (!id || id === 'undefined') {
+            UI.toast('Erro interno: Cliente não identificado. Volte na tela de clientes e clique novamente.', 'error');
+            return;
+        }
+
         const payload = { client_id: id, history: document.getElementById('fa-hist').value, habits: document.getElementById('fa-hab').value, objectives: document.getElementById('fa-obj').value, notes: document.getElementById('fa-obs').value };
         const { error } = await db.from('anamnesis').insert(payload);
-        if(error) { UI.toast(`Falha: ${error.message}`, 'error'); return; }
+        if(error) { UI.toast(`Falha ao salvar: ${error.message}`, 'error'); return; }
+        
         Modals.close(); UI.toast('Ficha clínica salva no histórico.'); this.loadAnamnese(id);
     },
     async loadAnamnese(id) {
@@ -618,14 +670,31 @@ const Actions = {
     
     async fetchBarcode(val) {
         if(val.length >= 8) {
+            const inputNome = document.getElementById('fp-nome');
+            inputNome.value = "Buscando no servidor...";
             try {
-                const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${val}.json`);
-                const json = await res.json();
+                let res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${val}.json`);
+                let json = await res.json();
                 if(json.status === 1 && json.product.product_name) {
-                    document.getElementById('fp-nome').value = json.product.product_name;
-                    UI.toast('Produto identificado no banco de dados mundial.', 'success');
+                    inputNome.value = json.product.product_name;
+                    UI.toast('Produto encontrado!', 'success'); return;
                 }
-            } catch(e) { console.log('API EAN Erro', e); }
+                
+                res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${val}`);
+                json = await res.json();
+                if(json.items && json.items.length > 0) {
+                    inputNome.value = json.items[0].title;
+                    UI.toast('Produto encontrado!', 'success'); return;
+                }
+                throw new Error("Não encontrou");
+            } catch(e) { 
+                inputNome.value = ""; 
+                inputNome.removeAttribute('readonly'); 
+                inputNome.style.background = "#fff"; 
+                inputNome.style.cursor = "text"; 
+                inputNome.placeholder = "Não localizado na internet. Digite o nome...";
+                UI.toast('Produto não listado online. Digite o nome.', 'warning');
+            }
         }
     },
     async saveProduct(e) { e.preventDefault(); await db.from('products').insert({ barcode: document.getElementById('fp-bar').value, name: document.getElementById('fp-nome').value, price: document.getElementById('fp-preco').value, commission: document.getElementById('fp-com').value, stock: document.getElementById('fp-qtd').value, min_stock: document.getElementById('fp-min').value }); Modals.close(); UI.toast('Registro finalizado!'); },
@@ -671,4 +740,13 @@ const Actions = {
     }
 };
 
-document.addEventListener('DOMContentLoaded', () => Auth.init());
+document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+        const splash = document.getElementById('splash-screen');
+        if(splash) {
+            splash.style.opacity = '0';
+            setTimeout(() => splash.remove(), 500);
+        }
+    }, 4000);
+    Auth.init();
+});

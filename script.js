@@ -1,12 +1,10 @@
 /** 
- * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO 4.0 DEFINITIVA
- * (Splash, EAN Auto, Extrato Bancário, Anamnese e Login Corrigidos)
+ * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO DEFINITIVA
  */
 
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const DB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
 
-// Ignora o Storage do navegador para evitar o bloqueio do Tracking Prevention
 const db = window.supabase.createClient(DB_URL, DB_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
 });
@@ -17,8 +15,7 @@ const App = {
     view: 'agenda', 
     currentDate: new Date(), 
     charts: {}, 
-    settings: {},
-    currentClientId: null // CORREÇÃO: Memória travada para o ID do Cliente na Anamnese
+    settings: {}
 };
 
 const U = {
@@ -62,11 +59,10 @@ const Auth = {
         const btn = document.getElementById('btn-login'); btn.textContent = 'Aguarde...';
         
         try {
-            // CORREÇÃO DE LOGIN: maybeSingle() impede que a API falhe feio se o usuário não existir
-            const { data, error } = await db.from('users').select('*').eq('username', u).maybeSingle();
+            const { data, error } = await db.from('users').select('*').ilike('username', u).maybeSingle();
             
-            if (error) throw new Error(`Falha no banco de dados: ${error.message}`);
-            if (!data) throw new Error("Usuário não cadastrado no sistema.");
+            if (error) throw new Error(`Falha no sistema: ${error.message}`);
+            if (!data) throw new Error("Usuário não cadastrado.");
             if (data.password !== p) throw new Error("Senha incorreta.");
             
             App.user = data; 
@@ -77,6 +73,7 @@ const Auth = {
                 btn.textContent = 'Entrar'; 
                 return; 
             }
+            document.getElementById('login-form').reset();
             this.success();
         } catch(e) { 
             UI.toast(e.message, 'error'); 
@@ -99,7 +96,12 @@ const Auth = {
             if(Render[App.view]) Render[App.view]();
         }).subscribe();
     },
-    logout() { UI.confirm('Até logo! Deseja sair do sistema?', () => location.reload()); }
+    logout() { 
+        UI.confirm('Deseja realmente sair da sua conta?', () => {
+            App.user = null;
+            window.location.reload(true); 
+        }); 
+    }
 };
 
 const Nav = {
@@ -118,7 +120,7 @@ const Nav = {
         document.querySelectorAll('.nav-link, .b-item').forEach(el => el.classList.remove('active'));
         document.querySelectorAll(`[data-view="${id}"]`).forEach(el => el.classList.add('active'));
         
-        const titles = { agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', anamnese:'Ficha de Avaliação', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema' };
+        const titles = { agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', anamnese:'Ficha de Avaliação', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema' };
         document.getElementById('page-title').textContent = titles[id] || 'Amor que Cuida';
         if(Render[id]) Render[id]();
     },
@@ -130,14 +132,24 @@ const Render = {
     async agenda() {
         this.buildCalendar();
         try {
-            const { data, error } = await db.from('appointments').select('*, clients(name), services(name), users!user_id(name)').eq('date', U.iso(App.currentDate));
+            let query = db.from('appointments').select('*, clients(name), services(name), users!user_id(name)').eq('date', U.iso(App.currentDate));
+            if (App.role !== 'owner') query = query.eq('user_id', App.user.id);
+
+            const { data, error } = await query;
             if(error) throw error;
             const cont = document.getElementById('agenda-list');
             if(!data || !data.length) { cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Sua agenda está livre neste dia.</p></div>`; return; }
-            cont.innerHTML = data.map(a => `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid var(--primary)">
-                <div><h4 style="font-size:1.2rem">${a.time} - ${a.clients?.name || 'Cliente'}</h4><p style="margin:5px 0; color:var(--muted)">${a.services?.name || '-'}</p><p style="font-size:0.8rem">Profissional: <b>${a.users?.name || '-'}</b></p></div>
-                <div style="background:var(--primary-light); color:var(--primary-dark); padding:5px 12px; border-radius:20px; font-size:0.8rem; font-weight:bold">${a.status.toUpperCase()}</div>
-            </div>`).join('');
+            cont.innerHTML = data.map(a => {
+                const isBlocked = a.status === 'bloqueado';
+                return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${isBlocked ? '#9e9e9e' : 'var(--primary)'}; background: ${isBlocked ? '#f5f5f5' : '#fff'};">
+                    <div>
+                        <h4 style="font-size:1.2rem; color: ${isBlocked ? 'var(--muted)' : 'var(--text)'}">${a.time} - ${isBlocked ? 'Horário Bloqueado' : (a.clients?.name || 'Cliente')}</h4>
+                        ${isBlocked ? `<p style="margin:5px 0; color:var(--muted); font-style:italic;">Motivo: ${a.notes || 'Não informado'}</p>` : `<p style="margin:5px 0; color:var(--muted)">${a.services?.name || '-'}</p>`}
+                        <p style="font-size:0.8rem">Profissional: <b>${a.users?.name || '-'}</b></p>
+                    </div>
+                    <div style="background:${isBlocked ? '#e0e0e0' : 'var(--primary-light)'}; color:${isBlocked ? '#616161' : 'var(--primary-dark)'}; padding:5px 12px; border-radius:20px; font-size:0.8rem; font-weight:bold">${a.status.toUpperCase()}</div>
+                </div>`;
+            }).join('');
         } catch (e) { UI.toast(`Erro na agenda: ${e.message}`, 'error'); }
     },
     buildCalendar() {
@@ -160,39 +172,67 @@ const Render = {
             <div class="card">
                 <a href="#" class="wpp-btn" onclick="Modals.open('whatsapp', '${c.phone}', '${c.name}'); event.stopPropagation()"><i class="ph ph-whatsapp-logo"></i></a>
                 <h4 style="color:var(--primary); font-size:1.2rem; margin-bottom:10px">${c.name}</h4><p><i class="ph ph-phone"></i> ${c.phone}</p>
-                <button class="btn-secondary" style="margin-top:15px; width:100%" onclick="Render.anamnese('${c.id}', '${c.name}')"><i class="ph ph-file-text"></i> Histórico / Anamnese</button>
+                <div style="display:flex; gap:10px; margin-top:15px;">
+                    <button class="btn-secondary" style="flex:1" onclick="Render.perfilCliente('${c.id}', '${c.name}')"><i class="ph ph-user"></i> Ver Perfil</button>
+                    <button class="btn-secondary" style="flex:1" onclick="Render.anamnese('${c.id}', '${c.name}')"><i class="ph ph-file-text"></i> Anamnese</button>
+                </div>
             </div>`).join('');
     },
     anamnese(id, name) {
-        // CORREÇÃO: Trava o ID na memória do app para não perder ao abrir modais
-        App.currentClientId = id; 
         document.getElementById('current-anamnese-client-id').value = id;
         document.getElementById('anamnese-title').textContent = `Ficha de: ${name}`;
         Nav.showView('anamnese'); Actions.loadAnamnese(id);
     },
+    async perfilCliente(id, name) {
+        document.getElementById('current-perfil-client-id').value = id;
+        document.getElementById('perfil-cliente-title').textContent = `Perfil: ${name}`;
+        Nav.showView('perfil-cliente');
+        
+        const { data: comandas } = await db.from('comandas').select('*, users(name)').eq('client_id', id).eq('status', 'fechada').order('created_at', {ascending: false});
+        
+        document.getElementById('perfil-info').innerHTML = `<div class="card" style="border-left:4px solid var(--primary);"><h4 style="font-size:1.2rem;">Total de Visitas: ${comandas.length}</h4></div>`;
+        
+        const list = document.getElementById('perfil-visitas-list');
+        if(!comandas || comandas.length === 0) {
+            list.innerHTML = "<p style='color:var(--muted); padding:2rem; text-align:center;'>Nenhum histórico de visita concluída.</p>";
+            return;
+        }
+
+        list.innerHTML = comandas.map(c => {
+            const itens = (c.items||[]).map(i => i.name).join(', ');
+            return `<div class="card" style="margin-bottom:10px;">
+                <h4 style="color:var(--primary-dark); font-size:1.1rem; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;">
+                    <i class="ph ph-calendar"></i> ${new Date(c.created_at).toLocaleDateString()}
+                </h4>
+                <p style="margin-bottom:5px;"><b>Profissional Responsável:</b> ${c.users?.name || 'Não informado'}</p>
+                <p style="margin-bottom:5px;"><b>Serviços/Produtos:</b> ${itens || 'Nenhum detalhe salvo'}</p>
+                <p><b>Total Investido:</b> ${U.money(c.total)}</p>
+            </div>`;
+        }).join('');
+    },
     async cobrancas() {
-        const { data } = await db.from('debts').select('*, clients(name)').gt('remaining_amount', 0);
+        const { data } = await db.from('debts').select('*, clients(name)').gt('remaining_amount', 0).order('created_at', {ascending: false});
         const cont = document.getElementById('cobrancas-list');
         if (!data || data.length === 0) { cont.innerHTML = "<p style='color:var(--muted)'>Nenhuma cobrança em aberto no momento.</p>"; return; }
         
         cont.innerHTML = data.map(d => `
-            <div class="card" style="border-left:4px solid #d32f2f">
-                <div style="display:flex; justify-content:space-between; margin-bottom:15px; align-items:center">
+            <div class="card" style="border-left:5px solid #d32f2f; display:flex; flex-direction:column; justify-content:space-between;">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div>
-                        <span style="font-size:0.75rem; color:white; background:var(--muted); padding:3px 8px; border-radius:10px; font-weight:bold">${d.comanda_ticket || 'MANUAL'}</span>
-                        <h4 style="font-size:1.3rem; margin-top:8px">${d.clients?.name || 'Cliente'}</h4>
+                        <span style="font-size:0.8rem; color:#d32f2f; font-weight:bold; letter-spacing:1px">${d.comanda_ticket || 'MANUAL'}</span>
+                        <h4 style="font-size:1.2rem; margin-top:5px">${d.clients?.name || 'Cliente'}</h4>
                     </div>
-                    <div class="val" style="color:#d32f2f; font-size:1.8rem">${U.money(d.remaining_amount)}</div>
+                    <span style="font-size:0.7rem; font-weight:bold; padding: 4px 10px; border-radius:20px; background:#ffebee; color:#d32f2f">PENDENTE</span>
                 </div>
-                <div style="display:flex; gap:10px;">
-                    <button class="btn-primary" style="padding:0.8rem; font-size:0.9rem" onclick="Modals.open('debitar', '${d.id}', ${d.remaining_amount})"><i class="ph ph-check-circle"></i> Receber Pagamento</button>
-                    ${App.role==='owner' ? `<button class="btn-secondary" style="padding:0.8rem; font-size:0.9rem" onclick="Modals.open('desconto', '${d.id}', ${d.remaining_amount})">Desconto %</button>` : ''}
-                </div>
+                <div class="val" style="font-size:1.8rem; margin:15px 0; color:#d32f2f;">${U.money(d.remaining_amount)}</div>
+                <button class="btn-primary" style="width:100%; padding:0.8rem; display:flex; align-items:center; justify-content:center; gap:8px" onclick="Modals.open('cobranca_detalhes', '${d.id}')">
+                    <i class="ph ph-list-magnifying-glass"></i> Abrir Ticket de Cobrança
+                </button>
             </div>`).join('');
     },
     async servicos() {
         const { data } = await db.from('services').select('*').order('name');
-        document.getElementById('servicos-list').innerHTML = data.map(s => `<div class="card"><h4 style="font-size:1.2rem; border-bottom:1px solid #eee; padding-bottom:10px">${s.name}</h4><div style="margin:10px 0; color:var(--muted)"><p>Comissão: <b style="color:var(--text)">${s.commission}%</b></p>${s.has_assistant?`<p>Auxiliar: <b style="color:var(--text)">${s.assistant_commission}%</b></p>`:''}</div><div class="val" style="font-size:1.5rem">${U.money(s.price)}</div></div>`).join('');
+        document.getElementById('servicos-list').innerHTML = data.map(s => `<div class="card"><h4 style="font-size:1.2rem; border-bottom:1px solid #eee; padding-bottom:10px">${s.name}</h4><div style="margin:10px 0; color:var(--muted)"><p>Comissão: <b style="color:var(--text)">${s.commission}%</b></p>${s.has_assistant?`<p>Auxiliar: <b style="color:var(--text)">${s.assistant_commission}%</b></p>`:''}<p>Custo Fixo Lançado: <b style="color:#d32f2f">${U.money(s.cost)}</b></p></div><div class="val" style="font-size:1.5rem">${U.money(s.price)}</div></div>`).join('');
     },
     async produtos() {
         const { data } = await db.from('products').select('*').order('name');
@@ -439,7 +479,7 @@ const Modals = {
             </div>`;
             
             if(!isFechada) {
-                const sOpts = servicos.map(s => `<option value='{"id":"${s.id}","name":"${s.name}","price":${s.price},"commission":${s.commission},"type":"service"}'>${s.name} - ${U.money(s.price)}</option>`).join('');
+                const sOpts = servicos.map(s => `<option value='{"id":"${s.id}","name":"${s.name}","price":${s.price},"cost":${s.cost || 0},"commission":${s.commission},"type":"service"}'>${s.name} - ${U.money(s.price)}</option>`).join('');
                 const pOpts = produtos.map(p => `<option value='{"id":"${p.id}","name":"${p.name}","price":${p.price},"commission":${p.commission},"type":"product"}'>${p.name} (Estoque: ${p.stock}) - ${U.money(p.price)}</option>`).join('');
                 html += `
                 <div style="display:flex; gap:10px; margin-bottom:20px; align-items: flex-end;">
@@ -449,10 +489,40 @@ const Modals = {
                     </div>
                     <button type="button" class="btn-secondary" style="width:auto; padding:1.2rem 2rem; background:var(--primary-light); color:var(--primary)" onclick="Actions.addComandaItem('${comanda.id}')"><i class="ph ph-plus" style="font-size:1.3rem"></i> Lançar</button>
                 </div>
-                <button type="button" class="btn-primary" style="background:#2e7d32; padding:1.2rem; font-size:1.1rem; display:flex; justify-content:center; gap:10px; width: 100%;" onclick="Actions.closeComanda('${comanda.id}', '${comanda.client_id}', ${comanda.total}, '${comanda.ticket}')"><i class="ph ph-check-circle" style="font-size:1.5rem"></i> Fechar Comanda e Faturar</button>`;
+                <button type="button" class="btn-primary" style="background:#2e7d32; padding:1.2rem; font-size:1.1rem; display:flex; justify-content:center; gap:10px; width: 100%;" onclick="Actions.closeComanda('${comanda.id}', '${comanda.client_id}', ${comanda.total}, '${comanda.ticket}')"><i class="ph ph-check-circle" style="font-size:1.5rem"></i> Fechar Comanda e Lançar Custos</button>`;
             } else if (App.role === 'owner') {
                 html += `<button type="button" class="btn-secondary" style="color:#d32f2f; padding:1.2rem; display:flex; justify-content:center; gap:10px; width:100%" onclick="Actions.reopenComanda('${comanda.id}')"><i class="ph ph-warning-circle" style="font-size:1.5rem"></i> Reabrir Comanda</button>`;
             }
+        }
+        else if (type === 'cobranca_detalhes') {
+            const { data: debt } = await db.from('debts').select('*, comandas(*, clients(name))').eq('id', param1).single();
+            const comanda = debt.comandas;
+            let htmlList = (comanda.items||[]).map(i => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #eee; font-size:0.95rem;"><span>${i.name}</span><b>${U.money(i.price)}</b></div>`).join('');
+            
+            html += `
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: #d32f2f;">Cobrança do Ticket: ${comanda.ticket}</h3>
+                <p style="color: var(--muted); margin-top: 5px; font-size:1.1rem;">Cliente: <b style="color:var(--text)">${comanda.clients?.name}</b></p>
+            </div>
+            <div style="background: #fafafa; border: 1px solid var(--border); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
+                <h4 style="border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px; color:var(--muted)">Consumo no Salão</h4>
+                ${htmlList || '<p>Nenhum item listado.</p>'}
+                <div style="display:flex; justify-content:space-between; margin-top:10px; padding-top:10px; border-top:2px dashed #ccc;">
+                    <span style="font-weight:bold;">Total da Comanda:</span>
+                    <span style="font-weight:bold; color:var(--primary-dark);">${U.money(debt.total_amount)}</span>
+                </div>
+            </div>
+            
+            <div style="background:#fff5f5; padding:20px; border-radius:12px; margin-bottom:20px; border-left:5px solid #d32f2f; display:flex; justify-content:space-between; align-items:center;">
+                <span style="color:#d32f2f; font-weight:bold; font-size:1.2rem;">Valor Pendente:</span>
+                <b style="font-size:2rem; color:#d32f2f">${U.money(debt.remaining_amount)}</b>
+            </div>
+            
+            <div style="display:flex; gap:10px; margin-bottom:10px;">
+                <button type="button" class="btn-primary" style="flex:1; background:#2e7d32;" onclick="Modals.open('debitar', '${debt.id}', ${debt.remaining_amount})"><i class="ph ph-check-circle"></i> Receber / Debitar Valor</button>
+            </div>
+            ${App.role==='owner' ? `<button type="button" class="btn-secondary" style="width:100%; border:1px solid var(--border);" onclick="Modals.open('desconto', '${debt.id}', ${debt.remaining_amount})"><i class="ph ph-percent"></i> Aplicar Desconto (%)</button>` : ''}
+            `;
         }
         else if(type === 'agendamento') {
             const [c, s, u] = await Promise.all([db.from('clients').select('id,name').order('name'), db.from('services').select('id,name,price,has_assistant'), db.from('users').select('id,name').neq('username', 'admin.teste')]);
@@ -488,7 +558,30 @@ const Modals = {
                         <input type="time" id="fa-time" required style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);">
                     </div>
                 </div>
-                <button type="submit" class="btn-primary" style="padding:1.2rem; width:100%;">Confirmar e Bloquear Horário</button>
+                <button type="submit" class="btn-primary" style="padding:1.2rem; width:100%;">Confirmar Horário</button>
+            </form>`;
+        }
+        else if(type === 'bloquear_agenda') {
+            html += `
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: #d32f2f;">Bloquear Horário / Ausência</h3>
+            </div>
+            <form onsubmit="Actions.blockAppointment(event)">
+                <div class="input-group">
+                    <label>Motivo (Opcional)</label>
+                    <input type="text" id="fb-motivo" placeholder="Ex: Almoço, Reunião, Médico..." style="width:100%; padding:12px; border-radius:8px;">
+                </div>
+                <div style="display:flex; gap:10px; margin-bottom: 20px;">
+                    <div style="flex:1">
+                        <label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:5px; color:var(--text);">Data</label>
+                        <input type="date" id="fb-date" required style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);">
+                    </div>
+                    <div style="flex:1">
+                        <label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:5px; color:var(--text);">Horário Início</label>
+                        <input type="time" id="fb-time" required style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);">
+                    </div>
+                </div>
+                <button type="submit" class="btn-primary" style="padding:1.2rem; width:100%; background: #d32f2f;">Confirmar Bloqueio</button>
             </form>`;
         }
         else if(type === 'comanda') {
@@ -525,7 +618,7 @@ const Modals = {
         else if(type === 'despesa') {
             html += `<h3>Lançamento de Despesa/Custo</h3><form onsubmit="Actions.createDespesa(event)">
                 <div class="input-group"><label>Descrição da Saída</label><input type="text" id="fd-desc" placeholder="Ex: Conta de Energia..." required></div>
-                <div class="input-group"><label>Categoria do Gasto</label><select id="fd-cat" required style="padding:1.2rem; border-radius:8px"><option value="Custos Fixos">Custo Fixo (Aluguel, Água, Luz)</option><option value="Custos Variáveis">Custo Variável (Produtos)</option><option value="Pessoal/Pagamentos">Pessoal (Salários, Pró-Labore)</option></select></div>
+                <div class="input-group"><label>Categoria do Gasto</label><select id="fd-cat" required style="padding:1.2rem; border-radius:8px"><option value="Custos Fixos">Custo Fixo (Aluguel, Água, Luz, etc)</option><option value="Custos Variáveis">Custo Variável (Produtos e Insumos)</option><option value="Pessoal/Pagamentos">Pessoal (Salários, Pró-Labore, Limpeza)</option></select></div>
                 <div class="input-group"><label>Valor (R$)</label><input type="number" id="fd-val" step="0.01" required style="padding:1.2rem"></div>
                 <button type="submit" class="btn-primary" style="padding:1.2rem">Registrar Saída</button></form>`;
         }
@@ -538,13 +631,13 @@ const Modals = {
                 <button type="submit" class="btn-primary" style="padding:1.2rem">${param1 ? 'Salvar Edição' : 'Criar Template'}</button></form>`;
         }
         else if(type === 'debitar' || type === 'desconto') {
-            html += `<h3>${type==='debitar'?'Registrar Recebimento':'Aplicar Desconto'}</h3>
+            html += `<h3>${type==='debitar'?'Registrar Recebimento Parcial/Total':'Aplicar Desconto'}</h3>
             <div style="background:#f9f9f9; padding:20px; border-radius:12px; margin-bottom:20px; border-left:5px solid #d32f2f">
                 <p style="color:var(--muted); font-size:0.9rem; margin-bottom:5px">Pendente na Cobrança:</p>
                 <b style="font-size:2rem; color:#d32f2f">${U.money(param2)}</b>
             </div>
             <form onsubmit="Actions.${type==='debitar'?'debitDebt':'discountDebt'}(event, '${param1}', ${param2})">
-                <div class="input-group"><label>${type==='debitar'?'Valor Recebido (R$)':'Porcentagem do Desconto (%)'}</label><input type="number" id="f-val" step="0.01" required style="padding:1.2rem; font-size:1.2rem; border-radius:8px"></div>
+                <div class="input-group"><label>${type==='debitar'?'Valor Informado pelo Cliente (R$)':'Porcentagem do Desconto (%)'}</label><input type="number" id="f-val" step="0.01" required style="padding:1.2rem; font-size:1.2rem; border-radius:8px"></div>
                 <button type="submit" class="btn-primary" style="padding:1.2rem">Confirmar</button></form>`;
         }
         else if(type === 'nova_anamnese') {
@@ -581,10 +674,10 @@ const Actions = {
     async saveAnamnese(e) {
         e.preventDefault(); 
         
-        // CORREÇÃO DA ANAMNESE: Puxa da memória travada. Se falhar, avisa na hora.
-        const id = App.currentClientId;
+        // CORREÇÃO: Puxa o ID diretamente do input hidden gerado e protegido pela função Render.anamnese
+        const id = document.getElementById('current-anamnese-client-id').value;
         if (!id || id === 'undefined') {
-            UI.toast('Erro interno: Cliente não identificado. Volte na tela de clientes e clique novamente.', 'error');
+            UI.toast('Erro interno: ID da Cliente não recuperado. Volte na tela de clientes e abra a anamnese novamente.', 'error');
             return;
         }
 
@@ -603,8 +696,20 @@ const Actions = {
 
     async createAppointment(e) {
         e.preventDefault(); const auxId = document.getElementById('fa-aux').value;
-        const { error } = await db.from('appointments').insert({ client_id: document.getElementById('fa-cli').value, service_id: document.getElementById('fa-serv').value, user_id: document.getElementById('fa-user').value, assistant_id: auxId || null, date: document.getElementById('fa-date').value, time: document.getElementById('fa-time').value });
+        const { error } = await db.from('appointments').insert({ client_id: document.getElementById('fa-cli').value, service_id: document.getElementById('fa-serv').value, user_id: document.getElementById('fa-user').value, assistant_id: auxId || null, date: document.getElementById('fa-date').value, time: document.getElementById('fa-time').value, status: 'agendado' });
         if(error) UI.toast(`Erro: ${error.message}`, 'error'); else { Modals.close(); UI.toast('Horário bloqueado com sucesso!'); }
+    },
+    async blockAppointment(e) {
+        e.preventDefault();
+        const { error } = await db.from('appointments').insert({
+            user_id: App.user.id,
+            date: document.getElementById('fb-date').value,
+            time: document.getElementById('fb-time').value,
+            status: 'bloqueado',
+            notes: document.getElementById('fb-motivo').value
+        });
+        if(error) { UI.toast(`Erro: ${error.message}`, 'error'); } 
+        else { Modals.close(); UI.toast('Horário bloqueado/indisponível com sucesso!'); }
     },
 
     async createComanda(e) {
@@ -648,14 +753,35 @@ const Actions = {
         });
     },
     async closeComanda(comandaId, clientId, total, ticketNum) {
-        UI.confirm('Deseja fechar a comanda e enviar para Faturamento?', async () => {
+        UI.confirm('Deseja fechar a comanda, enviar para faturamento e processar custos fixos?', async () => {
+            
+            // Verifica e soma os Custos Fixos lançados no serviço
+            const { data: comanda } = await db.from('comandas').select('items').eq('id', comandaId).single();
+            let totalCustoFixo = 0;
+            if(comanda.items) {
+                comanda.items.forEach(item => {
+                    if (item.type === 'service' && item.cost) {
+                        totalCustoFixo += parseFloat(item.cost);
+                    }
+                });
+            }
+
             await db.from('comandas').update({ status: 'fechada' }).eq('id', comandaId);
-            if(total > 0) { await db.from('debts').insert({ client_id: clientId, total_amount: total, remaining_amount: total, comanda_id: comandaId, comanda_ticket: ticketNum }); }
-            Modals.close(); UI.toast('Comanda Faturada com Sucesso!');
+            
+            if(total > 0) { 
+                await db.from('debts').insert({ client_id: clientId, total_amount: total, remaining_amount: total, comanda_id: comandaId, comanda_ticket: ticketNum }); 
+            }
+            
+            // Dispara o desconto na tabela de Despesas para afetar o Fluxo de Caixa se houver custo fixo registrado
+            if(totalCustoFixo > 0) {
+                await db.from('despesas').insert({ description: `Custo Fixo - Ref: ${ticketNum}`, amount: totalCustoFixo, category: 'Custos Fixos' });
+            }
+
+            Modals.close(); UI.toast('Comanda Faturada e Custos Aplicados!');
         });
     },
     async reopenComanda(id) {
-        UI.confirm('ALERTA: Reabrir a comanda exclui as dívidas e os valores lançados no Extrato Financeiro provenientes dela. Continuar?', async () => {
+        UI.confirm('ALERTA: Reabrir exclui as dívidas ativas criadas por esta comanda. (Custos fixos já lançados permanecerão). Continuar?', async () => {
             await db.from('debts').delete().eq('comanda_id', id);
             await db.from('comandas').update({ status: 'aberta' }).eq('id', id);
             Modals.close(); UI.toast('Ação Desfeita! Comanda Reaberta.');
@@ -671,19 +797,21 @@ const Actions = {
     async fetchBarcode(val) {
         if(val.length >= 8) {
             const inputNome = document.getElementById('fp-nome');
-            inputNome.value = "Buscando no servidor...";
+            inputNome.value = "Buscando informações na internet...";
             try {
-                let res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${val}.json`);
+                // Nova requisição: API do Mercado Livre
+                let res = await fetch(`https://api.mercadolibre.com/sites/MLB/search?q=${val}`);
                 let json = await res.json();
-                if(json.status === 1 && json.product.product_name) {
-                    inputNome.value = json.product.product_name;
-                    UI.toast('Produto encontrado!', 'success'); return;
+                if(json.results && json.results.length > 0) {
+                    inputNome.value = json.results[0].title;
+                    UI.toast('Produto encontrado via Mercado Livre!', 'success'); return;
                 }
                 
-                res = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${val}`);
+                // Fallback de segurança (OpenFoodFacts)
+                res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${val}.json`);
                 json = await res.json();
-                if(json.items && json.items.length > 0) {
-                    inputNome.value = json.items[0].title;
+                if(json.status === 1 && json.product.product_name) {
+                    inputNome.value = json.product.product_name;
                     UI.toast('Produto encontrado!', 'success'); return;
                 }
                 throw new Error("Não encontrou");
@@ -692,8 +820,8 @@ const Actions = {
                 inputNome.removeAttribute('readonly'); 
                 inputNome.style.background = "#fff"; 
                 inputNome.style.cursor = "text"; 
-                inputNome.placeholder = "Não localizado na internet. Digite o nome...";
-                UI.toast('Produto não listado online. Digite o nome.', 'warning');
+                inputNome.placeholder = "Não localizado na internet. Digite o nome manualmente...";
+                UI.toast('Produto não listado online. Digite o nome manualmente.', 'warning');
             }
         }
     },
@@ -719,9 +847,15 @@ const Actions = {
         const nV = Math.max(0, max - v);
         await db.from('debts').update({ remaining_amount: nV }).eq('id', id); 
         if (nV === 0) { await db.from('debts').delete().eq('id', id); }
-        Modals.close(); UI.toast('Pagamento processado.'); 
+        Modals.close(); UI.toast('Pagamento processado.'); setTimeout(() => Modals.open('cobranca_detalhes', id), 100);
     },
-    async discountDebt(e, id, max) { e.preventDefault(); const perc = parseFloat(document.getElementById('f-val').value); await db.from('debts').update({ remaining_amount: Math.max(0, max - (max * perc / 100)) }).eq('id', id); Modals.close(); UI.toast('Desconto autorizado!'); },
+    async discountDebt(e, id, max) { 
+        e.preventDefault(); 
+        const perc = parseFloat(document.getElementById('f-val').value); 
+        await db.from('debts').update({ remaining_amount: Math.max(0, max - (max * perc / 100)) }).eq('id', id); 
+        Modals.close(); UI.toast('Desconto autorizado!'); 
+        setTimeout(() => Modals.open('cobranca_detalhes', id), 100);
+    },
 
     async saveSettings(e) {
         e.preventDefault(); const n = document.getElementById('cfg-name').value; const p = document.getElementById('cfg-phone').value;

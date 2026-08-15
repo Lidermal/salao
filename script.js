@@ -1,6 +1,6 @@
 /** 
  * SISTEMA ESTÚDIO AMOR QUE CUIDA
- * INTEGRAÇÃO COMPLETA
+ * INTEGRAÇÃO COMPLETA + QUINZENAS + RELATÓRIOS + COBRANÇAS EXCLUSIVAS
  */
 
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
@@ -24,24 +24,32 @@ const U = {
     iso: d => { const tzOffset = d.getTimezoneOffset() * 60000; return (new Date(d.getTime() - tzOffset)).toISOString().split('T')[0]; },
     date: d => new Date(d).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}),
     
-    // Geração Automática das Quinzenas (Ex: "Q2 Agosto 2026")
+    getCurrentQuinzenaValue() {
+        let curr = new Date();
+        let m = String(curr.getMonth() + 1).padStart(2, '0');
+        let y = curr.getFullYear();
+        let q = curr.getDate() <= 15 ? 'Q1' : 'Q2';
+        return `${y}-${m}-${q}`;
+    },
+    
     generateQuinzenasOptions() {
         let html = '';
         let curr = new Date();
-        for(let i=0; i<8; i++) { // Últimas 8 quinzenas (~4 meses)
+        for(let i=0; i<8; i++) {
             let d = new Date(curr.getFullYear(), curr.getMonth() - Math.floor(i/2), 1);
             let m = String(d.getMonth() + 1).padStart(2, '0');
             let y = d.getFullYear();
             let mName = d.toLocaleString('pt-BR', {month:'long'});
             let q = (i % 2 === 0) ? 'Q2' : 'Q1';
-            // Se hoje é dia <=15 e estamos no primeiro loop, pula a Q2 atual pois não começou
             if(i === 0 && curr.getDate() <= 15) continue;
-            html += `<option value="${y}-${m}-${q}">${q === 'Q1' ? '1ª' : '2ª'} Quinzena (${mName}/${y})</option>`;
+            let val = `${y}-${m}-${q}`;
+            html += `<option value="${val}">${q === 'Q1' ? '1ª' : '2ª'} Quinzena (${mName}/${y})</option>`;
         }
         return html;
     },
-    // Retorna as datas de início e fim da quinzena para o Supabase
+    
     getQuinzenaDates(val) {
+        if(!val) return { start: '1970-01-01T00:00:00Z', end: '2099-12-31T23:59:59Z' };
         const [y, m, q] = val.split('-');
         const lastDay = new Date(y, m, 0).getDate();
         if (q === 'Q1') return { start: `${y}-${m}-01T00:00:00Z`, end: `${y}-${m}-15T23:59:59Z` };
@@ -51,7 +59,7 @@ const U = {
         const opts = this.generateQuinzenasOptions();
         document.querySelectorAll('.quinzena-select').forEach(sel => {
             sel.innerHTML = opts;
-            sel.selectedIndex = 0; // A quinzena atual é sempre a primeira válida
+            sel.value = this.getCurrentQuinzenaValue(); // Seta sempre para a atual
         });
     }
 };
@@ -159,7 +167,7 @@ const Nav = {
         document.querySelectorAll('.nav-link, .b-item').forEach(el => el.classList.remove('active'));
         document.querySelectorAll(`[data-view="${id}"]`).forEach(el => el.classList.add('active'));
         
-        const titles = { agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', anamnese:'Ficha de Avaliação', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão' };
+        const titles = { agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', anamnese:'Ficha de Avaliação', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', relatorios:'Relatórios & Arquivos' };
         document.getElementById('page-title').textContent = titles[id] || 'Amor que Cuida';
         if(Render[id]) Render[id]();
     },
@@ -179,7 +187,6 @@ const Render = {
             const cont = document.getElementById('agenda-list');
             if(!data || !data.length) { cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Sua agenda está livre neste dia.</p></div>`; return; }
             
-            // Lógica de Agrupamento Contínuo dos Bloqueios
             let groupedData = [];
             let lastBlock = null;
 
@@ -306,7 +313,7 @@ const Render = {
         }).join('');
     },
 
-    // Ticket Visual de Cobranças
+    // Ticket Visual de Cobranças Exclusivas
     async cobrancas() {
         const { data: debts } = await db.from('debts').select('*, clients(name)').gt('remaining_amount', 0).order('created_at', {ascending: false});
         const cont = document.getElementById('cobrancas-list');
@@ -314,6 +321,7 @@ const Render = {
         
         let htmlFinal = '';
         for (let d of debts) {
+            const fTkt = `FAT-${d.id.substring(0,5).toUpperCase()}`; // Fatura Exclusiva
             const ticketsArr = d.comanda_ticket ? d.comanda_ticket.split(', ').map(t => t.trim()) : [];
             const { data: relatedComandas } = await db.from('comandas').select('items, created_at, ticket').in('ticket', ticketsArr);
             
@@ -322,9 +330,9 @@ const Render = {
                 relatedComandas.forEach(rc => {
                     const dt = new Date(rc.created_at).toLocaleDateString();
                     if(rc.items) {
-                        htmlList += `<div style="font-size:0.75rem; color:var(--primary); margin-top:10px; border-bottom:1px dashed #ccc; padding-bottom:3px; font-family:sans-serif;">Ticket: ${rc.ticket} (${dt})</div>`;
+                        htmlList += `<div style="font-size:0.75rem; color:#666; margin-top:10px; border-bottom:1px dashed #ccc; padding-bottom:3px; font-family:sans-serif;">Comanda Origem: ${rc.ticket} (${dt})</div>`;
                         rc.items.forEach(i => {
-                            htmlList += `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px dashed #eee; font-size:0.95rem;"><span>${i.name}</span><b>${U.money(i.price)}</b></div>`;
+                            htmlList += `<div style="display:flex; justify-content:space-between; padding:5px 0; font-size:0.95rem;"><span>${i.name}</span><b>${U.money(i.price)}</b></div>`;
                         });
                     }
                 });
@@ -333,22 +341,22 @@ const Render = {
             htmlFinal += `
             <div class="card" style="padding:0; overflow:hidden; border:1px solid #d32f2f;">
                 <div style="background:#fffee6; padding:20px; font-family:'Courier New', Courier, monospace; color:#333; border-bottom:2px dashed #ccc;">
-                    <h3 style="text-align:center; font-family:'Courier New', monospace; font-weight:bold; margin-bottom:15px; font-size:1.4rem; color:#d32f2f">TICKET DE COBRANÇA</h3>
-                    <p style="margin-bottom:5px"><b>Cliente:</b> ${d.clients?.name}</p>
-                    <p style="margin-bottom:15px; font-size:0.8rem"><b>Ref Unificada:</b> ${d.comanda_ticket}</p>
+                    <h3 style="text-align:center; font-family:'Courier New', monospace; font-weight:bold; margin-bottom:5px; font-size:1.4rem; color:#d32f2f">FATURA DE COBRANÇA</h3>
+                    <h4 style="text-align:center; margin-bottom:15px; font-size:1rem; color:#666">${fTkt}</h4>
+                    <p style="margin-bottom:5px; border-bottom:1px solid #ddd; padding-bottom:10px;"><b>Cliente:</b> ${d.clients?.name}</p>
                     
-                    <div style="border-top:1px dashed #999; border-bottom:1px dashed #999; padding:10px 0; margin-bottom:15px; max-height:200px; overflow-y:auto;">
+                    <div style="padding:10px 0; margin-bottom:15px; max-height:200px; overflow-y:auto; border-bottom:1px dashed #999;">
                         ${htmlList || 'Nenhum detalhe de itens encontrado.'}
                     </div>
                     
-                    <div style="font-size:0.85rem; color:#666; margin-bottom:10px">Valor Total Consumido: ${U.money(d.total_amount)}</div>
-                    <div style="display:flex; justify-content:space-between; font-size:1.2rem; font-weight:bold; color:#d32f2f">
+                    <div style="font-size:0.85rem; color:#666; margin-bottom:10px; text-align:right;">Valor Original Consumido: ${U.money(d.total_amount)}</div>
+                    <div style="display:flex; justify-content:space-between; font-size:1.4rem; font-weight:bold; color:#d32f2f; padding-top:10px">
                         <span>FALTA PAGAR:</span>
                         <span>${U.money(d.remaining_amount)}</span>
                     </div>
                 </div>
                 <div style="padding:15px; display:flex; gap:10px; background:#fff">
-                    <button class="btn-primary" style="flex:1; background:#2e7d32;" onclick="Modals.open('debitar', '${d.id}', ${d.remaining_amount})"><i class="ph ph-money"></i> Receber Pagamento</button>
+                    <button class="btn-primary" style="flex:1; background:#2e7d32;" onclick="Modals.open('debitar', '${d.id}', ${d.remaining_amount}, '${fTkt}')"><i class="ph ph-money"></i> Receber Pagamento</button>
                     ${App.role==='owner' ? `<button class="btn-secondary" style="width:auto;" onclick="Modals.open('desconto', '${d.id}', ${d.remaining_amount})"><i class="ph ph-percent"></i> Desc.</button>` : ''}
                 </div>
             </div>`;
@@ -410,6 +418,8 @@ const Render = {
                 <button class="btn-secondary" style="flex:1; color:#d32f2f; background:#ffebee" onclick="Actions.deleteMensagem('${m.id}')"><i class="ph ph-trash"></i> Excluir</button>
             </div></div>`).join('');
     },
+    
+    // FUNCIONÁRIOS (Sempre esconde o admin.teste)
     async funcionarios() {
         const { data } = await db.from('users').select('*').neq('username', 'admin.teste').order('name');
         document.getElementById('funcionarios-list').innerHTML = data.map(u => `
@@ -425,20 +435,18 @@ const Render = {
             </div>`).join('');
     },
     
+    // TELAS OPERACIONAIS FIXADAS NA QUINZENA ATUAL
     async despesas() {
         let query = db.from('despesas').select('*').order('date', {ascending: false});
-        
-        const qFilter = document.getElementById('filter-despesa-quinzena')?.value;
-        if (qFilter) {
-            const range = U.getQuinzenaDates(qFilter);
-            query = query.gte('date', range.start).lte('date', range.end);
-        }
+        const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); // Busca SOMENTE a quinzena atual
+        query = query.gte('date', range.start).lte('date', range.end);
 
         const { data } = await query;
         let totais = { 'Custos Fixos': 0, 'Comissões': 0, 'Pessoal/Pagamentos': 0, 'Custos Variáveis': 0 };
         data.forEach(d => { if(totais[d.category] !== undefined) totais[d.category] += d.amount; else totais['Custos Variáveis'] += d.amount; });
         
         document.getElementById('despesas-list').innerHTML = `
+            <p style="color:var(--muted); font-size:0.9rem; margin-bottom:1.5rem"><i class="ph ph-info"></i> Registros de quinzenas anteriores foram arquivados em <b>Relatórios & Arquivos</b>.</p>
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:20px">
                 <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #d32f2f"><p style="font-size:0.8rem">Custos Fixos</p><div class="val" style="color:#d32f2f; font-size:1.2rem">-${U.money(totais['Custos Fixos'])}</div></div>
                 <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #cd7f32"><p style="font-size:0.8rem">Comissões Autom.</p><div class="val" style="color:#cd7f32; font-size:1.2rem">-${U.money(totais['Comissões'])}</div></div>
@@ -462,26 +470,22 @@ const Render = {
             type: 'pie', 
             data: { labels: Object.keys(totais), datasets: [{ data: Object.values(totais), backgroundColor: ['#d32f2f', '#cd7f32', '#8e24aa', '#e65100'] }] }
         });
-
-        window.currentDespesasData = data;
     },
 
     async comissao() {
         const isOwner = App.role === 'owner';
         let query = db.from('comandas').select('*, users(name)');
         
-        const qFilter = document.getElementById('filter-comissao-quinzena')?.value;
-        if (qFilter) {
-            const range = U.getQuinzenaDates(qFilter);
-            query = query.gte('created_at', range.start).lte('created_at', range.end);
-        }
+        const qFilter = document.getElementById('filter-comissao-quinzena')?.value || U.getCurrentQuinzenaValue();
+        const range = U.getQuinzenaDates(qFilter);
+        query = query.gte('created_at', range.start).lte('created_at', range.end);
 
         if(!isOwner) query = query.eq('user_id', App.user.id);
         const { data } = await query;
         
         let html = ''; let totalComissao = 0; let rank = {};
         data.forEach(c => {
-            if(!c.items || c.status !== 'fechada') return; // Somente comandas fechadas geram comissao real
+            if(!c.items || c.status !== 'fechada') return; 
             c.items.forEach(i => {
                 if(i.commission) {
                     const v = (i.price * i.commission) / 100;
@@ -510,12 +514,9 @@ const Render = {
         let qComand = db.from('comandas').select('total, ticket, created_at').eq('status', 'fechada');
         let qDesp = db.from('despesas').select('description, amount, date');
         
-        const qFilter = document.getElementById('filter-fluxo-quinzena')?.value;
-        if (qFilter) {
-            const range = U.getQuinzenaDates(qFilter);
-            qComand = qComand.gte('created_at', range.start).lte('created_at', range.end);
-            qDesp = qDesp.gte('date', range.start).lte('date', range.end);
-        }
+        const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); // Busca SOMENTE a quinzena atual
+        qComand = qComand.gte('created_at', range.start).lte('created_at', range.end);
+        qDesp = qDesp.gte('date', range.start).lte('date', range.end);
 
         const [ {data:comand}, {data:desp} ] = await Promise.all([qComand, qDesp]);
         
@@ -524,6 +525,7 @@ const Render = {
         const lucro = receita - gasto;
         
         document.getElementById('resumo-cards').innerHTML = `
+            <p style="color:var(--muted); font-size:0.9rem; margin-bottom:1.5rem"><i class="ph ph-info"></i> Registros de quinzenas anteriores foram arquivados em <b>Relatórios & Arquivos</b>.</p>
             <div class="card" style="border-bottom:4px solid #2e7d32"><h4>Faturamento (Entradas)</h4><div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(receita)}</div></div>
             <div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custos Gerais (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(gasto)}</div></div>
             <div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
@@ -532,15 +534,15 @@ const Render = {
         comand.forEach(c => { if(c.total>0) extrato.push({ type: 'in', desc: `Comanda Fechada ${c.ticket||'-'}`, val: c.total, date: new Date(c.created_at) }); });
         desp.forEach(d => { extrato.push({ type: 'out', desc: d.description, val: d.amount, date: new Date(d.date) }); });
         
-        // ORDENAÇÃO EXATA BANCÁRIA (O MAIS ANTIGO PRIMEIRO PARA CALCULAR SALDO)
+        // ORDENAÇÃO EXATA BANCÁRIA: Tempo cronológico normal (do mais antigo para calcular o saldo). 
+        // Se tempos forem exatos (fechamento): Receita(1) -> Custo(2) -> Comissão(3)
         extrato.sort((a,b) => {
             let tA = a.date.getTime();
             let tB = b.date.getTime();
-            if (tA !== tB) return tA - tB;
+            if (tA !== tB) return tA - tB; 
             
-            // Se mesma data exata (fechamento de comanda): Ordem: 1º Comissão, 2º Custo Fixo, 3º Receita
-            let pA = a.type === 'in' ? 3 : (a.desc.includes('Custo') ? 2 : 1);
-            let pB = b.type === 'in' ? 3 : (b.desc.includes('Custo') ? 2 : 1);
+            let pA = a.type === 'in' ? 1 : (a.desc.includes('Custo') ? 2 : 3);
+            let pB = b.type === 'in' ? 1 : (b.desc.includes('Custo') ? 2 : 3);
             return pA - pB;
         });
         
@@ -551,9 +553,10 @@ const Render = {
         });
         
         // INVERTER PARA MOSTRAR O MAIS RECENTE EM CIMA
+        // A inversão de [Receita, Custo, Comissão] vira [Comissão, Custo, Receita]. O que é exatamente o solicitado!
         extrato.reverse();
         
-        document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações financeiras nesta quinzena.</p>' :
+        document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações na quinzena atual.</p>' :
             extrato.map(i => `
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;">
                 <div style="flex:1">
@@ -566,13 +569,60 @@ const Render = {
                     <span style="font-size:0.85rem; color:var(--muted); font-weight:bold">Saldo Contábil: ${U.money(i.saldo)}</span>
                 </div>
             </div>`).join('');
-            
-        window.currentFluxoData = extrato;
-        window.currentTotaisFluxo = { receita, gasto, lucro };
+    },
+
+    // NOVA RENDERIZAÇÃO: RELATÓRIOS & ARQUIVOS
+    async relatorios() {
+        const qFilter = document.getElementById('filter-relatorios').value;
+        const range = U.getQuinzenaDates(qFilter);
+        
+        let qComand = db.from('comandas').select('total, ticket, created_at').eq('status', 'fechada').gte('created_at', range.start).lte('created_at', range.end);
+        let qDesp = db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
+        
+        const [ {data:comand}, {data:desp} ] = await Promise.all([qComand, qDesp]);
+
+        // Processa Despesas
+        let htmlDesp = '';
+        if(desp.length === 0) { htmlDesp = '<p style="color:var(--muted); text-align:center;">Sem gastos registrados na quinzena.</p>'; }
+        else {
+            let despArr = [...desp].sort((a,b) => new Date(b.date) - new Date(a.date));
+            htmlDesp = despArr.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${d.description}</b><br><span style="font-size:0.8rem; color:#888">${new Date(d.date).toLocaleString('pt-BR')} - ${d.category}</span></div><div style="color:#d32f2f; font-weight:bold">-${U.money(d.amount)}</div></div>`).join('');
+        }
+        document.getElementById('relatorio-despesas-conteudo').innerHTML = htmlDesp;
+        window.currentDespesasData = desp;
+
+        // Processa Fluxo
+        let extrato = [];
+        comand.forEach(c => { if(c.total>0) extrato.push({ type: 'in', desc: `Comanda Fechada ${c.ticket||'-'}`, val: c.total, date: new Date(c.created_at) }); });
+        desp.forEach(d => { extrato.push({ type: 'out', desc: d.description, val: d.amount, date: new Date(d.date) }); });
+        
+        extrato.sort((a,b) => {
+            let tA = a.date.getTime(); let tB = b.date.getTime();
+            if (tA !== tB) return tA - tB;
+            let pA = a.type === 'in' ? 1 : (a.desc.includes('Custo') ? 2 : 3);
+            let pB = b.type === 'in' ? 1 : (b.desc.includes('Custo') ? 2 : 3);
+            return pA - pB;
+        });
+        
+        let saldoAtual = 0; let totalIn = 0; let totalOut = 0;
+        extrato = extrato.map(item => { 
+            if(item.type === 'in') totalIn += item.val; else totalOut += item.val;
+            saldoAtual += item.type === 'in' ? item.val : -item.val; 
+            return { ...item, saldo: saldoAtual }; 
+        });
+        extrato.reverse();
+        
+        let htmlFluxo = '';
+        if(extrato.length === 0) { htmlFluxo = '<p style="color:var(--muted); text-align:center;">Nenhuma movimentação financeira.</p>'; }
+        else {
+            htmlFluxo += `<div style="background:#f9f9f9; padding:15px; border-radius:8px; display:flex; justify-content:space-around; margin-bottom:15px;"><div>Entradas: <b style="color:#2e7d32">${U.money(totalIn)}</b></div><div>Saídas: <b style="color:#d32f2f">-${U.money(totalOut)}</b></div><div>Líquido: <b style="color:${(totalIn-totalOut)>=0?'#2e7d32':'#d32f2f'}">${U.money(totalIn-totalOut)}</b></div></div>`;
+            htmlFluxo += extrato.map(i => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}">${i.type==='in'?'[+]':'[-]'}</b> ${i.desc}<br><span style="font-size:0.8rem; color:#888">${i.date.toLocaleString('pt-BR')}</span></div><div style="text-align:right"><b>${U.money(i.val)}</b><br><span style="font-size:0.75rem; color:#666">Saldo: ${U.money(i.saldo)}</span></div></div>`).join('');
+        }
+        document.getElementById('relatorio-fluxo-conteudo').innerHTML = htmlFluxo;
+        window.currentFluxoData = extrato; window.currentTotaisFluxo = { receita: totalIn, gasto: totalOut, lucro: totalIn - totalOut };
     },
 
     async performance() {
-        // Performance mantém geral como dashboard
         const [ {data}, {data:agendas} ] = await Promise.all([ db.from('comandas').select('*, users(name), items').eq('status', 'fechada'), db.from('appointments').select('*') ]);
         let rankFunc = {}; let rankServ = {}; let totalFaturamento = 0;
         data.forEach(c => { 
@@ -608,7 +658,7 @@ const Render = {
 };
 
 const Modals = {
-    async open(type, param1=null, param2=null) {
+    async open(type, param1=null, param2=null, param3=null) {
         const cont = document.getElementById('modal-container');
         let html = `<div class="modal"><button class="modal-close" onclick="Modals.close()"><i class="ph ph-x"></i></button>`;
         
@@ -761,7 +811,7 @@ const Modals = {
         else if(type === 'debitar' || type === 'desconto') {
             html += `<h3>${type==='debitar'?'Registrar Recebimento':'Aplicar Desconto'}</h3>
             <div style="background:#f9f9f9; padding:20px; border-radius:12px; margin-bottom:20px; border-left:5px solid #d32f2f">
-                <p style="color:var(--muted); font-size:0.9rem; margin-bottom:5px">Pendente no Recibo:</p>
+                <p style="color:var(--muted); font-size:0.9rem; margin-bottom:5px">Ref: ${param3 || 'Pendente no Recibo'}</p>
                 <b style="font-size:2rem; color:#d32f2f">${U.money(param2)}</b>
             </div>
             <form onsubmit="Actions.${type==='debitar'?'debitDebt':'discountDebt'}(event, '${param1}', ${param2})">
@@ -811,7 +861,7 @@ const Modals = {
 };
 
 const Actions = {
-    exportPDF(viewType) {
+    exportPDF(viewType, quinzenaStr) {
         if(!window.jspdf) return UI.toast('Carregando PDF. Tente novamente em instantes.', 'warning');
         const { jsPDF } = window.jspdf;
         const doc = new jsPDF();
@@ -824,20 +874,20 @@ const Actions = {
         
         if (viewType === 'despesas') {
             doc.text(`Relatório de Despesas e Custos Gerais`, 105, 30, null, null, "center");
-            const filter = document.getElementById('filter-despesa-quinzena')?.options[document.getElementById('filter-despesa-quinzena').selectedIndex].text || 'Geral';
-            doc.text(`Período: ${filter}`, 105, 38, null, null, "center");
+            const qTxt = document.getElementById('filter-relatorios').options[document.getElementById('filter-relatorios').selectedIndex].text;
+            doc.text(`Período: ${qTxt}`, 105, 38, null, null, "center");
             
             if(!window.currentDespesasData || window.currentDespesasData.length === 0) return UI.toast('Sem dados no momento.', 'warning');
             
             const rows = window.currentDespesasData.map(d => [ new Date(d.date).toLocaleString('pt-BR'), d.category, d.description, U.money(d.amount) ]);
             doc.autoTable({ startY: 45, head: [['Data', 'Categoria', 'Descrição', 'Valor (R$)']], body: rows, theme: 'striped', headStyles: { fillColor: [183, 110, 121] } });
-            doc.save(`AQC_Despesas_${filter.replace(/ /g,'_')}.pdf`);
+            doc.save(`AQC_Despesas_${quinzenaStr}.pdf`);
             UI.toast('Relatório de Despesas Gerado!');
             
         } else if (viewType === 'fluxo') {
             doc.text(`Relatório de Fluxo de Caixa (Extrato Bancário)`, 105, 30, null, null, "center");
-            const filter = document.getElementById('filter-fluxo-quinzena')?.options[document.getElementById('filter-fluxo-quinzena').selectedIndex].text || 'Geral';
-            doc.text(`Período: ${filter}`, 105, 38, null, null, "center");
+            const qTxt = document.getElementById('filter-relatorios').options[document.getElementById('filter-relatorios').selectedIndex].text;
+            doc.text(`Período: ${qTxt}`, 105, 38, null, null, "center");
             
             if(!window.currentFluxoData || window.currentFluxoData.length === 0) return UI.toast('Sem dados.', 'warning');
             
@@ -847,7 +897,7 @@ const Actions = {
 
             const rows = window.currentFluxoData.map(d => [ d.date.toLocaleString('pt-BR'), d.type === 'in' ? 'Entrada' : 'Saída', d.desc, U.money(d.val), U.money(d.saldo) ]);
             doc.autoTable({ startY: 55, head: [['Data', 'Tipo', 'Descrição', 'Movimentação', 'Saldo Contábil']], body: rows, theme: 'striped', headStyles: { fillColor: [183, 110, 121] } });
-            doc.save(`AQC_Fluxo_Caixa_${filter.replace(/ /g,'_')}.pdf`);
+            doc.save(`AQC_Fluxo_Caixa_${quinzenaStr}.pdf`);
             UI.toast('Relatório de Fluxo Gerado!');
         }
     },
@@ -864,7 +914,6 @@ const Actions = {
     async createClient(e) { e.preventDefault(); await db.from('clients').insert({ name: document.getElementById('fc-nome').value, phone: document.getElementById('fc-fone').value }); Modals.close(); UI.toast('Cliente adicionado!'); Render.clientes(); },
     async updateClient(e, id) { e.preventDefault(); await db.from('clients').update({ name: document.getElementById('fce-nome').value, phone: document.getElementById('fce-fone').value }).eq('id', id); Modals.close(); UI.toast('Cliente alterado!'); Render.clientes(); },
     
-    // ANAMNESE BUG RESOLVIDO COM ID CORRETO PASSADO POR PARAM1
     async saveAnamnese(e, idCliente) {
         e.preventDefault(); 
         if (!idCliente || idCliente === 'undefined') { UI.toast('Erro de ID. Volte e clique na Ficha novamente.', 'error'); return; }
@@ -889,7 +938,6 @@ const Actions = {
         div.innerHTML = data.map(d => `<div class="card" style="border-left: 4px solid var(--primary); background:#fffafb"><h4 style="font-size:0.9rem; color:var(--muted); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px"><i class="ph ph-calendar-blank"></i> ${new Date(d.created_at).toLocaleString('pt-BR')} &nbsp;•&nbsp; <i class="ph ph-user"></i> Prof: ${d.users?.name || 'Sistema'}</h4><p style="margin-bottom:8px"><b>Histórico:</b> ${d.history}</p><p style="margin-bottom:8px"><b>Hábitos:</b> ${d.habits}</p><p style="margin-bottom:8px"><b>Objetivo:</b> ${d.objectives}</p><p style="padding:15px; background:white; border:1px solid #eee; border-radius:12px; margin-top:15px"><b style="color:var(--primary-dark)">Diagnóstico:</b><br>${d.notes}</p></div>`).join('');
     },
 
-    // FUNCIONARIOS (NOVO)
     async saveFuncionario(e, id) {
         e.preventDefault();
         const nome = document.getElementById('ff-nome').value;
@@ -1019,20 +1067,17 @@ const Actions = {
         await db.from('services').insert({ name: document.getElementById('fs-nome').value, price: document.getElementById('fs-valor').value, cost: document.getElementById('fs-custo').value, commission: document.getElementById('fs-com').value, has_assistant: aux, assistant_commission: aux ? document.getElementById('fs-auxcom').value : 0 }); Modals.close(); UI.toast('Serviço adicionado!'); Render.servicos();
     },
     
-    // API CÓDIGO DE BARRAS REESCRITA E ABERTA
     async fetchBarcode(val) {
         if(val.length >= 8) {
             const inputNome = document.getElementById('fp-nome');
             inputNome.value = "Buscando nas bases online...";
             
-            // Tentativa 1: UPCItemDB (Global Base)
             try {
                 let res1 = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${val}`);
                 let json1 = await res1.json();
                 if(json1.items && json1.items.length > 0) { inputNome.value = json1.items[0].title; UI.toast('Produto encontrado!', 'success'); return; }
             } catch(e) {}
             
-            // Tentativa 2: Mercado Livre
             try {
                 let res2 = await fetch(`https://api.mercadolibre.com/sites/MLB/search?q=${val}`);
                 let json2 = await res2.json();

@@ -169,7 +169,12 @@ const Nav = {
         
         const titles = { agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', anamnese:'Ficha de Avaliação', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', relatorios:'Relatórios & Arquivos' };
         document.getElementById('page-title').textContent = titles[id] || 'Amor que Cuida';
-        if(Render[id]) Render[id]();
+        
+        // Telas de DETALHE (Anamnese/Perfil) já são renderizadas por quem as chama (Render.anamnese/Render.perfilCliente),
+        // pois precisam do ID do cliente como parâmetro. Chamar Render[id]() aqui de novo (sem parâmetros) sobrescrevia
+        // o ID já salvo com "undefined" e recriava a tela em loop. Por isso ficam de fora do auto-render genérico.
+        const detailViews = ['anamnese', 'perfil-cliente'];
+        if(Render[id] && !detailViews.includes(id)) Render[id]();
     },
     toggleMenu() { document.getElementById('main-sidebar').classList.toggle('open'); document.getElementById('mobile-overlay').classList.toggle('hidden'); },
     closeMenu() { document.getElementById('main-sidebar').classList.remove('open'); document.getElementById('mobile-overlay').classList.add('hidden'); }

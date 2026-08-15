@@ -8,7 +8,7 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Bibliotecas para Gerar PDF -->
+    <!-- Bibliotecas para Gerar PDF Compatíveis com Mobile -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     
@@ -17,17 +17,15 @@
 </head>
 <body>
 
-    <!-- TELA DE CARREGAMENTO (SPLASH SCREEN) -->
+    <!-- TELA DE CARREGAMENTO -->
     <div id="splash-screen" style="position: fixed; inset: 0; background: var(--primary); z-index: 9999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; transition: opacity 0.5s;">
         <i class="ph ph-scissors" style="font-size: 5rem; margin-bottom: 1rem; animation: pulse 1.5s infinite;"></i>
         <h1 style="color: white; font-size: 2.8rem; margin-bottom: 0.5rem; text-align:center; font-family: 'Playfair Display', serif;">Estúdio Amor Que Cuida</h1>
         <p style="font-size: 1.2rem; font-weight: 300; letter-spacing: 2px;">by Andressa Vieira</p>
     </div>
-    <style>
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
-    </style>
+    <style> @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } } </style>
 
-    <!-- ALERTAS E CONFIRMAÇÕES -->
+    <!-- ALERTAS -->
     <div id="toast-container"></div>
     <div id="custom-confirm" class="overlay hidden" style="z-index: 999999;">
         <div class="modal" style="max-width: 400px; text-align: center;">
@@ -40,7 +38,7 @@
         </div>
     </div>
 
-    <!-- TELA DE LOGIN / AUTENTICAÇÃO -->
+    <!-- TELA DE LOGIN -->
     <div id="auth-layer" class="auth-layer active">
         <section id="login-screen" class="screen active">
             <div class="login-card">
@@ -69,7 +67,7 @@
                 <a href="#" class="nav-link" data-view="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
                 <a href="#" class="nav-link" data-view="clientes"><i class="ph ph-users"></i> Clientes</a>
                 
-                <div class="nav-section owner-only">ESTOQUE & SERVIÇOS</div>
+                <div class="nav-section owner-only">GESTÃO DE ESTOQUE</div>
                 <a href="#" class="nav-link owner-only" data-view="servicos"><i class="ph ph-sparkle"></i> Catálogo de Serviços</a>
                 <a href="#" class="nav-link owner-only" data-view="produtos"><i class="ph ph-package"></i> Controle de Produtos</a>
                 
@@ -78,9 +76,10 @@
                 <a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Comissionamento</a>
                 <a href="#" class="nav-link owner-only" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Fluxo de Caixa</a>
                 
-                <div class="nav-section owner-only">INTELIGÊNCIA</div>
+                <div class="nav-section owner-only">INTELIGÊNCIA & ADMIN</div>
                 <a href="#" class="nav-link owner-only" data-view="performance"><i class="ph ph-chart-line-up"></i> Painel de Performance</a>
                 <a href="#" class="nav-link owner-only" data-view="mensagens"><i class="ph ph-chat-circle-text"></i> Mensagens Prontas</a>
+                <a href="#" class="nav-link owner-only" data-view="funcionarios"><i class="ph ph-identification-badge"></i> Equipe / Colaboradores</a>
                 
                 <div class="spacer" style="margin-top: 2rem;"></div>
                 <a href="#" class="nav-link owner-only" data-view="configuracoes"><i class="ph ph-gear"></i> Configurações</a>
@@ -115,12 +114,10 @@
                 
                 <section id="view-comandas" class="view">
                     <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('comanda')">+ Gerar Nova Comanda</button>
-                    
-                    <div style="margin-bottom:15px; display:flex; gap:10px; align-items:center">
-                        <label style="font-size:0.9rem; font-weight:bold">Filtrar Comandas do Mês:</label>
-                        <input type="month" id="filter-comanda-month" onchange="Render.comandas()" style="padding:0.5rem; border-radius:8px; border:1px solid var(--border)">
+                    <div style="margin-bottom:15px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+                        <label style="font-size:0.9rem; font-weight:bold">Filtrar Quinzena / Mês:</label>
+                        <select id="filter-comanda-quinzena" class="quinzena-select" onchange="Render.comandas()" style="padding:0.5rem; border-radius:8px; border:1px solid var(--border); flex:1"></select>
                     </div>
-
                     <div id="comandas-list" class="data-grid"></div>
                 </section>
                 
@@ -135,7 +132,7 @@
                         <h2 id="anamnese-title">Ficha de Avaliação</h2>
                         <input type="hidden" id="current-anamnese-client-id">
                     </div>
-                    <button class="btn-primary" onclick="Modals.open('nova_anamnese')" style="margin-bottom: 1.5rem; width:auto; padding:0.8rem 1.5rem">+ Nova Avaliação Clínica</button>
+                    <button class="btn-primary" onclick="Modals.open('nova_anamnese', document.getElementById('current-anamnese-client-id').value)" style="margin-bottom: 1.5rem; width:auto; padding:0.8rem 1.5rem">+ Nova Avaliação Clínica</button>
                     <div id="anamnese-history-list" class="data-list"></div>
                 </section>
 
@@ -145,11 +142,8 @@
                         <h2 id="perfil-cliente-title">Perfil do Cliente</h2>
                         <input type="hidden" id="current-perfil-client-id">
                     </div>
-                    
-                    <!-- Destaque para pendências -->
                     <div id="perfil-debitos-destaque" style="margin-bottom: 1.5rem;"></div>
                     <div id="perfil-anamnese-destaque" style="margin-bottom: 1.5rem;"></div>
-                    
                     <div id="perfil-info" style="margin-bottom: 2rem;"></div>
                     <h3 style="margin-bottom: 15px;">Histórico de Visitas no Salão</h3>
                     <div id="perfil-visitas-list" class="data-list"></div>
@@ -169,40 +163,45 @@
                     <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('mensagem')">+ Criar Template</button>
                     <div id="mensagens-list" class="data-grid"></div>
                 </section>
+
+                <section id="view-funcionarios" class="view">
+                    <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('funcionario')">+ Registrar Colaborador</button>
+                    <div id="funcionarios-list" class="data-grid"></div>
+                </section>
                 
-                <!-- DASHBOARDS E RELATÓRIOS -->
                 <section id="view-despesas" class="view">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center; flex-wrap:wrap; gap:10px;">
                         <h2>Gestão de Custos</h2>
                         <div style="display:flex; gap:10px">
-                            <button class="btn-secondary desktop-only" style="width:auto; padding:0.6rem 1.2rem; border:1px solid #d32f2f; color:#d32f2f" onclick="Actions.exportPDF('despesas')"><i class="ph ph-file-pdf"></i> Baixar Relatório PDF</button>
+                            <button class="btn-secondary desktop-only" style="width:auto; padding:0.6rem 1.2rem; border:1px solid #d32f2f; color:#d32f2f" onclick="Actions.exportPDF('despesas')"><i class="ph ph-file-pdf"></i> PDF</button>
                             <button class="btn-primary desktop-only" style="width:auto; padding:0.6rem 1.2rem" onclick="Modals.open('despesa')">+ Lançar Despesa Manual</button>
                         </div>
                     </div>
-                    
-                    <div style="margin-bottom:15px; display:flex; gap:10px; align-items:center">
-                        <label style="font-size:0.9rem; font-weight:bold">Filtrar Mês/Ano:</label>
-                        <input type="month" id="filter-despesa-month" onchange="Render.despesas()" style="padding:0.5rem; border-radius:8px; border:1px solid var(--border)">
-                        <span style="font-size:0.8rem; color:var(--muted);">(Isto arquiva visualmente os meses anteriores)</span>
+                    <div style="margin-bottom:15px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+                        <label style="font-size:0.9rem; font-weight:bold">Arquivamento de Período:</label>
+                        <select id="filter-despesa-quinzena" class="quinzena-select" onchange="Render.despesas()" style="padding:0.5rem; border-radius:8px; border:1px solid var(--border); flex:1"></select>
                     </div>
-
                     <canvas id="chart-despesas" style="width:100%; max-height:250px; margin-bottom:2rem"></canvas>
                     <div id="despesas-list" class="data-list"></div>
                 </section>
 
-                <section id="view-comissao" class="view"><div id="comissao-dashboard"></div></section>
+                <section id="view-comissao" class="view">
+                    <div style="margin-bottom:15px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+                        <label style="font-size:0.9rem; font-weight:bold">Visualizar Quinzena:</label>
+                        <select id="filter-comissao-quinzena" class="quinzena-select" onchange="Render.comissao()" style="padding:0.5rem; border-radius:8px; border:1px solid var(--border); flex:1"></select>
+                    </div>
+                    <div id="comissao-dashboard"></div>
+                </section>
                 
                 <section id="view-resumo-financeiro" class="view">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center">
+                    <div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center; flex-wrap:wrap; gap:10px;">
                         <h2>Fluxo de Caixa</h2>
-                        <button class="btn-secondary desktop-only" style="width:auto; padding:0.6rem 1.2rem; border:1px solid #2e7d32; color:#2e7d32" onclick="Actions.exportPDF('fluxo')"><i class="ph ph-file-pdf"></i> Exportar Fluxo (PDF)</button>
+                        <button class="btn-secondary desktop-only" style="width:auto; padding:0.6rem 1.2rem; border:1px solid #2e7d32; color:#2e7d32" onclick="Actions.exportPDF('fluxo')"><i class="ph ph-file-pdf"></i> Baixar Relatório</button>
                     </div>
-                    
-                    <div style="margin-bottom:15px; display:flex; gap:10px; align-items:center">
-                        <label style="font-size:0.9rem; font-weight:bold">Filtrar Mês/Ano:</label>
-                        <input type="month" id="filter-fluxo-month" onchange="Render['resumo-financeiro']()" style="padding:0.5rem; border-radius:8px; border:1px solid var(--border)">
+                    <div style="margin-bottom:15px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+                        <label style="font-size:0.9rem; font-weight:bold">Pasta / Período:</label>
+                        <select id="filter-fluxo-quinzena" class="quinzena-select" onchange="Render['resumo-financeiro']()" style="padding:0.5rem; border-radius:8px; border:1px solid var(--border); flex:1"></select>
                     </div>
-
                     <div id="resumo-cards" class="data-grid" style="margin-bottom:2rem"></div>
                     <div class="card" style="margin-bottom:1rem">
                         <h3 style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:10px">Extrato Detalhado</h3>
@@ -240,7 +239,7 @@
         </nav>
     </div>
 
-    <!-- CONTAINER DE POP-UPS -->
+    <!-- CONTAINER DE MODAIS -->
     <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
     
     <script src="script.js"></script>

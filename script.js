@@ -1,5 +1,6 @@
 /** 
  * SISTEMA ESTÚDIO AMOR QUE CUIDA
+ * INTEGRAÇÃO COMPLETA DE MELHORIAS (FINANCEIRO, ESTOQUE, PDF, AGENDA)
  */
 
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
@@ -21,7 +22,18 @@ const App = {
 const U = {
     money: v => new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'}).format(v||0),
     iso: d => { const tzOffset = d.getTimezoneOffset() * 60000; return (new Date(d.getTime() - tzOffset)).toISOString().split('T')[0]; },
-    date: d => new Date(d).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'})
+    date: d => new Date(d).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}),
+    // Set filters automatically to the current month to act as the "archiving" feature for new months
+    initFilters: () => {
+        const now = new Date();
+        const monthVal = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+        const despesaInput = document.getElementById('filter-despesa-month');
+        const fluxoInput = document.getElementById('filter-fluxo-month');
+        const comandaInput = document.getElementById('filter-comanda-month');
+        if(despesaInput) despesaInput.value = monthVal;
+        if(fluxoInput) fluxoInput.value = monthVal;
+        if(comandaInput) comandaInput.value = monthVal;
+    }
 };
 
 const UI = {
@@ -68,15 +80,12 @@ const Auth = {
             App.user = data; 
             App.role = data.role;
             
-            // Entra no sistema independentemente de ser o primeiro acesso
             document.getElementById('login-form').reset();
             this.success();
 
-            // Se for o primeiro acesso ou senha 123456, joga o modal na frente sem poder fechar
             if(data.first_login || p === '123456') { 
                 setTimeout(() => {
                     Modals.open('first_login'); 
-                    // Oculta o botão de fechar para forçar a alteração
                     const closeBtn = document.querySelector('#modal-container .modal-close');
                     if(closeBtn) closeBtn.style.display = 'none';
                 }, 500);
@@ -97,6 +106,7 @@ const Auth = {
         const { data: set } = await db.from('settings').select('*').single();
         if(set) { App.settings = set; document.getElementById('brand-name').textContent = set.studio_name; }
         
+        U.initFilters();
         Nav.init(); Nav.showView('agenda');
         
         db.channel('custom-all-channel').on('postgres_changes', { event: '*', schema: 'public' }, payload => {
@@ -147,17 +157,43 @@ const Render = {
             const cont = document.getElementById('agenda-list');
             if(!data || !data.length) { cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Sua agenda está livre neste dia.</p></div>`; return; }
             
-            cont.innerHTML = data.map(a => {
+            // Lógica de Agrupamento Contínuo dos Bloqueios (Passo 1 solicitado)
+            let groupedData = [];
+            let lastBlock = null;
+
+            data.forEach(a => {
+                if (a.status === 'bloqueado') {
+                    if (lastBlock && lastBlock.user_id === a.user_id && lastBlock.notes === a.notes) {
+                        let [h, m] = a.time.split(':').map(Number);
+                        m += 30; if(m >= 60) { h+=1; m-=60; }
+                        lastBlock.endTimeDisplay = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+                    } else {
+                        let [h, m] = a.time.split(':').map(Number);
+                        m += 30; if(m >= 60) { h+=1; m-=60; }
+                        lastBlock = { ...a, isGroupedBlock: true, endTimeDisplay: `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}` };
+                        groupedData.push(lastBlock);
+                    }
+                } else {
+                    lastBlock = null;
+                    groupedData.push(a);
+                }
+            });
+
+            cont.innerHTML = groupedData.map(a => {
                 const isBlocked = a.status === 'bloqueado';
                 const isArrived = a.status === 'chegou';
                 let statusColor = isBlocked ? '#616161' : (isArrived ? '#2e7d32' : 'var(--primary-dark)');
                 let statusBg = isBlocked ? '#e0e0e0' : (isArrived ? '#e8f5e9' : 'var(--primary-light)');
                 let borderColor = isBlocked ? '#9e9e9e' : (isArrived ? '#4caf50' : 'var(--primary)');
                 
+                const displayTime = isBlocked ? `${a.time.slice(0,5)} até ${a.endTimeDisplay}` : a.time.slice(0,5);
+                const titleText = isBlocked ? 'Horário Bloqueado' : (a.clients?.name || 'Cliente');
+                const reasonText = a.notes || 'Sem justificativa';
+                
                 return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${borderColor}; background: ${isBlocked ? '#f5f5f5' : '#fff'};">
                     <div>
-                        <h4 style="font-size:1.2rem; color: ${isBlocked ? 'var(--muted)' : 'var(--text)'}">${a.time} - ${isBlocked ? 'Horário Bloqueado' : (a.clients?.name || 'Cliente')}</h4>
-                        ${isBlocked ? `<p style="margin:5px 0; color:var(--muted); font-style:italic;">Indisponível</p>` : `<p style="margin:5px 0; color:var(--muted)">${a.services?.name || '-'}</p>`}
+                        <h4 style="font-size:1.2rem; color: ${isBlocked ? 'var(--muted)' : 'var(--text)'}">${displayTime} - ${titleText}</h4>
+                        ${isBlocked ? `<p style="margin:5px 0; color:var(--muted); font-style:italic;">Indisponível<br>Motivo: ${reasonText}</p>` : `<p style="margin:5px 0; color:var(--muted)">${a.services?.name || '-'}</p>`}
                         <p style="font-size:0.8rem">Profissional: <b>${a.users?.name || '-'}</b></p>
                         ${(!isBlocked && a.status === 'agendado') ? `<button class="btn-primary" style="padding: 5px 15px; font-size: 0.8rem; margin-top: 10px; width: auto;" onclick="Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i> Marcar como Chegou</button>` : ''}
                     </div>
@@ -183,9 +219,9 @@ const Render = {
     async clientes() {
         const { data } = await db.from('clients').select('*').order('name');
         
-        // Passando diretamente as Strings na função usando interpolação limpa
+        // CORREÇÃO: Usar escaping pesado para evitar undefined em nomes com aspas
         document.getElementById('clientes-list').innerHTML = data.map(c => {
-            const safeName = c.name.replace(/'/g, "\\'"); // Escapa aspas simples
+            const safeName = c.name.replace(/'/g, "\\'").replace(/"/g, '&quot;'); 
             return `
             <div class="card">
                 <a href="#" class="wpp-btn" onclick="Modals.open('whatsapp', '${c.phone}', '${safeName}'); event.stopPropagation()"><i class="ph ph-whatsapp-logo"></i></a>
@@ -200,7 +236,8 @@ const Render = {
     anamnese(id, name) {
         document.getElementById('current-anamnese-client-id').value = id;
         document.getElementById('anamnese-title').textContent = `Ficha de: ${name}`;
-        Nav.showView('anamnese'); Actions.loadAnamnese(id);
+        Nav.showView('anamnese'); 
+        Actions.loadAnamnese(id);
     },
     async perfilCliente(id, name) {
         document.getElementById('current-perfil-client-id').value = id;
@@ -208,12 +245,25 @@ const Render = {
         Nav.showView('perfil-cliente');
         
         const { data: comandas } = await db.from('comandas').select('*, users(name)').eq('client_id', id).eq('status', 'fechada').order('created_at', {ascending: false});
+        const { data: anamnese } = await db.from('anamnesis').select('notes, created_at, users(name)').eq('client_id', id).order('created_at', {ascending: false}).limit(1);
+        const { data: debts } = await db.from('debts').select('*').eq('client_id', id).gt('remaining_amount', 0).maybeSingle();
         
-        const { data: anamnese } = await db.from('anamnesis').select('notes, created_at').eq('client_id', id).order('created_at', {ascending: false}).limit(1);
-        
+        // Mostrar Débitos pendentes do cliente no perfil (Novo Requisito)
+        const debitosDiv = document.getElementById('perfil-debitos-destaque');
+        if (debts && debts.remaining_amount > 0) {
+            debitosDiv.innerHTML = `<div class="card" style="background:#ffebee; border-left:5px solid #d32f2f; margin-bottom:10px;">
+                <h4 style="color:#d32f2f; margin-bottom:5px;"><i class="ph ph-warning-circle"></i> Atenção: Cliente possui débitos ativos</h4>
+                <p style="font-size:1.1rem">Valor Pendente: <b>${U.money(debts.remaining_amount)}</b></p>
+                <p style="font-size:0.8rem; color:var(--muted); margin-top:5px">Ref. Tickets Unificados: ${debts.comanda_ticket}</p>
+                <button class="btn-primary" style="margin-top:10px; background:#d32f2f; width:auto; padding:0.5rem 1rem" onclick="Nav.showView('cobrancas')">Ir para Cobranças</button>
+            </div>`;
+        } else {
+            debitosDiv.innerHTML = '';
+        }
+
         const anamneseDiv = document.getElementById('perfil-anamnese-destaque');
         if(anamnese && anamnese.length > 0) {
-            anamneseDiv.innerHTML = `<div class="card" style="background:#fffafb; border:1px solid var(--primary-light);"><h4 style="color:var(--primary-dark); margin-bottom:10px;"><i class="ph ph-file-text"></i> Diagnóstico da Última Avaliação</h4><p style="font-style:italic;">"${anamnese[0].notes}"</p><span style="font-size:0.75rem; color:var(--muted); display:block; margin-top:10px;">Anotado em: ${new Date(anamnese[0].created_at).toLocaleDateString()}</span></div>`;
+            anamneseDiv.innerHTML = `<div class="card" style="background:#fffafb; border:1px solid var(--primary-light);"><h4 style="color:var(--primary-dark); margin-bottom:10px;"><i class="ph ph-file-text"></i> Diagnóstico da Última Avaliação</h4><p style="font-style:italic;">"${anamnese[0].notes}"</p><span style="font-size:0.75rem; color:var(--muted); display:block; margin-top:10px;">Anotado em: ${new Date(anamnese[0].created_at).toLocaleDateString()} por ${anamnese[0].users?.name || 'Profissional não identificado'}</span></div>`;
         } else {
             anamneseDiv.innerHTML = '';
         }
@@ -232,48 +282,68 @@ const Render = {
                 <h4 style="color:var(--primary-dark); font-size:1.1rem; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;">
                     <i class="ph ph-calendar"></i> ${new Date(c.created_at).toLocaleDateString()}
                 </h4>
+                <p style="margin-bottom:5px;"><b>Ticket Associado:</b> ${c.ticket || 'S/N'}</p>
                 <p style="margin-bottom:5px;"><b>Profissional Responsável:</b> ${c.users?.name || 'Não informado'}</p>
                 <p style="margin-bottom:5px;"><b>Serviços/Produtos Consumidos:</b> ${itens || 'Nenhum detalhe salvo'}</p>
-                <p><b>Total Investido:</b> ${U.money(c.total)}</p>
+                <p><b>Total Investido na Visita:</b> ${U.money(c.total)}</p>
             </div>`;
         }).join('');
     },
+
+    // Ticket Único Unificado na listagem de Cobranças
     async cobrancas() {
-        const { data } = await db.from('debts').select('*, clients(name), comandas(items)').gt('remaining_amount', 0).order('created_at', {ascending: false});
+        const { data: debts } = await db.from('debts').select('*, clients(name)').gt('remaining_amount', 0).order('created_at', {ascending: false});
         const cont = document.getElementById('cobrancas-list');
-        if (!data || data.length === 0) { cont.innerHTML = "<p style='color:var(--muted)'>Nenhuma cobrança em aberto no momento.</p>"; return; }
+        if (!debts || debts.length === 0) { cont.innerHTML = "<p style='color:var(--muted)'>Nenhuma cobrança em aberto no momento.</p>"; return; }
         
-        cont.innerHTML = data.map(d => {
-            const items = d.comandas?.items || [];
-            let htmlList = items.map(i => `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #eee; font-size:0.95rem;"><span>${i.name}</span><b>${U.money(i.price)}</b></div>`).join('');
+        // Puxar detalhes dos itens das comandas unificadas
+        let htmlFinal = '';
+        for (let d of debts) {
+            const ticketsArr = d.comanda_ticket ? d.comanda_ticket.split(', ').map(t => t.trim()) : [];
+            const { data: relatedComandas } = await db.from('comandas').select('items, created_at, ticket').in('ticket', ticketsArr);
             
-            return `
+            let htmlList = '';
+            if(relatedComandas) {
+                relatedComandas.forEach(rc => {
+                    const dt = new Date(rc.created_at).toLocaleDateString();
+                    if(rc.items) {
+                        htmlList += `<div style="font-size:0.75rem; color:var(--primary); margin-top:10px; border-bottom:1px dashed #ccc; padding-bottom:3px;">Ticket: ${rc.ticket} (${dt})</div>`;
+                        rc.items.forEach(i => {
+                            htmlList += `<div style="display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid #eee; font-size:0.95rem;"><span>${i.name}</span><b>${U.money(i.price)}</b></div>`;
+                        });
+                    }
+                });
+            }
+
+            htmlFinal += `
             <div class="card" style="border-left:5px solid #d32f2f;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div>
-                        <span style="font-size:0.8rem; color:#d32f2f; font-weight:bold; letter-spacing:1px">${d.comanda_ticket || 'TKT-####'}</span>
+                        <span style="font-size:0.8rem; color:#d32f2f; font-weight:bold; letter-spacing:1px">TICKETS UNIFICADOS: ${d.comanda_ticket || 'TKT-####'}</span>
                         <h4 style="font-size:1.2rem; margin-top:5px">${d.clients?.name || 'Cliente'}</h4>
                     </div>
-                    <span style="font-size:0.7rem; font-weight:bold; padding: 4px 10px; border-radius:20px; background:#ffebee; color:#d32f2f">COBRANÇA ATIVA</span>
+                    <span style="font-size:0.7rem; font-weight:bold; padding: 4px 10px; border-radius:20px; background:#ffebee; color:#d32f2f">DÉBITO ATIVO</span>
                 </div>
                 
-                <div style="background: #fafafa; border: 1px solid var(--border); border-radius: 12px; padding: 10px; margin: 15px 0;">
-                    <h5 style="margin-bottom:8px; color:var(--muted)">Resumo do Consumo</h5>
-                    ${htmlList || '<p style="font-size:0.8rem; color:var(--muted)">Detalhes não encontrados.</p>'}
+                <div style="background: #fafafa; border: 1px solid var(--border); border-radius: 12px; padding: 10px; margin: 15px 0; max-height:200px; overflow-y:auto;">
+                    <h5 style="margin-bottom:8px; color:var(--muted)">Resumo Consolidado do Cliente</h5>
+                    ${htmlList || '<p style="font-size:0.8rem; color:var(--muted)">Detalhes de itens não encontrados.</p>'}
                 </div>
 
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
-                    <span style="color:var(--muted); font-size:0.9rem;">Pendente:</span>
+                    <span style="color:var(--muted); font-size:0.9rem;">Dívida Total Acumulada: ${U.money(d.total_amount)}<br>Falta Pagar:</span>
                     <span class="val" style="font-size:1.8rem; color:#d32f2f;">${U.money(d.remaining_amount)}</span>
                 </div>
 
                 <div style="display:flex; gap:10px;">
-                    <button class="btn-primary" style="flex:1; padding:0.8rem; background:#2e7d32;" onclick="Modals.open('debitar', '${d.id}', ${d.remaining_amount})"><i class="ph ph-check-circle"></i> Receber Pagamento</button>
+                    <button class="btn-primary" style="flex:1; padding:0.8rem; background:#2e7d32;" onclick="Modals.open('debitar', '${d.id}', ${d.remaining_amount})"><i class="ph ph-check-circle"></i> Debitar / Receber</button>
                     ${App.role==='owner' ? `<button class="btn-secondary" style="width:auto; padding:0.8rem;" onclick="Modals.open('desconto', '${d.id}', ${d.remaining_amount})"><i class="ph ph-percent"></i> Desc.</button>` : ''}
                 </div>
             </div>`;
-        }).join('');
+        }
+        cont.innerHTML = htmlFinal;
     },
+
     async servicos() {
         const { data } = await db.from('services').select('*').order('name');
         document.getElementById('servicos-list').innerHTML = data.map(s => `<div class="card"><h4 style="font-size:1.2rem; border-bottom:1px solid #eee; padding-bottom:10px">${s.name}</h4><div style="margin:10px 0; color:var(--muted)"><p>Comissão: <b style="color:var(--text)">${s.commission}%</b></p>${s.has_assistant?`<p>Auxiliar: <b style="color:var(--text)">${s.assistant_commission}%</b></p>`:''}<p>Custo Fixo Lançado: <b style="color:#d32f2f">${U.money(s.cost)}</b></p></div><div class="val" style="font-size:1.5rem">${U.money(s.price)}</div></div>`).join('');
@@ -295,13 +365,22 @@ const Render = {
             </div>`).join('');
     },
     async comandas() {
-        const { data } = await db.from('comandas').select('*, clients(name), users(name)').order('created_at', {ascending: false});
-        document.getElementById('comandas-list').innerHTML = data.map(c => `
+        let query = db.from('comandas').select('*, clients(name), users(name)').order('created_at', {ascending: false});
+        
+        // Filtro de Arquivamento Mensal
+        const monthFilter = document.getElementById('filter-comanda-month')?.value;
+        if (monthFilter) {
+            query = query.gte('created_at', `${monthFilter}-01T00:00:00Z`).lte('created_at', `${monthFilter}-31T23:59:59Z`);
+        }
+
+        const { data } = await query;
+        document.getElementById('comandas-list').innerHTML = (!data || data.length === 0) ? '<p style="color:var(--muted)">Sem comandas para este mês.</p>' : data.map(c => `
             <div class="card" style="border-left: 5px solid ${c.status === 'aberta' ? 'var(--primary)' : '#ccc'}">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <div>
                         <span style="font-size:0.8rem; color:var(--primary); font-weight:bold; letter-spacing:1px">${c.ticket || 'TKT-####'}</span>
                         <h4 style="font-size:1.2rem; margin-top:5px">${c.clients?.name || 'Desconhecido'}</h4>
+                        <p style="font-size:0.8rem; color:var(--muted)">${new Date(c.created_at).toLocaleDateString()}</p>
                     </div>
                     <span style="font-size:0.7rem; font-weight:bold; padding: 4px 10px; border-radius:20px; background:${c.status === 'aberta' ? 'var(--primary-light)' : '#eee'}; color:${c.status === 'aberta' ? 'var(--primary-dark)' : 'var(--muted)'}">${c.status.toUpperCase()}</span>
                 </div>
@@ -320,21 +399,35 @@ const Render = {
             </div></div>`).join('');
     },
     
+    // Despesas: Abas atualizadas com "Comissões"
     async despesas() {
-        const { data } = await db.from('despesas').select('*').order('date', {ascending: false});
-        let totais = { 'Custos Fixos': 0, 'Custos Variáveis': 0, 'Pessoal/Pagamentos': 0 };
-        data.forEach(d => { if(totais[d.category] !== undefined) totais[d.category] += d.amount; });
+        let query = db.from('despesas').select('*').order('date', {ascending: false});
+        
+        // Filtro Mensal
+        const monthFilter = document.getElementById('filter-despesa-month')?.value;
+        if (monthFilter) {
+            query = query.gte('date', `${monthFilter}-01T00:00:00Z`).lte('date', `${monthFilter}-31T23:59:59Z`);
+        }
+
+        const { data } = await query;
+        let totais = { 'Custos Fixos': 0, 'Comissões': 0, 'Pessoal/Pagamentos': 0, 'Custos Variáveis': 0 };
+        data.forEach(d => { if(totais[d.category] !== undefined) totais[d.category] += d.amount; else totais['Custos Variáveis'] += d.amount; });
         
         document.getElementById('despesas-list').innerHTML = `
             <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; margin-bottom:20px">
                 <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #d32f2f"><p style="font-size:0.8rem">Custos Fixos</p><div class="val" style="color:#d32f2f; font-size:1.2rem">-${U.money(totais['Custos Fixos'])}</div></div>
-                <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #e65100"><p style="font-size:0.8rem">Variáveis / Produtos</p><div class="val" style="color:#e65100; font-size:1.2rem">-${U.money(totais['Custos Variáveis'])}</div></div>
-                <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #8e24aa"><p style="font-size:0.8rem">Pagamentos/Pessoal</p><div class="val" style="color:#8e24aa; font-size:1.2rem">-${U.money(totais['Pessoal/Pagamentos'])}</div></div>
+                <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #cd7f32"><p style="font-size:0.8rem">Comissões (Autom.)</p><div class="val" style="color:#cd7f32; font-size:1.2rem">-${U.money(totais['Comissões'])}</div></div>
+                <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #8e24aa"><p style="font-size:0.8rem">Pessoal/Equipe</p><div class="val" style="color:#8e24aa; font-size:1.2rem">-${U.money(totais['Pessoal/Pagamentos'])}</div></div>
+                <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #e65100"><p style="font-size:0.8rem">Variáveis / Insumos</p><div class="val" style="color:#e65100; font-size:1.2rem">-${U.money(totais['Custos Variáveis'])}</div></div>
             </div>` + 
             data.map(d => {
-                const color = d.category === 'Custos Fixos' ? '#d32f2f' : (d.category === 'Custos Variáveis' ? '#e65100' : '#8e24aa');
+                let color = '#d32f2f';
+                if(d.category === 'Comissões') color = '#cd7f32';
+                else if(d.category === 'Pessoal/Pagamentos') color = '#8e24aa';
+                else if(d.category === 'Custos Variáveis') color = '#e65100';
+
                 return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${color}">
-                    <div><h4>${d.description}</h4><p style="font-size:0.8rem; color:var(--muted)">${d.category} • ${U.date(d.date)}</p></div>
+                    <div><h4>${d.description}</h4><p style="font-size:0.8rem; color:var(--muted)">${d.category} • ${new Date(d.date).toLocaleString('pt-BR')}</p></div>
                     <div class="val" style="color:${color}">-${U.money(d.amount)}</div>
                 </div>`;
             }).join('');
@@ -342,9 +435,13 @@ const Render = {
         if(App.charts.despesas) App.charts.despesas.destroy();
         App.charts.despesas = new Chart(document.getElementById('chart-despesas'), { 
             type: 'pie', 
-            data: { labels: Object.keys(totais), datasets: [{ data: Object.values(totais), backgroundColor: ['#d32f2f', '#e65100', '#8e24aa'] }] }
+            data: { labels: Object.keys(totais), datasets: [{ data: Object.values(totais), backgroundColor: ['#d32f2f', '#cd7f32', '#8e24aa', '#e65100'] }] }
         });
+
+        // Store para PDF Export
+        window.currentDespesasData = data;
     },
+
     async comissao() {
         const isOwner = App.role === 'owner';
         let query = db.from('comandas').select('*, users(name)');
@@ -353,7 +450,7 @@ const Render = {
         
         let html = ''; let totalComissao = 0; let rank = {};
         data.forEach(c => {
-            if(!c.items) return;
+            if(!c.items || c.status !== 'fechada') return; // Only process closed comandas for final commission
             c.items.forEach(i => {
                 if(i.commission) {
                     const v = (i.price * i.commission) / 100;
@@ -366,23 +463,30 @@ const Render = {
         
         if(isOwner) {
             const sorted = Object.entries(rank).sort((a,b)=>b[1]-a[1]);
-            html = `<div class="card" style="margin-bottom:20px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); color:white; padding:2rem; box-shadow:0 10px 20px rgba(183, 110, 121, 0.3)"><h3 style="color:white; font-weight:400; opacity:0.9">Total Estimado de Comissões a Pagar</h3><div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div></div>
+            html = `<div class="card" style="margin-bottom:20px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); color:white; padding:2rem; box-shadow:0 10px 20px rgba(183, 110, 121, 0.3)"><h3 style="color:white; font-weight:400; opacity:0.9">Total de Comissões Geradas no Sistema</h3><div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div><p style="font-size:0.8rem; opacity:0.8; margin-top:10px">Os valores exatos por fechamento já são deduzidos automaticamente no fluxo de caixa.</p></div>
             <h3 style="margin:20px 0 15px 0">Ranking de Comissionamento</h3><div class="data-grid">` + 
             sorted.map((s,i) => {
                 let color = '#cd7f32'; if(i===0) color='#ffd700'; else if(i===1) color='#c0c0c0';
                 return `<div class="card"><div style="display:flex; justify-content:space-between; align-items:center"><h4 style="font-size:1.1rem">${i+1}º ${s[0]}</h4><i class="ph ph-medal" style="color:${color}; font-size:2rem"></i></div><div class="val" style="margin-top:15px; font-size:1.8rem">${U.money(s[1])}</div></div>`;
             }).join('') + '</div>';
         } else {
-            html = `<div class="card" style="margin-bottom:20px; background:var(--primary); color:white; padding:2rem"><h4 style="color:white; font-weight:400">Minha Comissão (Acumulado)</h4><div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div></div><div class="data-list">` + html + `</div>`;
+            html = `<div class="card" style="margin-bottom:20px; background:var(--primary); color:white; padding:2rem"><h4 style="color:white; font-weight:400">Minha Comissão</h4><div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div></div><div class="data-list">` + html + `</div>`;
         }
         document.getElementById('comissao-dashboard').innerHTML = html;
     },
     
+    // FLUXO DE CAIXA: Correção de Nomenclatura, Data precisa e Filtro Mensal
     async 'resumo-financeiro'() {
-        const [ {data:comand}, {data:desp} ] = await Promise.all([
-            db.from('comandas').select('total, ticket, created_at').eq('status', 'fechada'), 
-            db.from('despesas').select('description, amount, date')
-        ]);
+        let qComand = db.from('comandas').select('total, ticket, created_at').eq('status', 'fechada');
+        let qDesp = db.from('despesas').select('description, amount, date');
+        
+        const monthFilter = document.getElementById('filter-fluxo-month')?.value;
+        if (monthFilter) {
+            qComand = qComand.gte('created_at', `${monthFilter}-01T00:00:00Z`).lte('created_at', `${monthFilter}-31T23:59:59Z`);
+            qDesp = qDesp.gte('date', `${monthFilter}-01T00:00:00Z`).lte('date', `${monthFilter}-31T23:59:59Z`);
+        }
+
+        const [ {data:comand}, {data:desp} ] = await Promise.all([qComand, qDesp]);
         
         const receita = comand.reduce((acc, c) => acc + c.total, 0); 
         const gasto = desp.reduce((acc, d) => acc + d.amount, 0); 
@@ -390,11 +494,11 @@ const Render = {
         
         document.getElementById('resumo-cards').innerHTML = `
             <div class="card" style="border-bottom:4px solid #2e7d32"><h4>Faturamento (Entradas)</h4><div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(receita)}</div></div>
-            <div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custo Operacional (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(gasto)}</div></div>
+            <div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custos Gerais (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(gasto)}</div><p style="font-size:0.7rem; color:var(--muted); margin-top:5px">Fixos, Variáveis e Comissões.</p></div>
             <div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
         
         let extrato = [];
-        comand.forEach(c => { if(c.total>0) extrato.push({ type: 'in', desc: `Comanda ${c.ticket||'-'}`, val: c.total, date: new Date(c.created_at) }); });
+        comand.forEach(c => { if(c.total>0) extrato.push({ type: 'in', desc: `Comanda Fechada ${c.ticket||'-'}`, val: c.total, date: new Date(c.created_at) }); });
         desp.forEach(d => { extrato.push({ type: 'out', desc: d.description, val: d.amount, date: new Date(d.date) }); });
         
         extrato.sort((a,b) => a.date - b.date);
@@ -407,20 +511,25 @@ const Render = {
         
         extrato.sort((a,b) => b.date - a.date);
         
-        document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações financeiras no período.</p>' :
+        document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações financeiras no período selecionado.</p>' :
             extrato.map(i => `
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;">
                 <div style="flex:1">
-                    <b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Pagamento'}</b>
+                    <b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Saída'}</b>
                     <p style="margin-top:5px; font-weight:600; font-size:1.1rem">${i.desc}</p>
-                    <span style="font-size:0.8rem; color:var(--muted)">${U.date(i.date)}</span>
+                    <span style="font-size:0.8rem; color:var(--muted)">${i.date.toLocaleString('pt-BR')}</span>
                 </div>
                 <div style="text-align:right">
                     <span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.3rem; display:block">${i.type==='in'?'+':'-'} ${U.money(i.val)}</span>
-                    <span style="font-size:0.85rem; color:var(--muted); font-weight:bold">Saldo: ${U.money(i.saldo)}</span>
+                    <span style="font-size:0.85rem; color:var(--muted); font-weight:bold">Saldo Contábil: ${U.money(i.saldo)}</span>
                 </div>
             </div>`).join('');
+            
+        // Store para PDF
+        window.currentFluxoData = extrato;
+        window.currentTotaisFluxo = { receita, gasto, lucro };
     },
+
     async performance() {
         const [ {data}, {data:agendas} ] = await Promise.all([ db.from('comandas').select('*, users(name), items').eq('status', 'fechada'), db.from('appointments').select('*') ]);
         
@@ -533,9 +642,9 @@ const Modals = {
                     </div>
                     <button type="button" class="btn-secondary" style="width:auto; padding:1.2rem 2rem; background:var(--primary-light); color:var(--primary)" onclick="Actions.addComandaItem('${comanda.id}')"><i class="ph ph-plus" style="font-size:1.3rem"></i> Lançar</button>
                 </div>
-                <button type="button" class="btn-primary" style="background:#2e7d32; padding:1.2rem; font-size:1.1rem; display:flex; justify-content:center; gap:10px; width: 100%;" onclick="Actions.closeComanda('${comanda.id}', '${comanda.client_id}', ${comanda.total}, '${comanda.ticket}')"><i class="ph ph-check-circle" style="font-size:1.5rem"></i> Fechar Comanda e Lançar Custos</button>`;
+                <button type="button" class="btn-primary" style="background:#2e7d32; padding:1.2rem; font-size:1.1rem; display:flex; justify-content:center; gap:10px; width: 100%;" onclick="Actions.closeComanda('${comanda.id}', '${comanda.client_id}', ${comanda.total}, '${comanda.ticket}')"><i class="ph ph-check-circle" style="font-size:1.5rem"></i> Faturar Ticket e Lançar Custos</button>`;
             } else if (App.role === 'owner') {
-                html += `<button type="button" class="btn-secondary" style="color:#d32f2f; padding:1.2rem; display:flex; justify-content:center; gap:10px; width:100%" onclick="Actions.reopenComanda('${comanda.id}')"><i class="ph ph-warning-circle" style="font-size:1.5rem"></i> Reabrir Comanda</button>`;
+                html += `<button type="button" class="btn-secondary" style="color:#d32f2f; padding:1.2rem; display:flex; justify-content:center; gap:10px; width:100%" onclick="Actions.reopenComanda('${comanda.id}')"><i class="ph ph-warning-circle" style="font-size:1.5rem"></i> Reabrir Comanda (Exclui Lançamentos Financeiros)</button>`;
             }
         }
         else if(type === 'agendamento') {
@@ -596,6 +705,10 @@ const Modals = {
                             <input type="time" id="fb-end" required style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);">
                         </div>
                     </div>
+                    <div>
+                        <label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:5px; color:var(--text);">Motivo / Justificativa</label>
+                        <textarea id="fb-motivo" required placeholder="Ex: Manutenção, Almoço, Médico..." style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);" rows="2"></textarea>
+                    </div>
                 </div>
                 <button type="submit" class="btn-primary" style="padding:1.2rem; width:100%; background: #d32f2f;">Confirmar Bloqueio</button>
             </form>`;
@@ -617,8 +730,8 @@ const Modals = {
         }
         else if(type === 'produto') {
             html += `<h3>Novo Produto Automático</h3><form onsubmit="Actions.saveProduct(event)">
-                <div class="input-group"><label>Cód. Barras (EAN) - Mercado Livre</label><input type="text" id="fp-bar" oninput="Actions.fetchBarcode(this.value)" placeholder="Digite ou passe o leitor..." required></div>
-                <div class="input-group"><label>Descrição do Produto</label><input type="text" id="fp-nome" readonly required placeholder="O sistema vai preencher isso..." style="background:#e9ecef; cursor:not-allowed; border: 1px dashed #ccc;"></div>
+                <div class="input-group"><label>Cód. Barras (EAN) - Mercado Livre</label><input type="text" id="fp-bar" oninput="Actions.fetchBarcode(this.value)" placeholder="Passe o leitor ou digite (min 8 dig)..." required></div>
+                <div class="input-group"><label>Descrição do Produto</label><input type="text" id="fp-nome" readonly required placeholder="O sistema vai preencher isso via API..." style="background:#e9ecef; cursor:not-allowed; border: 1px dashed #ccc;"></div>
                 <div style="display:flex; gap:10px; background:#f9f9f9; padding:15px; border-radius:12px; margin-bottom:15px">
                     <div class="input-group" style="margin:0"><label>Preço Venda (R$)</label><input type="number" id="fp-preco" step="0.01" required></div>
                     <div class="input-group" style="margin:0"><label>Comissão (%)</label><input type="number" id="fp-com" max="100" required></div>
@@ -632,8 +745,8 @@ const Modals = {
                 <button type="submit" class="btn-primary" style="padding:1.2rem">Atualizar</button></form>`;
         }
         else if(type === 'despesa') {
-            html += `<h3>Lançamento de Despesa/Custo</h3><form onsubmit="Actions.createDespesa(event)">
-                <div class="input-group"><label>Descrição da Saída</label><input type="text" id="fd-desc" placeholder="Ex: Conta de Energia..." required></div>
+            html += `<h3>Lançamento de Despesa/Custo Manual</h3><form onsubmit="Actions.createDespesa(event)">
+                <div class="input-group"><label>Descrição da Saída</label><input type="text" id="fd-desc" placeholder="Ex: Conta de Energia, Reposição..." required></div>
                 <div class="input-group"><label>Categoria do Gasto</label><select id="fd-cat" required style="padding:1.2rem; border-radius:8px"><option value="Custos Fixos">Custo Fixo (Aluguel, Água, Luz, etc)</option><option value="Custos Variáveis">Custo Variável (Produtos e Insumos)</option><option value="Pessoal/Pagamentos">Pessoal (Salários, Pró-Labore, Limpeza)</option></select></div>
                 <div class="input-group"><label>Valor (R$)</label><input type="number" id="fd-val" step="0.01" required style="padding:1.2rem"></div>
                 <button type="submit" class="btn-primary" style="padding:1.2rem">Registrar Saída</button></form>`;
@@ -649,7 +762,7 @@ const Modals = {
         else if(type === 'debitar' || type === 'desconto') {
             html += `<h3>${type==='debitar'?'Registrar Recebimento Parcial/Total':'Aplicar Desconto'}</h3>
             <div style="background:#f9f9f9; padding:20px; border-radius:12px; margin-bottom:20px; border-left:5px solid #d32f2f">
-                <p style="color:var(--muted); font-size:0.9rem; margin-bottom:5px">Pendente na Cobrança:</p>
+                <p style="color:var(--muted); font-size:0.9rem; margin-bottom:5px">Pendente nas Cobranças Unificadas:</p>
                 <b style="font-size:2rem; color:#d32f2f">${U.money(param2)}</b>
             </div>
             <form onsubmit="Actions.${type==='debitar'?'debitDebt':'discountDebt'}(event, '${param1}', ${param2})">
@@ -676,94 +789,149 @@ const Modals = {
 };
 
 const Actions = {
+    // Exportador de PDF usando jsPDF e Autotable
+    exportPDF(viewType) {
+        if(!window.jspdf) return UI.toast('Módulo PDF ainda carregando...', 'warning');
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(18);
+        doc.setTextColor(183, 110, 121); // var(--primary)
+        doc.text("ESTÚDIO AMOR QUE CUIDA", 105, 20, null, null, "center");
+        doc.setFontSize(12);
+        doc.setTextColor(50, 50, 50);
+        
+        if (viewType === 'despesas') {
+            doc.text(`Relatório de Despesas e Custos Gerais`, 105, 30, null, null, "center");
+            const filter = document.getElementById('filter-despesa-month')?.value || 'Geral';
+            doc.text(`Período: ${filter}`, 105, 38, null, null, "center");
+            
+            if(!window.currentDespesasData || window.currentDespesasData.length === 0) return UI.toast('Sem dados para exportar.', 'warning');
+            
+            const rows = window.currentDespesasData.map(d => [
+                new Date(d.date).toLocaleDateString(),
+                d.category,
+                d.description,
+                U.money(d.amount)
+            ]);
+            
+            doc.autoTable({
+                startY: 45,
+                head: [['Data', 'Categoria', 'Descrição', 'Valor (R$)']],
+                body: rows,
+                theme: 'striped',
+                headStyles: { fillColor: [183, 110, 121] }
+            });
+            doc.save(`AQC_Despesas_${filter}.pdf`);
+            UI.toast('Relatório PDF Gerado!');
+            
+        } else if (viewType === 'fluxo') {
+            doc.text(`Relatório de Fluxo de Caixa Mensal`, 105, 30, null, null, "center");
+            const filter = document.getElementById('filter-fluxo-month')?.value || 'Geral';
+            doc.text(`Período: ${filter}`, 105, 38, null, null, "center");
+            
+            if(!window.currentFluxoData || window.currentFluxoData.length === 0) return UI.toast('Sem dados para exportar.', 'warning');
+            
+            const r = window.currentTotaisFluxo;
+            doc.setFontSize(10);
+            doc.text(`Faturamento: ${U.money(r.receita)}   |   Custos: ${U.money(r.gasto)}   |   Líquido: ${U.money(r.lucro)}`, 105, 45, null, null, "center");
+
+            const rows = window.currentFluxoData.map(d => [
+                d.date.toLocaleDateString(),
+                d.type === 'in' ? 'Entrada' : 'Saída',
+                d.desc,
+                U.money(d.val),
+                U.money(d.saldo)
+            ]);
+            
+            doc.autoTable({
+                startY: 55,
+                head: [['Data', 'Tipo', 'Descrição', 'Movimentação', 'Saldo Contábil']],
+                body: rows,
+                theme: 'striped',
+                headStyles: { fillColor: [183, 110, 121] }
+            });
+            doc.save(`AQC_Fluxo_Caixa_${filter}.pdf`);
+            UI.toast('Relatório de Fluxo Gerado!');
+        }
+    },
+
     async updatePassword(e) {
         e.preventDefault(); 
         const newPass = document.getElementById('new-pass').value;
         if(newPass.length < 3) return UI.toast('Senha muito curta.', 'error');
         
         const { error } = await db.from('users').update({ password: newPass, first_login: false }).eq('id', App.user.id);
+        if(error) { UI.toast(`Erro ao atualizar: ${error.message}`, 'error'); return; }
         
-        if(error) { 
-            UI.toast(`Erro ao atualizar: ${error.message}`, 'error'); 
-            return; 
-        }
-        
-        App.user.first_login = false;
-        document.getElementById('new-pass').value = ''; 
-        Modals.close(); 
-        UI.toast('Senha registrada com sucesso!'); 
+        App.user.first_login = false; document.getElementById('new-pass').value = ''; Modals.close(); UI.toast('Senha registrada com sucesso!'); 
     },
+    
     async createClient(e) { e.preventDefault(); await db.from('clients').insert({ name: document.getElementById('fc-nome').value, phone: document.getElementById('fc-fone').value }); Modals.close(); UI.toast('Cliente adicionado!'); },
     
+    // Anamnese (Passo 3): Corrigido o envio do Profissional
     async saveAnamnese(e) {
         e.preventDefault(); 
         const id = document.getElementById('current-anamnese-client-id').value;
-        if (!id || id === 'undefined') {
-            UI.toast('Erro interno: ID da Cliente não recuperado. Volte na tela de clientes.', 'error');
-            return;
-        }
+        if (!id || id === 'undefined') { UI.toast('Erro interno de ID. Volte na tela e clique novamente.', 'error'); return; }
 
-        const payload = { client_id: id, history: document.getElementById('fa-hist').value, habits: document.getElementById('fa-hab').value, objectives: document.getElementById('fa-obj').value, notes: document.getElementById('fa-obs').value };
+        const payload = { 
+            client_id: id, 
+            user_id: App.user.id, // O profissional logado é anexado aqui
+            history: document.getElementById('fa-hist').value, 
+            habits: document.getElementById('fa-hab').value, 
+            objectives: document.getElementById('fa-obj').value, 
+            notes: document.getElementById('fa-obs').value 
+        };
         const { error } = await db.from('anamnesis').insert(payload);
         if(error) { UI.toast(`Falha ao salvar: ${error.message}`, 'error'); return; }
         
-        Modals.close(); UI.toast('Ficha clínica salva no histórico.'); this.loadAnamnese(id);
+        Modals.close(); UI.toast('Ficha clínica registrada por ' + App.user.name); this.loadAnamnese(id);
     },
     async loadAnamnese(id) {
-        const { data } = await db.from('anamnesis').select('*').eq('client_id', id).order('created_at', {ascending: false});
+        const { data } = await db.from('anamnesis').select('*, users(name)').eq('client_id', id).order('created_at', {ascending: false});
         const div = document.getElementById('anamnese-history-list');
-        if(!data || !data.length) { div.innerHTML = "<p style='color:var(--muted); text-align:center; padding:2rem'>Nenhum registro clínico encontrado para esta cliente.</p>"; return; }
-        div.innerHTML = data.map(d => `<div class="card" style="border-left: 4px solid var(--primary); background:#fffafb"><h4 style="font-size:0.9rem; color:var(--muted); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px"><i class="ph ph-calendar-blank"></i> Data: ${new Date(d.created_at).toLocaleDateString()}</h4><p style="margin-bottom:8px"><b>Histórico:</b> ${d.history}</p><p style="margin-bottom:8px"><b>Hábitos:</b> ${d.habits}</p><p style="margin-bottom:8px"><b>Objetivo:</b> ${d.objectives}</p><p style="padding:15px; background:white; border:1px solid #eee; border-radius:12px; margin-top:15px"><b style="color:var(--primary-dark)">Diagnóstico:</b><br>${d.notes}</p></div>`).join('');
+        if(!data || !data.length) { div.innerHTML = "<p style='color:var(--muted); text-align:center; padding:2rem'>Nenhum registro clínico para esta cliente.</p>"; return; }
+        div.innerHTML = data.map(d => `<div class="card" style="border-left: 4px solid var(--primary); background:#fffafb"><h4 style="font-size:0.9rem; color:var(--muted); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px"><i class="ph ph-calendar-blank"></i> Data: ${new Date(d.created_at).toLocaleDateString()} &nbsp;•&nbsp; <i class="ph ph-user"></i> Prof: ${d.users?.name || 'Sistema'}</h4><p style="margin-bottom:8px"><b>Histórico:</b> ${d.history}</p><p style="margin-bottom:8px"><b>Hábitos:</b> ${d.habits}</p><p style="margin-bottom:8px"><b>Objetivo:</b> ${d.objectives}</p><p style="padding:15px; background:white; border:1px solid #eee; border-radius:12px; margin-top:15px"><b style="color:var(--primary-dark)">Diagnóstico:</b><br>${d.notes}</p></div>`).join('');
     },
 
     async createAppointment(e) {
         e.preventDefault(); const auxId = document.getElementById('fa-aux').value;
         const { error } = await db.from('appointments').insert({ client_id: document.getElementById('fa-cli').value, service_id: document.getElementById('fa-serv').value, user_id: document.getElementById('fa-user').value, assistant_id: auxId || null, date: document.getElementById('fa-date').value, time: document.getElementById('fa-time').value, status: 'agendado' });
-        if(error) UI.toast(`Erro: ${error.message}`, 'error'); else { Modals.close(); UI.toast('Horário salvo com sucesso!'); }
+        if(error) UI.toast(`Erro: ${error.message}`, 'error'); else { Modals.close(); UI.toast('Horário salvo com sucesso!'); Render.agenda(); }
     },
     
-    // BLOQUEIO DE AGENDA COM INTERVALO E ANTI-DUPLICIDADE
     async blockAppointment(e) {
         e.preventDefault();
         const date = document.getElementById('fb-date').value;
         const start = document.getElementById('fb-time').value;
         const end = document.getElementById('fb-end').value;
+        const motivo = document.getElementById('fb-motivo').value;
 
-        if (start >= end) {
-            UI.toast('A hora de término deve ser maior que a hora de início.', 'error');
-            return;
-        }
+        if (start >= end) { UI.toast('Hora de término menor que a de início.', 'error'); return; }
 
-        // Verifica se há algo na agenda neste meio tempo
         const { data: existing } = await db.from('appointments').select('time').eq('date', date).gte('time', start).lt('time', end);
-        if (existing && existing.length > 0) {
-            UI.toast('Já existem clientes ou bloqueios neste horário. Impossível bloquear.', 'error');
-            return;
-        }
+        if (existing && existing.length > 0) { UI.toast('Existem clientes/bloqueios nesta janela.', 'error'); return; }
 
-        // Cria os blocos de 30 em 30 min (Garante que todo o intervalo fique indisponível)
         let current = new Date(`1970-01-01T${start}:00`);
         const endTime = new Date(`1970-01-01T${end}:00`);
         const inserts = [];
 
         while(current < endTime) {
-            inserts.push({
-                user_id: App.user.id,
-                date: date,
-                time: current.toTimeString().slice(0,5),
-                status: 'bloqueado'
-            });
+            inserts.push({ user_id: App.user.id, date: date, time: current.toTimeString().slice(0,5), status: 'bloqueado', notes: motivo });
             current.setMinutes(current.getMinutes() + 30);
         }
 
         const { error } = await db.from('appointments').insert(inserts);
-        if(error) { UI.toast(`Erro ao bloquear: ${error.message}`, 'error'); } 
-        else { Modals.close(); UI.toast('Intervalo bloqueado com sucesso!'); Render.agenda(); }
+        if(error) { UI.toast(`Erro: ${error.message}`, 'error'); } 
+        else { Modals.close(); UI.toast('Horário 100% indisponível agora!', 'success'); Render.agenda(); }
     },
     
     async markAsArrived(appointmentId) {
         await db.from('appointments').update({ status: 'chegou' }).eq('id', appointmentId);
         UI.toast('Status atualizado. Cliente aguardando!');
+        Render.agenda();
     },
 
     async createComanda(e) {
@@ -775,12 +943,12 @@ const Actions = {
         Modals.close(); UI.toast(`Comanda ${tk} gerada!`);
     },
     async addComandaItem(id) {
-        const val = document.getElementById('add-item-sel').value; if(!val) { UI.toast('Selecione algo da lista.', 'error'); return; }
+        const val = document.getElementById('add-item-sel').value; if(!val) { UI.toast('Selecione algo.', 'error'); return; }
         const item = JSON.parse(val); 
         
         if(item.type === 'product') {
             const { data: prod } = await db.from('products').select('stock').eq('id', item.id).single();
-            if(prod.stock <= 0) return UI.toast('Este produto está sem estoque disponível.', 'error');
+            if(prod.stock <= 0) return UI.toast('Sem estoque disponível.', 'error');
             await db.from('products').update({stock: prod.stock - 1}).eq('id', item.id);
         }
         
@@ -791,7 +959,7 @@ const Actions = {
         Modals.close(); setTimeout(() => Modals.open('edit_comanda', id), 100);
     },
     async removeComandaItem(comandaId, itemIndex) {
-        UI.confirm('Remover este lançamento da comanda?', async () => {
+        UI.confirm('Remover este lançamento?', async () => {
             const { data: comanda } = await db.from('comandas').select('items, total').eq('id', comandaId).single();
             const items = comanda.items || [];
             const item = items[itemIndex];
@@ -807,55 +975,92 @@ const Actions = {
         });
     },
     
-    // FECHAR COMANDA - GERA CUSTO FIXO COM A DATA ATUAL EXATA
+    // Passos 2 e 5: Fechar Comanda com Cobrança Unificada e Lançamentos de Custo EXATOS
     async closeComanda(comandaId, clientId, total, ticketNum) {
-        UI.confirm('Deseja fechar a comanda, enviar para faturamento e processar custos fixos?', async () => {
-            const { data: comanda } = await db.from('comandas').select('items, created_at').eq('id', comandaId).single();
+        UI.confirm('Deseja faturar a comanda, unificar a cobrança e processar custos/comissões automáticos?', async () => {
+            const { data: comanda } = await db.from('comandas').select('items, created_at, users(name)').eq('id', comandaId).single();
             let totalCustoFixo = 0;
+            let totalComissao = 0;
+
             if(comanda.items) {
                 comanda.items.forEach(item => {
-                    if (item.type === 'service' && item.cost) {
-                        totalCustoFixo += parseFloat(item.cost);
+                    if (item.type === 'service') {
+                        if (item.cost) totalCustoFixo += parseFloat(item.cost);
+                        if (item.commission) totalComissao += (item.price * item.commission) / 100;
+                    } else if (item.type === 'product' && item.commission) {
+                        totalComissao += (item.price * item.commission) / 100;
                     }
                 });
             }
 
-            await db.from('comandas').update({ status: 'fechada' }).eq('id', comandaId);
+            // Fecha a comanda na hora exata atual
+            const exataDataHoraFechamento = new Date().toISOString();
+            await db.from('comandas').update({ status: 'fechada', created_at: exataDataHoraFechamento }).eq('id', comandaId);
             
             if(total > 0) { 
-                await db.from('debts').insert({ client_id: clientId, total_amount: total, remaining_amount: total, comanda_id: comandaId, comanda_ticket: ticketNum }); 
-            }
-            
-            if(totalCustoFixo > 0) {
-                // Checa se já existe para não duplicar
-                const { data: checkDesp } = await db.from('despesas').select('id').eq('description', `Custo Fixo - Ref: ${ticketNum}`);
-                if(!checkDesp || checkDesp.length === 0) {
-                    await db.from('despesas').insert({ 
-                        description: `Custo Fixo - Ref: ${ticketNum}`, 
-                        amount: totalCustoFixo, 
-                        category: 'Custos Fixos',
-                        date: new Date().toISOString() // Data do fechamento exato
-                    });
+                // LÓGICA DE COBRANÇA UNIFICADA
+                const { data: existingDebt } = await db.from('debts').select('*').eq('client_id', clientId).gt('remaining_amount', 0).maybeSingle();
+                
+                if (existingDebt) {
+                    await db.from('debts').update({
+                        total_amount: existingDebt.total_amount + total,
+                        remaining_amount: existingDebt.remaining_amount + total,
+                        comanda_ticket: existingDebt.comanda_ticket + ', ' + ticketNum
+                    }).eq('id', existingDebt.id);
+                } else {
+                    await db.from('debts').insert({ 
+                        client_id: clientId, 
+                        total_amount: total, 
+                        remaining_amount: total, 
+                        comanda_ticket: ticketNum 
+                    }); 
                 }
             }
+            
+            // Lança Custo e Comissão no exato mesmo segundo para Fluxo perfeito
+            if(totalCustoFixo > 0) {
+                await db.from('despesas').insert({ 
+                    description: `Custo Fixo Serviço - Ref: ${ticketNum}`, 
+                    amount: totalCustoFixo, category: 'Custos Fixos', date: exataDataHoraFechamento 
+                });
+            }
+            if(totalComissao > 0) {
+                await db.from('despesas').insert({ 
+                    description: `Comissão Automática (${comanda.users?.name}) - Ref: ${ticketNum}`, 
+                    amount: totalComissao, category: 'Comissões', date: exataDataHoraFechamento 
+                });
+            }
 
-            Modals.close(); UI.toast('Comanda Faturada e Custos Aplicados!');
+            Modals.close(); UI.toast('Ticket Fechado e Integrado ao Caixa!'); Render.comandas();
         });
     },
     
-    // REABRIR COMANDA - EXCLUI O CUSTO FIXO E A COBRANÇA
     async reopenComanda(id) {
-        UI.confirm('ALERTA: Reabrir exclui as cobranças e remove os custos fixos dessa comanda. Continuar?', async () => {
-            const { data: comanda } = await db.from('comandas').select('ticket').eq('id', id).single();
+        UI.confirm('ALERTA: Reabrir exclui as cobranças parciais unificadas e os custos do fluxo de caixa desta comanda. Continuar?', async () => {
+            const { data: comanda } = await db.from('comandas').select('ticket, total').eq('id', id).single();
             
             if(comanda && comanda.ticket) {
-                // Remove o Custo Fixo gerado no fechamento para limpar o Histórico e Fluxo
-                await db.from('despesas').delete().eq('description', `Custo Fixo - Ref: ${comanda.ticket}`);
+                // Remove TODOS os custos e comissões daquela referência limpinho
+                await db.from('despesas').delete().like('description', `%Ref: ${comanda.ticket}%`);
+
+                // Logica Inversa na Dívida Unificada
+                const { data: existingDebt } = await db.from('debts').select('*').like('comanda_ticket', `%${comanda.ticket}%`).maybeSingle();
+                if(existingDebt) {
+                    let remainingTkts = existingDebt.comanda_ticket.split(', ').map(t=>t.trim()).filter(t => t !== comanda.ticket).join(', ');
+                    if(remainingTkts === '') {
+                        await db.from('debts').delete().eq('id', existingDebt.id);
+                    } else {
+                        await db.from('debts').update({ 
+                            total_amount: Math.max(0, existingDebt.total_amount - comanda.total), 
+                            remaining_amount: Math.max(0, existingDebt.remaining_amount - comanda.total), 
+                            comanda_ticket: remainingTkts 
+                        }).eq('id', existingDebt.id);
+                    }
+                }
             }
             
-            await db.from('debts').delete().eq('comanda_id', id);
             await db.from('comandas').update({ status: 'aberta' }).eq('id', id);
-            Modals.close(); UI.toast('Comanda Reaberta e registros financeiros removidos.');
+            Modals.close(); UI.toast('Ação Desfeita com Segurança!'); Render.comandas();
         });
     },
 
@@ -865,7 +1070,7 @@ const Actions = {
         Modals.close(); UI.toast('Serviço adicionado ao catálogo!');
     },
     
-    // API MERCADO LIVRE RESTAURADA E FUNCIONANDO
+    // Passo 4: API Mercado Livre Nativa, blindada contra erros
     async fetchBarcode(val) {
         if(val.length >= 8) {
             const inputNome = document.getElementById('fp-nome');
@@ -902,23 +1107,24 @@ const Actions = {
         else await db.from('message_templates').insert(payload);
         Modals.close(); UI.toast(id ? 'Template reescrito!' : 'Novo padrão salvo!'); 
     },
-    async deleteMensagem(id) { UI.confirm('Deletar este modelo de mensagem permanentemente?', async () => { await db.from('message_templates').delete().eq('id', id); UI.toast('Modelo descartado.'); }); },
+    async deleteMensagem(id) { UI.confirm('Deletar permanentemente?', async () => { await db.from('message_templates').delete().eq('id', id); UI.toast('Descartado.'); }); },
 
-    async createDespesa(e) { e.preventDefault(); await db.from('despesas').insert({ description: document.getElementById('fd-desc').value, amount: document.getElementById('fd-val').value, category: document.getElementById('fd-cat').value, date: new Date().toISOString() }); Modals.close(); UI.toast('Saída registrada!'); },
+    async createDespesa(e) { e.preventDefault(); await db.from('despesas').insert({ description: document.getElementById('fd-desc').value, amount: document.getElementById('fd-val').value, category: document.getElementById('fd-cat').value, date: new Date().toISOString() }); Modals.close(); UI.toast('Saída manual registrada!'); Render.despesas(); },
 
     async debitDebt(e, id, max) { 
         e.preventDefault(); const v = parseFloat(document.getElementById('f-val').value); 
         const nV = Math.max(0, max - v);
         await db.from('debts').update({ remaining_amount: nV }).eq('id', id); 
-        if (nV === 0) { await db.from('debts').delete().eq('id', id); }
-        Modals.close(); UI.toast('Pagamento processado.');
+        if (nV === 0) { await db.from('debts').delete().eq('id', id); } // Se pagou tudo, some
+        Modals.close(); UI.toast(`Baixa de ${U.money(v)} processada.`);
         Render.cobrancas();
     },
     async discountDebt(e, id, max) { 
         e.preventDefault(); 
         const perc = parseFloat(document.getElementById('f-val').value); 
-        await db.from('debts').update({ remaining_amount: Math.max(0, max - (max * perc / 100)) }).eq('id', id); 
-        Modals.close(); UI.toast('Desconto autorizado!'); 
+        const discountVal = (max * perc / 100);
+        await db.from('debts').update({ remaining_amount: Math.max(0, max - discountVal) }).eq('id', id); 
+        Modals.close(); UI.toast(`Desconto de ${perc}% autorizado!`); 
         Render.cobrancas();
     },
 

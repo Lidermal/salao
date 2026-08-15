@@ -61,6 +61,90 @@ const U = {
             sel.innerHTML = opts;
             sel.value = this.getCurrentQuinzenaValue(); // Seta sempre para a atual
         });
+    },
+
+    // Monta o extrato (Fluxo de Caixa) já ordenado: registros mais recentes em cima e,
+    // dentro de um mesmo fechamento de ticket: Comissão -> Custo -> Recebimento.
+    // Agrupa pelo número do ticket (via c.ticket / "Ref: TKT-XXXX" na descrição da despesa) em vez de
+    // confiar em timestamps idênticos, que antes misturavam os registros de tickets diferentes.
+    buildExtrato(comand, desp) {
+        let groups = {};
+        let avulsos = []; // despesas manuais sem ticket associado
+
+        (comand || []).forEach(c => {
+            if (c.total > 0) {
+                const tk = c.ticket || `SEMTKT-${c.created_at}`;
+                groups[tk] = groups[tk] || {};
+                groups[tk].date = new Date(c.created_at);
+                groups[tk].in = { type: 'in', desc: `Comanda Fechada ${c.ticket || '-'}`, val: c.total, date: new Date(c.created_at) };
+            }
+        });
+
+        (desp || []).forEach(d => {
+            const item = { type: 'out', desc: d.description, val: d.amount, date: new Date(d.date) };
+            const m = (d.description || '').match(/Ref:\s*(TKT-\d+)/);
+            if (m) {
+                const tk = m[1];
+                groups[tk] = groups[tk] || {};
+                if (!groups[tk].date) groups[tk].date = item.date;
+                if (d.category === 'Comissões' || /comiss/i.test(d.description || '')) groups[tk].comissao = item;
+                else groups[tk].custo = item;
+            } else {
+                avulsos.push(item);
+            }
+        });
+
+        // Blocos em ordem cronológica ASCENDENTE (mais antigo primeiro) para calcular o saldo corretamente.
+        // Ordem real dentro de cada ticket: Recebimento -> Custo -> Comissão.
+        let blocks = [];
+        Object.keys(groups).forEach(tk => {
+            const g = groups[tk]; const items = [];
+            if (g.in) items.push(g.in);
+            if (g.custo) items.push(g.custo);
+            if (g.comissao) items.push(g.comissao);
+            if (items.length) blocks.push({ sortDate: g.date, items });
+        });
+        avulsos.forEach(a => blocks.push({ sortDate: a.date, items: [a] }));
+
+        blocks.sort((a, b) => a.sortDate - b.sortDate);
+        let extrato = blocks.flatMap(b => b.items);
+
+        let saldoAtual = 0, totalIn = 0, totalOut = 0;
+        extrato = extrato.map(item => {
+            if (item.type === 'in') totalIn += item.val; else totalOut += item.val;
+            saldoAtual += item.type === 'in' ? item.val : -item.val;
+            return { ...item, saldo: saldoAtual };
+        });
+
+        // Inverte para exibição: mais recente em cima (Comissão -> Custo -> Recebimento dentro do grupo).
+        extrato.reverse();
+        return { extrato, totalIn, totalOut };
+    },
+
+    // Ordena listas que mostram SOMENTE despesas (Controle de Despesas / Relatório de Despesas):
+    // agrupa pelo ticket para garantir Comissão sempre acima do Custo do mesmo fechamento, mais recente em cima.
+    orderDespesas(desp) {
+        let groups = {}; let avulsos = [];
+        (desp || []).forEach(d => {
+            const m = (d.description || '').match(/Ref:\s*(TKT-\d+)/);
+            if (m) {
+                const tk = m[1]; const dt = new Date(d.date);
+                groups[tk] = groups[tk] || { date: dt };
+                if (dt > groups[tk].date) groups[tk].date = dt;
+                if (d.category === 'Comissões' || /comiss/i.test(d.description || '')) groups[tk].comissao = d;
+                else groups[tk].custo = d;
+            } else avulsos.push(d);
+        });
+        let blocks = [];
+        Object.keys(groups).forEach(tk => {
+            const g = groups[tk]; const items = [];
+            if (g.comissao) items.push(g.comissao);
+            if (g.custo) items.push(g.custo);
+            if (items.length) blocks.push({ sortDate: g.date, items });
+        });
+        avulsos.forEach(a => blocks.push({ sortDate: new Date(a.date), items: [a] }));
+        blocks.sort((a, b) => b.sortDate - a.sortDate);
+        return blocks.flatMap(b => b.items);
     }
 };
 
@@ -320,8 +404,9 @@ const Render = {
 
     // Ticket Visual de Cobranças Exclusivas
     async cobrancas() {
-        const { data: debts } = await db.from('debts').select('*, clients(name)').gt('remaining_amount', 0).order('created_at', {ascending: false});
+        const { data: debts, error } = await db.from('debts').select('*, clients(name)').gt('remaining_amount', 0).order('created_at', {ascending: false});
         const cont = document.getElementById('cobrancas-list');
+        if(error) { cont.innerHTML = `<p style='color:#d32f2f'><i class="ph ph-warning-circle"></i> Erro ao carregar cobranças: ${error.message}</p>`; UI.toast(`Erro em Cobranças: ${error.message}`, 'error'); return; }
         if (!debts || debts.length === 0) { cont.innerHTML = "<p style='color:var(--muted)'>Nenhuma cobrança em aberto no momento.</p>"; return; }
         
         let htmlFinal = '';
@@ -427,26 +512,33 @@ const Render = {
     // FUNCIONÁRIOS (Sempre esconde o admin.teste)
     async funcionarios() {
         const { data } = await db.from('users').select('*').neq('username', 'admin.teste').order('name');
-        document.getElementById('funcionarios-list').innerHTML = data.map(u => `
-            <div class="card" style="border-left: 4px solid ${u.active ? 'var(--primary)' : '#999'}; opacity: ${u.active ? '1' : '0.6'}">
+        document.getElementById('funcionarios-list').innerHTML = data.map(u => {
+            // Trata registros antigos/sem o campo "active" preenchido (null/undefined) como ATIVOS por padrão.
+            // Só é considerado desativado quando o valor for explicitamente "false".
+            const isActive = u.active !== false;
+            return `
+            <div class="card" style="border-left: 4px solid ${isActive ? 'var(--primary)' : '#999'}; opacity: ${isActive ? '1' : '0.6'}">
                 <h4 style="font-size:1.2rem; margin-bottom:5px">${u.name}</h4>
                 <p style="font-size:0.9rem; color:var(--muted)"><i class="ph ph-user"></i> Login: <b>${u.username}</b></p>
                 <p style="font-size:0.8rem; margin-top:5px; padding:3px 8px; border-radius:10px; display:inline-block; background:${u.role==='owner'?'#ffebee':'#e8f5e9'}; color:${u.role==='owner'?'#d32f2f':'#2e7d32'}">${u.role.toUpperCase()}</p>
-                ${!u.active ? `<p style="font-size:0.8rem; color:#d32f2f; margin-top:5px; font-weight:bold">CONTA DESATIVADA</p>` : ''}
+                ${!isActive ? `<p style="font-size:0.8rem; color:#d32f2f; margin-top:5px; font-weight:bold">CONTA DESATIVADA</p>` : ''}
                 <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap">
                     <button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Modals.open('edit_funcionario', '${u.id}')"><i class="ph ph-pencil"></i> Editar Perfil</button>
+                    <button class="btn-secondary" style="flex:1; min-width:120px; ${isActive ? 'color:#d32f2f;' : 'color:#2e7d32;'}" onclick="Actions.toggleFuncionarioStatus('${u.id}', ${isActive})"><i class="ph ${isActive ? 'ph-prohibit' : 'ph-check-circle'}"></i> ${isActive ? 'Desativar' : 'Ativar'}</button>
                     <button class="btn-secondary" style="flex:1; min-width:120px; color:#d32f2f;" onclick="Actions.deleteFuncionario('${u.id}')"><i class="ph ph-trash"></i> Excluir</button>
                 </div>
-            </div>`).join('');
+            </div>`;
+        }).join('');
     },
     
     // TELAS OPERACIONAIS FIXADAS NA QUINZENA ATUAL
     async despesas() {
-        let query = db.from('despesas').select('*').order('date', {ascending: false});
+        let query = db.from('despesas').select('*');
         const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); // Busca SOMENTE a quinzena atual
         query = query.gte('date', range.start).lte('date', range.end);
 
-        const { data } = await query;
+        const { data: rawData } = await query;
+        const data = U.orderDespesas(rawData); // Comissão sempre acima do Custo do mesmo ticket, mais recente em cima
         let totais = { 'Custos Fixos': 0, 'Comissões': 0, 'Pessoal/Pagamentos': 0, 'Custos Variáveis': 0 };
         data.forEach(d => { if(totais[d.category] !== undefined) totais[d.category] += d.amount; else totais['Custos Variáveis'] += d.amount; });
         
@@ -535,31 +627,7 @@ const Render = {
             <div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custos Gerais (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(gasto)}</div></div>
             <div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
         
-        let extrato = [];
-        comand.forEach(c => { if(c.total>0) extrato.push({ type: 'in', desc: `Comanda Fechada ${c.ticket||'-'}`, val: c.total, date: new Date(c.created_at) }); });
-        desp.forEach(d => { extrato.push({ type: 'out', desc: d.description, val: d.amount, date: new Date(d.date) }); });
-        
-        // ORDENAÇÃO EXATA BANCÁRIA: Tempo cronológico normal (do mais antigo para calcular o saldo). 
-        // Se tempos forem exatos (fechamento): Receita(1) -> Custo(2) -> Comissão(3)
-        extrato.sort((a,b) => {
-            let tA = a.date.getTime();
-            let tB = b.date.getTime();
-            if (tA !== tB) return tA - tB; 
-            
-            let pA = a.type === 'in' ? 1 : (a.desc.includes('Custo') ? 2 : 3);
-            let pB = b.type === 'in' ? 1 : (b.desc.includes('Custo') ? 2 : 3);
-            return pA - pB;
-        });
-        
-        let saldoAtual = 0;
-        extrato = extrato.map(item => {
-            saldoAtual += item.type === 'in' ? item.val : -item.val;
-            return { ...item, saldo: saldoAtual };
-        });
-        
-        // INVERTER PARA MOSTRAR O MAIS RECENTE EM CIMA
-        // A inversão de [Receita, Custo, Comissão] vira [Comissão, Custo, Receita]. O que é exatamente o solicitado!
-        extrato.reverse();
+        const { extrato } = U.buildExtrato(comand, desp);
         
         document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações na quinzena atual.</p>' :
             extrato.map(i => `
@@ -586,36 +654,18 @@ const Render = {
         
         const [ {data:comand}, {data:desp} ] = await Promise.all([qComand, qDesp]);
 
-        // Processa Despesas
+        // Processa Despesas (Comissão sempre acima do Custo do mesmo ticket, mais recente em cima)
         let htmlDesp = '';
         if(desp.length === 0) { htmlDesp = '<p style="color:var(--muted); text-align:center;">Sem gastos registrados na quinzena.</p>'; }
         else {
-            let despArr = [...desp].sort((a,b) => new Date(b.date) - new Date(a.date));
+            let despArr = U.orderDespesas(desp);
             htmlDesp = despArr.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${d.description}</b><br><span style="font-size:0.8rem; color:#888">${new Date(d.date).toLocaleString('pt-BR')} - ${d.category}</span></div><div style="color:#d32f2f; font-weight:bold">-${U.money(d.amount)}</div></div>`).join('');
         }
         document.getElementById('relatorio-despesas-conteudo').innerHTML = htmlDesp;
         window.currentDespesasData = desp;
 
-        // Processa Fluxo
-        let extrato = [];
-        comand.forEach(c => { if(c.total>0) extrato.push({ type: 'in', desc: `Comanda Fechada ${c.ticket||'-'}`, val: c.total, date: new Date(c.created_at) }); });
-        desp.forEach(d => { extrato.push({ type: 'out', desc: d.description, val: d.amount, date: new Date(d.date) }); });
-        
-        extrato.sort((a,b) => {
-            let tA = a.date.getTime(); let tB = b.date.getTime();
-            if (tA !== tB) return tA - tB;
-            let pA = a.type === 'in' ? 1 : (a.desc.includes('Custo') ? 2 : 3);
-            let pB = b.type === 'in' ? 1 : (b.desc.includes('Custo') ? 2 : 3);
-            return pA - pB;
-        });
-        
-        let saldoAtual = 0; let totalIn = 0; let totalOut = 0;
-        extrato = extrato.map(item => { 
-            if(item.type === 'in') totalIn += item.val; else totalOut += item.val;
-            saldoAtual += item.type === 'in' ? item.val : -item.val; 
-            return { ...item, saldo: saldoAtual }; 
-        });
-        extrato.reverse();
+        // Processa Fluxo (mesma ordenação robusta usada em Fluxo de Caixa)
+        const { extrato, totalIn, totalOut } = U.buildExtrato(comand, desp);
         
         let htmlFluxo = '';
         if(extrato.length === 0) { htmlFluxo = '<p style="color:var(--muted); text-align:center;">Nenhuma movimentação financeira.</p>'; }
@@ -853,7 +903,7 @@ const Modals = {
                 <div class="input-group"><label>Nível de Acesso</label><select id="ff-role" required style="padding:1.2rem; border-radius:8px"><option value="freelancer" ${f.role==='freelancer'?'selected':''}>Freelancer (Colaborador)</option><option value="owner" ${f.role==='owner'?'selected':''}>Proprietário (Acesso Total)</option></select></div>
                 ${param1 ? `
                     <div class="input-group" style="background:#f9f9f9; padding:15px; border-radius:12px">
-                        <label style="display:flex; align-items:center; gap:10px; cursor:pointer; margin:0"><input type="checkbox" id="ff-ativo" ${f.active ? 'checked' : ''} style="width:20px; height:20px"> Conta Ativa e Permitida Logar</label>
+                        <label style="display:flex; align-items:center; gap:10px; cursor:pointer; margin:0"><input type="checkbox" id="ff-ativo" ${f.active !== false ? 'checked' : ''} style="width:20px; height:20px"> Conta Ativa e Permitida Logar</label>
                     </div>
                     <button type="button" class="btn-secondary" style="margin-bottom:15px; border:1px solid var(--primary); color:var(--primary)" onclick="Actions.resetFuncionarioPassword('${param1}')"><i class="ph ph-key"></i> Redefinir Senha para 123456</button>
                 ` : ''}
@@ -966,6 +1016,16 @@ const Actions = {
     async deleteFuncionario(id) {
         UI.confirm('Deletar colaborador permanentemente?', async () => { await db.from('users').delete().eq('id', id); UI.toast('Conta excluída.'); Render.funcionarios(); });
     },
+    async toggleFuncionarioStatus(id, isCurrentlyActive) {
+        const novoStatus = !isCurrentlyActive;
+        const acaoTexto = novoStatus ? 'ativar' : 'desativar';
+        UI.confirm(`Deseja realmente ${acaoTexto} este colaborador?`, async () => {
+            const { error } = await db.from('users').update({ active: novoStatus }).eq('id', id);
+            if(error) { UI.toast(`Erro: ${error.message}`, 'error'); return; }
+            UI.toast(novoStatus ? 'Colaborador ativado!' : 'Colaborador desativado!');
+            Render.funcionarios();
+        });
+    },
 
     async createAppointment(e) {
         e.preventDefault(); const auxId = document.getElementById('fa-aux').value;
@@ -1037,11 +1097,15 @@ const Actions = {
             await db.from('comandas').update({ status: 'fechada', created_at: dataHoraExata }).eq('id', comandaId);
             
             if(total > 0) { 
-                const { data: existingDebt } = await db.from('debts').select('*').eq('client_id', clientId).gt('remaining_amount', 0).maybeSingle();
+                const { data: existingDebt, error: errFind } = await db.from('debts').select('*').eq('client_id', clientId).gt('remaining_amount', 0).maybeSingle();
+                if(errFind) UI.toast(`Erro ao consultar cobrança: ${errFind.message}`, 'error');
+                
                 if (existingDebt) {
-                    await db.from('debts').update({ total_amount: existingDebt.total_amount + total, remaining_amount: existingDebt.remaining_amount + total, comanda_ticket: existingDebt.comanda_ticket + ', ' + ticketNum }).eq('id', existingDebt.id);
+                    const { error: errUp } = await db.from('debts').update({ total_amount: existingDebt.total_amount + total, remaining_amount: existingDebt.remaining_amount + total, comanda_ticket: existingDebt.comanda_ticket + ', ' + ticketNum, created_at: dataHoraExata }).eq('id', existingDebt.id);
+                    if(errUp) UI.toast(`Erro ao atualizar cobrança: ${errUp.message}`, 'error');
                 } else {
-                    await db.from('debts').insert({ client_id: clientId, total_amount: total, remaining_amount: total, comanda_ticket: ticketNum }); 
+                    const { error: errIns } = await db.from('debts').insert({ client_id: clientId, total_amount: total, remaining_amount: total, comanda_ticket: ticketNum, created_at: dataHoraExata }); 
+                    if(errIns) UI.toast(`Erro ao gerar cobrança: ${errIns.message}`, 'error');
                 }
             }
             if(totalCustoFixo > 0) await db.from('despesas').insert({ description: `Custo Fixo Serviço - Ref: ${ticketNum}`, amount: totalCustoFixo, category: 'Custos Fixos', date: dataHoraExata });
@@ -1073,26 +1137,45 @@ const Actions = {
     },
     
     async fetchBarcode(val) {
-        if(val.length >= 8) {
-            const inputNome = document.getElementById('fp-nome');
-            inputNome.value = "Buscando nas bases online...";
-            
-            try {
-                let res1 = await fetch(`https://api.upcitemdb.com/prod/trial/lookup?upc=${val}`);
-                let json1 = await res1.json();
-                if(json1.items && json1.items.length > 0) { inputNome.value = json1.items[0].title; UI.toast('Produto encontrado!', 'success'); return; }
-            } catch(e) {}
-            
-            try {
-                let res2 = await fetch(`https://api.mercadolibre.com/sites/MLB/search?q=${val}`);
-                let json2 = await res2.json();
-                if(json2.results && json2.results.length > 0) { inputNome.value = json2.results[0].title; UI.toast('Encontrado no ML!', 'success'); return; }
-            } catch(e) {}
+        val = (val || '').trim();
+        if(val.length < 8) return UI.toast('Digite um código de barras válido (mínimo 8 dígitos).', 'warning');
 
-            inputNome.value = ""; 
-            inputNome.placeholder = "Não encontrado online. Digite o nome aqui...";
-            UI.toast('Não localizado. Pode digitar o nome manualmente.', 'warning');
+        const inputNome = document.getElementById('fp-nome');
+        inputNome.value = "Buscando nas bases online...";
+        inputNome.disabled = true;
+
+        // Bases gratuitas e sem necessidade de chave de API, com suporte a CORS direto do navegador.
+        // Open Beauty Facts cobre bem itens de salão (cosméticos/higiene); os demais servem de reforço.
+        const bases = [
+            { url: `https://world.openbeautyfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
+            { url: `https://world.openfoodfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
+            { url: `https://world.openproductsfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
+            { url: `https://api.upcitemdb.com/prod/trial/lookup?upc=${val}`, tipo: 'upc' },
+        ];
+
+        for (const base of bases) {
+            try {
+                const res = await fetch(base.url);
+                if(!res.ok) continue;
+                const json = await res.json();
+
+                if (base.tipo === 'off' && json.status === 1 && json.product) {
+                    const nome = [json.product.product_name, json.product.brands].filter(Boolean).join(' - ');
+                    if (nome) {
+                        inputNome.value = nome; inputNome.disabled = false;
+                        UI.toast('Produto encontrado!', 'success'); return;
+                    }
+                } else if (base.tipo === 'upc' && json.items && json.items.length > 0) {
+                    inputNome.value = json.items[0].title; inputNome.disabled = false;
+                    UI.toast('Produto encontrado!', 'success'); return;
+                }
+            } catch(e) { /* base indisponível ou sem CORS, tenta a próxima */ }
         }
+
+        inputNome.value = ""; 
+        inputNome.disabled = false;
+        inputNome.placeholder = "Não encontrado online. Digite o nome aqui...";
+        UI.toast('Não localizado nas bases gratuitas. Digite o nome manualmente.', 'warning');
     },
     async saveProduct(e) { e.preventDefault(); await db.from('products').insert({ barcode: document.getElementById('fp-bar').value, name: document.getElementById('fp-nome').value, price: document.getElementById('fp-preco').value, commission: document.getElementById('fp-com').value, stock: document.getElementById('fp-qtd').value, min_stock: document.getElementById('fp-min').value }); Modals.close(); UI.toast('Produto salvo!'); Render.produtos(); },
     async updateStock(e, id, curStock) { e.preventDefault(); const v = parseInt(document.getElementById('fa-qtd').value); await db.from('products').update({stock: curStock + v}).eq('id', id); Modals.close(); UI.toast('Estoque atualizado!'); Render.produtos(); },

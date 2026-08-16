@@ -1,6 +1,6 @@
 /** 
  * SISTEMA ESTÚDIO AMOR QUE CUIDA
- * INTEGRAÇÃO COMPLETA + QUINZENAS + RELATÓRIOS + COBRANÇAS EXCLUSIVAS
+ * INTEGRAÇÃO COMPLETA + QUINZENAS + RELATÓRIOS + COBRANÇAS EXCLUSIVAS + NOTIFICAÇÕES
  */
 
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
@@ -23,6 +23,17 @@ const U = {
     money: v => new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'}).format(v||0),
     iso: d => { const tzOffset = d.getTimezoneOffset() * 60000; return (new Date(d.getTime() - tzOffset)).toISOString().split('T')[0]; },
     date: d => new Date(d).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}),
+
+    // Substitui placeholders {cliente}, {data}, {hora}, {profissional}, {servico}, {salao} pelo valor real.
+    // Chaves que começam com "_" (ex: _kind) são metadados internos e nunca entram na mensagem.
+    fillTemplate(text, vars) {
+        let out = text || '';
+        Object.keys(vars || {}).forEach(k => {
+            if (k.startsWith('_')) return;
+            out = out.split(`{${k}}`).join(vars[k] ?? '');
+        });
+        return out;
+    },
     
     getCurrentQuinzenaValue() {
         let curr = new Date();
@@ -262,7 +273,7 @@ const Nav = {
         document.querySelectorAll('.nav-link, .b-item').forEach(el => el.classList.remove('active'));
         document.querySelectorAll(`[data-view="${id}"]`).forEach(el => el.classList.add('active'));
         
-        const titles = { agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', anamnese:'Ficha de Avaliação', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', relatorios:'Relatórios & Arquivos' };
+        const titles = { agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', anamnese:'Ficha de Avaliação', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', relatorios:'Relatórios & Arquivos', notificacoes:'Notificações' };
         document.getElementById('page-title').textContent = titles[id] || 'Amor que Cuida';
         
         // Telas de DETALHE (Anamnese/Perfil) já são renderizadas por quem as chama (Render.anamnese/Render.perfilCliente),
@@ -279,7 +290,9 @@ const Render = {
     async agenda() {
         this.buildCalendar();
         try {
-            let query = db.from('appointments').select('*, clients(name), services(name), users!user_id(name)').eq('date', U.iso(App.currentDate)).order('time', {ascending: true});
+            // Agora também busca o telefone do cliente (clients(name, phone)) para permitir o botão
+            // "Confirmar via WhatsApp" direto no card do agendamento.
+            let query = db.from('appointments').select('*, clients(name, phone), services(name), users!user_id(name)').eq('date', U.iso(App.currentDate)).order('time', {ascending: true});
             if (App.role !== 'owner') query = query.eq('user_id', App.user.id);
 
             const { data, error } = await query;
@@ -324,7 +337,10 @@ const Render = {
                         <h4 style="font-size:1.2rem; color: ${isBlocked ? 'var(--muted)' : 'var(--text)'}">${displayTime} - ${titleText}</h4>
                         ${isBlocked ? `<p style="margin:5px 0; color:var(--muted); font-style:italic;">Indisponível<br>Motivo: ${reasonText}</p>` : `<p style="margin:5px 0; color:var(--muted)">${a.services?.name || '-'}</p>`}
                         <p style="font-size:0.8rem">Profissional: <b>${a.users?.name || '-'}</b></p>
-                        ${(!isBlocked && a.status === 'agendado') ? `<button class="btn-primary" style="padding: 5px 15px; font-size: 0.8rem; margin-top: 10px; width: auto;" onclick="Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i> Marcar como Chegou</button>` : ''}
+                        ${(!isBlocked && a.status === 'agendado') ? `
+                            <button class="btn-primary" style="padding: 5px 15px; font-size: 0.8rem; margin-top: 10px; margin-right:8px; width: auto;" onclick="Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i> Marcar como Chegou</button>
+                            <button class="btn-secondary" style="padding: 5px 15px; font-size: 0.8rem; margin-top: 10px; width: auto; background:#e8f5e9; color:#1b8a4a; border:1px solid #25D366" onclick="Actions.sendConfirmacao('${a.id}')"><i class="ph ph-whatsapp-logo"></i> Confirmar via WhatsApp</button>
+                        ` : ''}
                     </div>
                     <div style="background:${statusBg}; color:${statusColor}; padding:5px 12px; border-radius:20px; font-size:0.8rem; font-weight:bold; text-align:center;">${a.status.toUpperCase()}</div>
                 </div>`;
@@ -374,7 +390,17 @@ const Render = {
         Nav.showView('perfil-cliente');
         
         const { data: comandas } = await db.from('comandas').select('*, users(name)').eq('client_id', id).eq('status', 'fechada').order('created_at', {ascending: false});
-        const { data: anamnese } = await db.from('anamnesis').select('notes, created_at, users(name)').eq('client_id', id).order('created_at', {ascending: false}).limit(1);
+
+        // Busca a anamnese SEM tentar embutir "users(...)" via relacionamento do PostgREST: quando não existe
+        // (ou não está reconhecida no cache de schema) uma FK entre anamnesis.user_id e users.id, o embed falha
+        // com "Could not find a relationship...". Buscamos o nome do profissional à parte e montamos manualmente.
+        const { data: anamneseRaw } = await db.from('anamnesis').select('notes, created_at, user_id').eq('client_id', id).order('created_at', {ascending: false}).limit(1);
+        let anamnese = anamneseRaw;
+        if (anamnese && anamnese.length && anamnese[0].user_id) {
+            const { data: prof } = await db.from('users').select('name').eq('id', anamnese[0].user_id).maybeSingle();
+            anamnese[0].users = { name: prof?.name || 'Não identificado' };
+        }
+
         const { data: debts } = await db.from('debts').select('*').eq('client_id', id).gt('remaining_amount', 0).maybeSingle();
         
         const debitosDiv = document.getElementById('perfil-debitos-destaque');
@@ -514,6 +540,7 @@ const Render = {
         document.getElementById('mensagens-list').innerHTML = data.map(m => `
             <div class="card"><h4 style="color:var(--primary); border-bottom:1px solid #eee; padding-bottom:10px">${m.title}</h4>
             <p style="margin:15px 0; font-style:italic; color:var(--muted)">"${m.content}"</p>
+            <p style="font-size:0.75rem; color:var(--muted); margin-bottom:10px"><i class="ph ph-magic-wand"></i> Placeholders disponíveis: {cliente}, {data}, {hora}, {profissional}, {servico}, {salao}</p>
             <div style="display:flex; gap:10px">
                 <button class="btn-secondary" style="flex:1" onclick="Modals.open('edit_mensagem', '${m.id}')"><i class="ph ph-pencil"></i> Editar</button>
                 <button class="btn-secondary" style="flex:1; color:#d32f2f; background:#ffebee" onclick="Actions.deleteMensagem('${m.id}')"><i class="ph ph-trash"></i> Excluir</button>
@@ -719,6 +746,72 @@ const Render = {
     configuracoes() {
         document.getElementById('cfg-name').value = App.settings.studio_name || '';
         document.getElementById('cfg-phone').value = App.settings.official_phone || '';
+    },
+
+    // NOVA TELA: NOTIFICAÇÕES
+    // Proprietário vê tudo (aniversariantes, confirmações pendentes de todos, estoque baixo, cobranças em aberto).
+    // Colaborador vê apenas aniversariantes e as confirmações pendentes dos SEUS próprios agendamentos.
+    async notificacoes() {
+        const isOwner = App.role === 'owner';
+        const todayIso = U.iso(new Date());
+        const todayMD = todayIso.slice(5); // "MM-DD"
+
+        let qAgenda = db.from('appointments').select('*, clients(name, phone), services(name), users!user_id(name)').eq('date', todayIso).eq('status', 'agendado');
+        if(!isOwner) qAgenda = qAgenda.eq('user_id', App.user.id);
+
+        const qClientes = db.from('clients').select('id, name, phone, birth_date').not('birth_date', 'is', null);
+
+        const tasks = [qAgenda, qClientes];
+        if(isOwner) {
+            tasks.push(db.from('products').select('stock, min_stock'));
+            tasks.push(db.from('debts').select('remaining_amount').gt('remaining_amount', 0));
+        }
+
+        const results = await Promise.all(tasks);
+        const agendaHoje = results[0].data || [];
+        const clientes = results[1].data || [];
+        const aniversariantesHoje = clientes.filter(c => c.birth_date && c.birth_date.slice(5) === todayMD);
+
+        let estoqueBaixo = [], debitos = [], totalDebitos = 0;
+        if(isOwner) {
+            const produtos = results[2].data || [];
+            estoqueBaixo = produtos.filter(p => p.stock <= p.min_stock);
+            debitos = results[3].data || [];
+            totalDebitos = debitos.reduce((acc, d) => acc + d.remaining_amount, 0);
+        }
+
+        let html = '';
+
+        html += `<h3 style="margin-bottom:10px"><i class="ph ph-cake"></i> Aniversariantes de Hoje</h3>`;
+        html += aniversariantesHoje.length === 0
+            ? `<p style="color:var(--muted); margin-bottom:25px">Nenhum aniversário hoje.</p>`
+            : aniversariantesHoje.map(c => `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid var(--primary); margin-bottom:10px">
+                <div><h4>${c.name}</h4><p style="font-size:0.8rem; color:var(--muted)">${c.phone || '-'}</p></div>
+                <button class="btn-primary" style="width:auto; background:#25D366; padding:0.6rem 1.2rem" onclick="Actions.sendParabens('${c.id}')"><i class="ph ph-whatsapp-logo"></i> Parabenizar</button>
+            </div>`).join('') + `<div style="margin-bottom:15px"></div>`;
+
+        html += `<h3 style="margin-bottom:10px"><i class="ph ph-calendar-check"></i> Confirmações Pendentes Hoje</h3>`;
+        html += agendaHoje.length === 0
+            ? `<p style="color:var(--muted); margin-bottom:25px">Nenhum agendamento pendente de confirmação hoje.</p>`
+            : agendaHoje.map(a => `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid var(--primary); margin-bottom:10px">
+                <div><h4>${a.time?.slice(0,5) || '-'} - ${a.clients?.name || '-'}</h4><p style="font-size:0.8rem; color:var(--muted)">${a.services?.name || '-'} • Profissional: ${a.users?.name || '-'}</p></div>
+                <button class="btn-primary" style="width:auto; background:#25D366; padding:0.6rem 1.2rem" onclick="Actions.sendConfirmacao('${a.id}')"><i class="ph ph-whatsapp-logo"></i> Confirmar</button>
+            </div>`).join('') + `<div style="margin-bottom:15px"></div>`;
+
+        if(isOwner) {
+            html += `<h3 style="margin-bottom:10px"><i class="ph ph-warning-circle"></i> Estoque Baixo</h3>`;
+            html += estoqueBaixo.length === 0
+                ? `<p style="color:var(--muted); margin-bottom:25px">Nenhum produto com estoque baixo.</p>`
+                : `<div class="card" style="border-left:4px solid #d32f2f; margin-bottom:25px"><p>${estoqueBaixo.length} produto(s) precisam de reposição.</p><button class="btn-secondary" style="width:auto; margin-top:10px" onclick="Nav.showView('produtos')">Ver Estoque</button></div>`;
+
+            html += `<h3 style="margin-bottom:10px"><i class="ph ph-money"></i> Cobranças em Aberto</h3>`;
+            html += debitos.length === 0
+                ? `<p style="color:var(--muted)">Nenhuma cobrança pendente.</p>`
+                : `<div class="card" style="border-left:4px solid #d32f2f"><p>Total pendente: <b>${U.money(totalDebitos)}</b> em ${debitos.length} cliente(s).</p><button class="btn-secondary" style="width:auto; margin-top:10px" onclick="Nav.showView('cobrancas')">Ver Cobranças</button></div>`;
+        }
+
+        const cont = document.getElementById('notificacoes-list');
+        if(cont) cont.innerHTML = html;
     }
 };
 
@@ -740,14 +833,23 @@ const Modals = {
         } 
         else if(type === 'whatsapp') {
             const { data: templates } = await db.from('message_templates').select('*');
-            const tOpts = templates.map(t => `<option value="${t.content}">${t.title}</option>`).join('');
+
+            // param3, quando presente, é um JSON com dados para personalizar a mensagem automaticamente
+            // (ex: {cliente, data, hora, profissional, servico, salao, _kind: 'confirmacao'|'aniversario'}).
+            let vars = {};
+            try { vars = param3 ? JSON.parse(param3) : {}; } catch(e) { vars = {}; }
+            window.currentWppVars = vars;
+            const hasVars = Object.keys(vars).length > 0;
+
+            const tOpts = templates.map(t => `<option value="${t.id}">${t.title}</option>`).join('');
             html += `<h3>Central de WhatsApp</h3>
             <div style="background:#f9f9f9; padding:15px; border-radius:12px; margin-bottom:20px; border:1px solid #eee">
                 <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 8px; line-height:1.4"><i class="ph ph-info"></i> O redirecionamento abaixo levará o texto para o aplicativo no seu dispositivo.</p>
                 <p style="font-size: 1rem;">Cliente Alvo: <b class="text-primary">${param2}</b></p>
                 <p style="font-size: 0.9rem; color:var(--muted)">Número: ${param1}</p>
+                ${hasVars ? `<p style="font-size:0.75rem; color:var(--muted); margin-top:8px"><i class="ph ph-magic-wand"></i> Modelos com {cliente}, {data}, {hora}, {profissional}, {servico} ou {salao} são preenchidos automaticamente.</p>` : ''}
             </div>
-            <div class="input-group"><label>Usar Modelo Automático</label><select onchange="document.getElementById('wpp-msg').value = this.value"><option value="">-- Escrever Mensagem Manualmente --</option>${tOpts}</select></div>
+            <div class="input-group"><label>Usar Modelo Automático</label><select id="wpp-template-sel" onchange="Actions.applyTemplate(this.value)"><option value="">-- Escrever Mensagem Manualmente --</option>${tOpts}</select></div>
             <div class="input-group"><textarea id="wpp-msg" rows="5" placeholder="Digite o texto que será enviado..." required></textarea></div>
             <button class="btn-primary" style="background:#25D366; font-size:1.1rem; padding:1.2rem;" onclick="Actions.sendWhatsApp('${param1}')"><i class="ph ph-whatsapp-logo" style="font-size:1.5rem"></i> Abrir Chat</button>`;
         }
@@ -870,7 +972,7 @@ const Modals = {
             if (param1) { const { data } = await db.from('message_templates').select('*').eq('id', param1).single(); m = data; }
             html += `<h3>${param1 ? 'Editar Mensagem' : 'Novo Template Automático'}</h3><form onsubmit="Actions.saveMensagem(event, '${param1 || ''}')">
                 <div class="input-group"><label>Título Interno</label><input type="text" id="fm-tit" value="${m.title}" required></div>
-                <div class="input-group"><label>Corpo do Texto</label><textarea id="fm-txt" rows="5" required>${m.content}</textarea></div>
+                <div class="input-group"><label>Corpo do Texto</label><textarea id="fm-txt" rows="5" required>${m.content}</textarea><p style="font-size:0.75rem; color:var(--muted); margin-top:8px"><i class="ph ph-magic-wand"></i> Use {cliente}, {data}, {hora}, {profissional}, {servico} ou {salao} para personalizar. Ex: "Olá {cliente}! Seu horário está confirmado para {data} às {hora} com {profissional}."</p></div>
                 <button type="submit" class="btn-primary" style="padding:1.2rem">${param1 ? 'Salvar Edição' : 'Criar Template'}</button></form>`;
         }
         else if(type === 'debitar' || type === 'desconto') {
@@ -895,6 +997,7 @@ const Modals = {
             html += `<h3>Novo Cliente</h3><form onsubmit="Actions.createClient(event)">
                 <div class="input-group"><label>Nome Completo</label><input type="text" id="fc-nome" required style="padding:1.2rem; border-radius:8px"></div>
                 <div class="input-group"><label>WhatsApp com DDD</label><input type="text" id="fc-fone" required style="padding:1.2rem; border-radius:8px"></div>
+                <div class="input-group"><label>Data de Nascimento (opcional, para mensagem de aniversário)</label><input type="date" id="fc-nasc" style="padding:1.2rem; border-radius:8px"></div>
                 <button type="submit" class="btn-primary" style="padding:1.2rem">Registrar</button></form>`;
         }
         else if(type === 'edit_cliente') {
@@ -902,6 +1005,7 @@ const Modals = {
             html += `<h3>Editar Cliente</h3><form onsubmit="Actions.updateClient(event, '${c.id}')">
                 <div class="input-group"><label>Nome</label><input type="text" id="fce-nome" value="${c.name}" required style="padding:1.2rem; border-radius:8px"></div>
                 <div class="input-group"><label>Telefone</label><input type="text" id="fce-fone" value="${c.phone}" required style="padding:1.2rem; border-radius:8px"></div>
+                <div class="input-group"><label>Data de Nascimento (opcional, para mensagem de aniversário)</label><input type="date" id="fce-nasc" value="${c.birth_date || ''}" style="padding:1.2rem; border-radius:8px"></div>
                 <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar Alterações</button></form>`;
         }
         else if(type === 'funcionario' || type === 'edit_funcionario') {
@@ -921,6 +1025,18 @@ const Modals = {
         }
         
         html += `</div>`; cont.innerHTML = html; cont.classList.remove('hidden');
+
+        // Se o modal do WhatsApp foi aberto com dados de contexto (agendamento ou aniversário),
+        // pré-seleciona automaticamente o modelo mais adequado ("Confirmação" ou "Aniversário").
+        if(type === 'whatsapp' && window.currentWppVars && window.currentWppVars._kind) {
+            const { data: templates } = await db.from('message_templates').select('*');
+            const pattern = window.currentWppVars._kind === 'aniversario' ? /anivers/i : /confirma/i;
+            const autoT = (templates || []).find(t => pattern.test(t.title));
+            if(autoT) {
+                const sel = document.getElementById('wpp-template-sel');
+                if(sel) { sel.value = autoT.id; Actions.applyTemplate(autoT.id); }
+            }
+        }
     },
     close() { document.getElementById('modal-container').classList.add('hidden'); }
 };
@@ -975,9 +1091,58 @@ const Actions = {
         if(error) { UI.toast(`Erro: ${error.message}`, 'error'); return; }
         App.user.first_login = false; Modals.close(); UI.toast('Senha salva com sucesso!'); 
     },
+
+    // Preenche a textarea da mensagem com o template escolhido, substituindo os placeholders
+    // ({cliente}, {data}, {hora}, {profissional}, {servico}, {salao}) pelos valores do contexto atual.
+    applyTemplate(templateId) {
+        const box = document.getElementById('wpp-msg');
+        if(!box) return;
+        if(!templateId) { box.value = ''; return; }
+        db.from('message_templates').select('content').eq('id', templateId).single().then(({ data }) => {
+            if(!data) return;
+            box.value = U.fillTemplate(data.content, window.currentWppVars || {});
+        });
+    },
+
+    // Abre o WhatsApp já com os dados do agendamento (cliente, data, hora, profissional, serviço)
+    // para preencher automaticamente o modelo de "Confirmação".
+    async sendConfirmacao(appId) {
+        const { data: a, error } = await db.from('appointments').select('*, clients(name, phone), services(name), users!user_id(name)').eq('id', appId).single();
+        if(error || !a) { UI.toast('Erro ao buscar agendamento.', 'error'); return; }
+        if(!a.clients?.phone) { UI.toast('Este cliente não possui telefone cadastrado.', 'error'); return; }
+        const vars = {
+            cliente: a.clients?.name || '',
+            data: new Date(a.date + 'T12:00:00').toLocaleDateString('pt-BR'),
+            hora: (a.time || '').slice(0,5),
+            profissional: a.users?.name || '',
+            servico: a.services?.name || '',
+            salao: App.settings.studio_name || 'Amor que Cuida',
+            _kind: 'confirmacao'
+        };
+        Modals.open('whatsapp', a.clients.phone, a.clients.name, JSON.stringify(vars));
+    },
+
+    // Abre o WhatsApp já com os dados do cliente para preencher automaticamente o modelo de "Aniversário".
+    async sendParabens(clientId) {
+        const { data: c, error } = await db.from('clients').select('name, phone').eq('id', clientId).single();
+        if(error || !c) { UI.toast('Cliente não encontrado.', 'error'); return; }
+        if(!c.phone) { UI.toast('Este cliente não possui telefone cadastrado.', 'error'); return; }
+        const vars = { cliente: c.name, salao: App.settings.studio_name || 'Amor que Cuida', _kind: 'aniversario' };
+        Modals.open('whatsapp', c.phone, c.name, JSON.stringify(vars));
+    },
     
-    async createClient(e) { e.preventDefault(); await db.from('clients').insert({ name: document.getElementById('fc-nome').value, phone: document.getElementById('fc-fone').value }); Modals.close(); UI.toast('Cliente adicionado!'); Render.clientes(); },
-    async updateClient(e, id) { e.preventDefault(); await db.from('clients').update({ name: document.getElementById('fce-nome').value, phone: document.getElementById('fce-fone').value }).eq('id', id); Modals.close(); UI.toast('Cliente alterado!'); Render.clientes(); },
+    async createClient(e) {
+        e.preventDefault();
+        const nasc = document.getElementById('fc-nasc').value;
+        await db.from('clients').insert({ name: document.getElementById('fc-nome').value, phone: document.getElementById('fc-fone').value, birth_date: nasc || null });
+        Modals.close(); UI.toast('Cliente adicionado!'); Render.clientes();
+    },
+    async updateClient(e, id) {
+        e.preventDefault();
+        const nasc = document.getElementById('fce-nasc').value;
+        await db.from('clients').update({ name: document.getElementById('fce-nome').value, phone: document.getElementById('fce-fone').value, birth_date: nasc || null }).eq('id', id);
+        Modals.close(); UI.toast('Cliente alterado!'); Render.clientes();
+    },
     
     async saveAnamnese(e, idCliente) {
         e.preventDefault(); 
@@ -999,10 +1164,22 @@ const Actions = {
     async loadAnamnese(id) {
         const div = document.getElementById('anamnese-history-list');
         if(!id || id === 'undefined') { div.innerHTML = "<p style='color:#d32f2f; text-align:center; padding:2rem'>ID do cliente não identificado. Volte e clique em Ficha novamente.</p>"; return; }
-        const { data, error } = await db.from('anamnesis').select('*, users(name)').eq('client_id', id).order('created_at', {ascending: false});
+
+        // Busca a anamnese sem embutir "users(...)" via relacionamento do PostgREST (evita o erro
+        // "Could not find a relationship between 'anamnesis' and 'users' in the schema cache" quando a
+        // FK ainda não existe/não foi recarregada no cache). Os nomes dos profissionais são buscados à parte.
+        const { data, error } = await db.from('anamnesis').select('*').eq('client_id', id).order('created_at', {ascending: false});
         if(error) { div.innerHTML = `<p style='color:#d32f2f; text-align:center; padding:2rem'>Erro ao carregar histórico: ${error.message}</p>`; return; }
         if(!data || !data.length) { div.innerHTML = "<p style='color:var(--muted); text-align:center; padding:2rem'>Nenhum registro clínico para este cliente.</p>"; return; }
-        div.innerHTML = data.map(d => `<div class="card" style="border-left: 4px solid var(--primary); background:#fffafb"><h4 style="font-size:0.9rem; color:var(--muted); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px"><i class="ph ph-calendar-blank"></i> ${new Date(d.created_at).toLocaleString('pt-BR')} &nbsp;•&nbsp; <i class="ph ph-user"></i> Prof: ${d.users?.name || 'Sistema'}</h4><p style="margin-bottom:8px"><b>Histórico:</b> ${d.history}</p><p style="margin-bottom:8px"><b>Hábitos:</b> ${d.habits}</p><p style="margin-bottom:8px"><b>Objetivo:</b> ${d.objectives}</p><p style="padding:15px; background:white; border:1px solid #eee; border-radius:12px; margin-top:15px"><b style="color:var(--primary-dark)">Diagnóstico:</b><br>${d.notes}</p></div>`).join('');
+
+        const userIds = [...new Set(data.map(d => d.user_id).filter(Boolean))];
+        let namesMap = {};
+        if(userIds.length) {
+            const { data: profs } = await db.from('users').select('id,name').in('id', userIds);
+            (profs || []).forEach(p => namesMap[p.id] = p.name);
+        }
+
+        div.innerHTML = data.map(d => `<div class="card" style="border-left: 4px solid var(--primary); background:#fffafb"><h4 style="font-size:0.9rem; color:var(--muted); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px"><i class="ph ph-calendar-blank"></i> ${new Date(d.created_at).toLocaleString('pt-BR')} &nbsp;•&nbsp; <i class="ph ph-user"></i> Prof: ${namesMap[d.user_id] || 'Sistema'}</h4><p style="margin-bottom:8px"><b>Histórico:</b> ${d.history}</p><p style="margin-bottom:8px"><b>Hábitos:</b> ${d.habits}</p><p style="margin-bottom:8px"><b>Objetivo:</b> ${d.objectives}</p><p style="padding:15px; background:white; border:1px solid #eee; border-radius:12px; margin-top:15px"><b style="color:var(--primary-dark)">Diagnóstico:</b><br>${d.notes}</p></div>`).join('');
     },
 
     async saveFuncionario(e, id) {
@@ -1158,28 +1335,35 @@ const Actions = {
         await db.from('services').insert({ name: document.getElementById('fs-nome').value, price: document.getElementById('fs-valor').value, cost: document.getElementById('fs-custo').value, commission: document.getElementById('fs-com').value, has_assistant: aux, assistant_commission: aux ? document.getElementById('fs-auxcom').value : 0 }); Modals.close(); UI.toast('Serviço adicionado!'); Render.servicos();
     },
     
+    // Busca o nome do produto pelo código de barras (GTIN/EAN) em várias bases gratuitas, em cascata.
+    // Ordem pensada para produtos de salão/cosmético: Open Beauty Facts primeiro (base específica de
+    // cosmético/higiene, com boa cobertura), depois bases brasileiras/gerais como fallback. Quando uma base
+    // pode não expor cabeçalho CORS (ex.: produto.xyz), tenta também via proxy CORS público como reforço.
+    // Erros de cada base ficam registrados no console (F12) para facilitar diagnóstico, em vez de serem
+    // silenciosamente ignorados como antes.
     async fetchBarcode(val) {
-        val = (val || '').trim();
+        val = (val || '').trim().replace(/\D/g, '');
         if(val.length < 8) return UI.toast('Digite um código de barras válido (mínimo 8 dígitos).', 'warning');
 
         const inputNome = document.getElementById('fp-nome');
         inputNome.value = "Buscando nas bases online...";
         inputNome.disabled = true;
 
-        // Bases gratuitas e sem necessidade de chave de API. Produto XYZ é brasileira/colaborativa (melhor
-        // chance para itens nacionais como os de um salão); as Open X Facts reforçam com cobertura internacional.
+        const corsProxy = u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`;
+
         const bases = [
-            { url: `https://api.produto.xyz/v1/gtin/${val}`, tipo: 'pxyz' },
             { url: `https://world.openbeautyfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
-            { url: `https://world.openfoodfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
             { url: `https://world.openproductsfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
+            { url: `https://world.openfoodfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
+            { url: `https://api.produto.xyz/v1/gtin/${val}`, tipo: 'pxyz' },
+            { url: corsProxy(`https://api.produto.xyz/v1/gtin/${val}`), tipo: 'pxyz' },
             { url: `https://api.upcitemdb.com/prod/trial/lookup?upc=${val}`, tipo: 'upc' },
         ];
 
         for (const base of bases) {
             try {
                 const res = await fetch(base.url);
-                if(!res.ok) continue;
+                if(!res.ok) { console.warn('[fetchBarcode] base retornou erro HTTP', res.status, base.url); continue; }
                 const json = await res.json();
 
                 if (base.tipo === 'pxyz' && json.Product && json.Product.name) {
@@ -1195,7 +1379,7 @@ const Actions = {
                     inputNome.value = json.items[0].title; inputNome.disabled = false;
                     UI.toast('Produto encontrado!', 'success'); return;
                 }
-            } catch(e) { /* base indisponível ou sem CORS, tenta a próxima */ }
+            } catch(e) { console.warn('[fetchBarcode] falha ao consultar', base.url, e.message); }
         }
 
         inputNome.value = ""; 

@@ -216,6 +216,12 @@ const Auth = {
         document.getElementById('header-user').textContent = App.user.name.split(' ')[0]; 
         document.getElementById('header-avatar').textContent = App.user.name.substring(0,2).toUpperCase();
         document.body.classList.toggle('is-owner', App.role === 'owner');
+
+        // Cobranças é uma área exclusiva de proprietário: colaboradores/freelancers não devem
+        // ver esse item no menu (nem lateral, nem mobile), mesmo que o HTML/CSS não trate isso.
+        document.querySelectorAll('[data-view="cobrancas"]').forEach(el => {
+            el.style.display = (App.role === 'owner') ? '' : 'none';
+        });
         
         const { data: set } = await db.from('settings').select('*').single();
         if(set) { App.settings = set; document.getElementById('brand-name').textContent = set.studio_name; }
@@ -245,6 +251,13 @@ const Nav = {
         });
     },
     showView(id) {
+        // Trava de segurança: mesmo que alguém force a navegação (ex: clique programático,
+        // hash na URL), colaborador/freelancer nunca acessa a tela de Cobranças.
+        if (id === 'cobrancas' && App.role !== 'owner') {
+            UI.toast('Acesso restrito a proprietários.', 'error');
+            id = 'agenda';
+        }
+
         App.view = id;
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.getElementById(`view-${id}`).classList.add('active');
@@ -622,10 +635,21 @@ const Render = {
         const lucro = receita - gasto;
         
         document.getElementById('resumo-cards').innerHTML = `
-            <p style="color:var(--muted); font-size:0.9rem; margin-bottom:1.5rem"><i class="ph ph-info"></i> Registros de quinzenas anteriores foram arquivados em <b>Relatórios & Arquivos</b>.</p>
             <div class="card" style="border-bottom:4px solid #2e7d32"><h4>Faturamento (Entradas)</h4><div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(receita)}</div></div>
             <div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custos Gerais (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(gasto)}</div></div>
             <div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
+        
+        // Aviso de arquivamento: fica UMA única vez, acima dos cards (fora do innerHTML de #resumo-cards,
+        // que agora só contém os 3 cartões). Reaproveita/injeta o elemento com id fixo para nunca duplicar
+        // mesmo que esta função rode várias vezes (ex: via realtime subscription).
+        let aviso = document.getElementById('resumo-aviso-arquivamento');
+        if (!aviso) {
+            aviso = document.createElement('p');
+            aviso.id = 'resumo-aviso-arquivamento';
+            aviso.style.cssText = 'color:var(--muted); font-size:0.9rem; margin-bottom:1.5rem';
+            document.getElementById('resumo-cards').insertAdjacentElement('beforebegin', aviso);
+        }
+        aviso.innerHTML = `<i class="ph ph-info"></i> Registros de quinzenas anteriores foram arquivados em <b>Relatórios & Arquivos</b>.`;
         
         const { extrato } = U.buildExtrato(comand, desp);
         
@@ -973,9 +997,10 @@ const Actions = {
         e.preventDefault(); 
         if (!idCliente || idCliente === 'undefined') { UI.toast('Erro de ID. Volte e clique na Ficha novamente.', 'error'); return; }
 
+        // Tabela "anamnesis" no Supabase só tem: id, client_id, history, habits, objectives, notes, created_at.
+        // NÃO existe coluna "user_id" — por isso o insert quebrava com "Could not find the 'user_id' column".
         const payload = { 
             client_id: idCliente, 
-            user_id: App.user.id, 
             history: document.getElementById('fa-hist').value, 
             habits: document.getElementById('fa-hab').value, 
             objectives: document.getElementById('fa-obj').value, 
@@ -1093,6 +1118,10 @@ const Actions = {
                     }
                 });
             }
+            // dataHoraExata = momento do FECHAMENTO da comanda. É o mesmo valor usado tanto para
+            // atualizar o created_at da comanda quanto para o "date" das despesas geradas
+            // (Custo Fixo Serviço / Comissão Automática), garantindo que o histórico mostre sempre
+            // a data/hora em que o ticket foi fechado, e não o momento em que a comanda foi aberta.
             const dataHoraExata = new Date().toISOString();
             await db.from('comandas').update({ status: 'fechada', created_at: dataHoraExata }).eq('id', comandaId);
             
@@ -1144,9 +1173,16 @@ const Actions = {
         inputNome.value = "Buscando nas bases online...";
         inputNome.disabled = true;
 
-        // Bases gratuitas e sem necessidade de chave de API, com suporte a CORS direto do navegador.
-        // Open Beauty Facts cobre bem itens de salão (cosméticos/higiene); os demais servem de reforço.
+        // Cosmos (Bluesoft) é de longe a base com melhor cobertura de EAN de produtos BRASILEIROS
+        // (ex: higiene/beleza como Monange, Seda, O Boticário). Exige token gratuito:
+        // 1) crie conta em https://cosmos.bluesoft.com.br
+        // 2) copie o token gerado
+        // 3) cole aqui em COSMOS_TOKEN (ou defina window.COSMOS_TOKEN antes de carregar este script)
+        const COSMOS_TOKEN = window.COSMOS_TOKEN || '';
+
+        // Bases gratuitas em cascata, da mais assertiva para produtos BR até o fallback internacional.
         const bases = [
+            ...(COSMOS_TOKEN ? [{ url: `https://api.cosmos.bluesoft.com.br/gtins/${val}.json`, tipo: 'cosmos' }] : []),
             { url: `https://world.openbeautyfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
             { url: `https://world.openfoodfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
             { url: `https://world.openproductsfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
@@ -1155,11 +1191,16 @@ const Actions = {
 
         for (const base of bases) {
             try {
-                const res = await fetch(base.url);
+                const opts = base.tipo === 'cosmos' ? { headers: { 'X-Cosmos-Token': COSMOS_TOKEN } } : {};
+                const res = await fetch(base.url, opts);
                 if(!res.ok) continue;
                 const json = await res.json();
 
-                if (base.tipo === 'off' && json.status === 1 && json.product) {
+                if (base.tipo === 'cosmos' && json && json.description) {
+                    const nome = [json.description, json.brand?.name].filter(Boolean).join(' - ');
+                    inputNome.value = nome; inputNome.disabled = false;
+                    UI.toast('Produto encontrado (Cosmos)!', 'success'); return;
+                } else if (base.tipo === 'off' && json.status === 1 && json.product) {
                     const nome = [json.product.product_name, json.product.brands].filter(Boolean).join(' - ');
                     if (nome) {
                         inputNome.value = nome; inputNome.disabled = false;

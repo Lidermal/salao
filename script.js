@@ -171,7 +171,6 @@ const UI = {
     },
     handleFabClick() {
         const v = App.view;
-        // MODIFICADO AQUI: Abre o menu mobile para agenda ao invés de direto o agendamento.
         if(v === 'agenda') Modals.open('menu_agenda_mobile');
         else if(v === 'comandas') Modals.open('comanda');
         else if(v === 'clientes') Modals.open('cliente');
@@ -787,18 +786,17 @@ const Modals = {
         const cont = document.getElementById('modal-container');
         let html = `<div class="modal"><button class="modal-close" onclick="Modals.close()"><i class="ph ph-x"></i></button>`;
         
-        // MODIFICADO AQUI: Inserido o novo case para o Menu Mobile
         if(type === 'menu_agenda_mobile') {
             html += `
             <div style="text-align: center; margin-bottom: 20px;">
-                <h3 style="margin: 0; color: var(--primary-dark);">Opções da Agenda</h3>
+                <h3 style="margin: 0; color: var(--primary-dark);">O que deseja fazer?</h3>
             </div>
-            <div style="display:flex; flex-direction:column; gap:15px; margin-bottom: 10px;">
-                <button class="btn-primary" style="padding:1.2rem; font-size:1.1rem" onclick="Modals.open('agendamento')">
-                    <i class="ph ph-calendar-plus" style="font-size:1.5rem"></i> Novo Agendamento
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <button class="btn-primary" style="padding:1.2rem; font-size:1.1rem; justify-content:flex-start" onclick="Modals.open('agendamento')">
+                    <i class="ph ph-calendar-plus" style="font-size:1.5rem; margin-right:10px;"></i> Agendar Cliente
                 </button>
-                <button class="btn-secondary" style="padding:1.2rem; font-size:1.1rem; border: 1px solid #d32f2f; color: #d32f2f; background: #ffebee;" onclick="Modals.open('bloquear_agenda')">
-                    <i class="ph ph-prohibit" style="font-size:1.5rem"></i> Bloquear Horário
+                <button class="btn-secondary" style="padding:1.2rem; font-size:1.1rem; border: 1px solid #d32f2f; color: #d32f2f; background: #ffebee; justify-content:flex-start" onclick="Modals.open('bloquear_agenda')">
+                    <i class="ph ph-prohibit" style="font-size:1.5rem; margin-right:10px;"></i> Bloquear Horário
                 </button>
             </div>`;
         }

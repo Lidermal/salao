@@ -533,42 +533,41 @@ const Render = {
     
     // TELAS OPERACIONAIS FIXADAS NA QUINZENA ATUAL
     async despesas() {
-        let query = db.from('despesas').select('*');
-        const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); // Busca SOMENTE a quinzena atual
-        query = query.gte('date', range.start).lte('date', range.end);
-
-        const { data: rawData } = await query;
-        const data = U.orderDespesas(rawData); // Comissão sempre acima do Custo do mesmo ticket, mais recente em cima
-        let totais = { 'Custos Fixos': 0, 'Comissões': 0, 'Pessoal/Pagamentos': 0, 'Custos Variáveis': 0 };
-        data.forEach(d => { if(totais[d.category] !== undefined) totais[d.category] += d.amount; else totais['Custos Variáveis'] += d.amount; });
-        
-        document.getElementById('despesas-list').innerHTML = `
-            <p style="color:var(--muted); font-size:0.9rem; margin-bottom:1.5rem"><i class="ph ph-info"></i> Registros de quinzenas anteriores foram arquivados em <b>Relatórios & Arquivos</b>.</p>
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:20px">
-                <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #d32f2f"><p style="font-size:0.8rem">Custos Fixos</p><div class="val" style="color:#d32f2f; font-size:1.2rem">-${U.money(totais['Custos Fixos'])}</div></div>
-                <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #cd7f32"><p style="font-size:0.8rem">Comissões Autom.</p><div class="val" style="color:#cd7f32; font-size:1.2rem">-${U.money(totais['Comissões'])}</div></div>
-                <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #8e24aa"><p style="font-size:0.8rem">Pessoal/Equipe</p><div class="val" style="color:#8e24aa; font-size:1.2rem">-${U.money(totais['Pessoal/Pagamentos'])}</div></div>
-                <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #e65100"><p style="font-size:0.8rem">Variáveis/Insumos</p><div class="val" style="color:#e65100; font-size:1.2rem">-${U.money(totais['Custos Variáveis'])}</div></div>
-            </div>` + 
-            data.map(d => {
-                let color = '#d32f2f';
-                if(d.category === 'Comissões') color = '#cd7f32';
-                else if(d.category === 'Pessoal/Pagamentos') color = '#8e24aa';
-                else if(d.category === 'Custos Variáveis') color = '#e65100';
-
-                return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${color}">
-                    <div><h4>${d.description}</h4><p style="font-size:0.8rem; color:var(--muted)">${d.category} • ${new Date(d.date).toLocaleString('pt-BR')}</p></div>
-                    <div class="val" style="color:${color}">-${U.money(d.amount)}</div>
-                </div>`;
-            }).join('');
+            let query = db.from('despesas').select('*');
+            const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); // Busca SOMENTE a quinzena atual
+            query = query.gte('date', range.start).lte('date', range.end);
+    
+            const { data: rawData } = await query;
+            const data = U.orderDespesas(rawData); // Comissão sempre acima do Custo do mesmo ticket, mais recente em cima
+            let totais = { 'Custos Fixos': 0, 'Comissões': 0, 'Pessoal/Pagamentos': 0, 'Custos Variáveis': 0 };
+            data.forEach(d => { if(totais[d.category] !== undefined) totais[d.category] += d.amount; else totais['Custos Variáveis'] += d.amount; });
             
-        if(App.charts.despesas) App.charts.despesas.destroy();
-        App.charts.despesas = new Chart(document.getElementById('chart-despesas'), { 
-            type: 'pie', 
-            data: { labels: Object.keys(totais), datasets: [{ data: Object.values(totais), backgroundColor: ['#d32f2f', '#cd7f32', '#8e24aa', '#e65100'] }] }
-        });
-    },
-
+            document.getElementById('despesas-list').innerHTML = `
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:20px">
+                    <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #d32f2f"><p style="font-size:0.8rem">Custos Fixos</p><div class="val" style="color:#d32f2f; font-size:1.2rem">-${U.money(totais['Custos Fixos'])}</div></div>
+                    <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #cd7f32"><p style="font-size:0.8rem">Comissões Autom.</p><div class="val" style="color:#cd7f32; font-size:1.2rem">-${U.money(totais['Comissões'])}</div></div>
+                    <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #8e24aa"><p style="font-size:0.8rem">Pessoal/Equipe</p><div class="val" style="color:#8e24aa; font-size:1.2rem">-${U.money(totais['Pessoal/Pagamentos'])}</div></div>
+                    <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #e65100"><p style="font-size:0.8rem">Variáveis/Insumos</p><div class="val" style="color:#e65100; font-size:1.2rem">-${U.money(totais['Custos Variáveis'])}</div></div>
+                </div>` + 
+                data.map(d => {
+                    let color = '#d32f2f';
+                    if(d.category === 'Comissões') color = '#cd7f32';
+                    else if(d.category === 'Pessoal/Pagamentos') color = '#8e24aa';
+                    else if(d.category === 'Custos Variáveis') color = '#e65100';
+    
+                    return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${color}">
+                        <div><h4>${d.description}</h4><p style="font-size:0.8rem; color:var(--muted)">${d.category} • ${new Date(d.date).toLocaleString('pt-BR')}</p></div>
+                        <div class="val" style="color:${color}">-${U.money(d.amount)}</div>
+                    </div>`;
+                }).join('');
+                
+            if(App.charts.despesas) App.charts.despesas.destroy();
+            App.charts.despesas = new Chart(document.getElementById('chart-despesas'), { 
+                type: 'pie', 
+                data: { labels: Object.keys(totais), datasets: [{ data: Object.values(totais), backgroundColor: ['#d32f2f', '#cd7f32', '#8e24aa', '#e65100'] }] }
+            });
+        },
+    
     async comissao() {
         const isOwner = App.role === 'owner';
         let query = db.from('comandas').select('*, users(name)');
@@ -622,7 +621,6 @@ const Render = {
         const lucro = receita - gasto;
         
         document.getElementById('resumo-cards').innerHTML = `
-            <p style="color:var(--muted); font-size:0.9rem; margin-bottom:1.5rem"><i class="ph ph-info"></i> Registros de quinzenas anteriores foram arquivados em <b>Relatórios & Arquivos</b>.</p>
             <div class="card" style="border-bottom:4px solid #2e7d32"><h4>Faturamento (Entradas)</h4><div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(receita)}</div></div>
             <div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custos Gerais (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(gasto)}</div></div>
             <div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
@@ -1081,7 +1079,7 @@ const Actions = {
     
     async closeComanda(comandaId, clientId, total, ticketNum) {
         UI.confirm('Deseja faturar e processar os custos na quinzena atual?', async () => {
-            const { data: comanda } = await db.from('comandas').select('items, users(name)').eq('id', comandaId).single();
+            const { data: comanda } = await db.from('comandas').select('created_at, items, users(name)').eq('id', comandaId).single();
             let totalCustoFixo = 0; let totalComissao = 0;
             if(comanda.items) {
                 comanda.items.forEach(item => {
@@ -1093,8 +1091,10 @@ const Actions = {
                     }
                 });
             }
-            const dataHoraExata = new Date().toISOString();
-            await db.from('comandas').update({ status: 'fechada', created_at: dataHoraExata }).eq('id', comandaId);
+            
+            // Usa a exata mesma data/hora da comanda para evitar qualquer divergência no extrato
+            const dataHoraExata = comanda.created_at; 
+            await db.from('comandas').update({ status: 'fechada' }).eq('id', comandaId);
             
             if(total > 0) { 
                 const { data: existingDebt, error: errFind } = await db.from('debts').select('*').eq('client_id', clientId).gt('remaining_amount', 0).maybeSingle();

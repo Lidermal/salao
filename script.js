@@ -1191,13 +1191,62 @@ const Actions = {
     },
     async blockAppointment(e) {
         e.preventDefault();
-        const date = document.getElementById('fb-date').value; const start = document.getElementById('fb-time').value; const end = document.getElementById('fb-end').value; const motivo = document.getElementById('fb-motivo').value;
-        if (start >= end) return UI.toast('Hora de término menor que início.', 'error');
-        const { data: existing } = await db.from('appointments').select('time').eq('date', date).gte('time', start).lt('time', end);
-        if (existing && existing.length > 0) return UI.toast('Conflito de horários.', 'error');
-        let current = new Date(`1970-01-01T${start}:00`); const endTime = new Date(`1970-01-01T${end}:00`); const inserts = [];
-        while(current < endTime) { inserts.push({ user_id: App.user.id, date: date, time: current.toTimeString().slice(0,5), status: 'bloqueado', notes: motivo }); current.setMinutes(current.getMinutes() + 30); }
-        await db.from('appointments').insert(inserts); Modals.close(); UI.toast('Horário bloqueado!', 'success'); Render.agenda(); 
+        const date = document.getElementById('fb-date').value; 
+        const start = document.getElementById('fb-time').value; 
+        const end = document.getElementById('fb-end').value; 
+        const motivo = document.getElementById('fb-motivo').value;
+
+        if (start >= end) return UI.toast('A hora de término deve ser maior que o início.', 'error');
+
+        // 1. Verifica se já existe agendamento no meio desse horário
+        const { data: existing, error: errCheck } = await db.from('appointments')
+            .select('time')
+            .eq('date', date)
+            .gte('time', start)
+            .lt('time', end)
+            .neq('status', 'cancelado'); // Ignora os cancelados
+
+        if (errCheck) return UI.toast(`Falha ao checar agenda: ${errCheck.message}`, 'error');
+        if (existing && existing.length > 0) return UI.toast('Conflito: Já existe cliente ou bloqueio neste horário.', 'error');
+
+        // 2. Calcula os blocos de forma matemática (segura para Mobile/iOS, sem bugar a hora)
+        let [startH, startM] = start.split(':').map(Number);
+        let [endH, endM] = end.split(':').map(Number);
+        
+        let currentMin = (startH * 60) + startM;
+        let finalMin = (endH * 60) + endM;
+        
+        const inserts = [];
+
+        while(currentMin < finalMin) { 
+            let h = Math.floor(currentMin / 60);
+            let m = currentMin % 60;
+            // Formata sempre para o padrão de banco de dados (ex: 09:30, 14:00)
+            let timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+
+            inserts.push({ 
+                user_id: App.user.id, 
+                date: date, 
+                time: timeStr, 
+                status: 'bloqueado', 
+                notes: motivo 
+            }); 
+            
+            currentMin += 30; // Avança de 30 em 30 minutos
+        }
+
+        // 3. Salva no banco e escuta se deu algum erro de tabela
+        const { error: insertError } = await db.from('appointments').insert(inserts);
+        
+        if (insertError) {
+            console.error("Erro Supabase:", insertError);
+            return UI.toast(`Erro ao salvar no banco: ${insertError.message}`, 'error');
+        }
+
+        // 4. Sucesso!
+        Modals.close(); 
+        UI.toast('Horário bloqueado com sucesso!', 'success'); 
+        Render.agenda(); 
     },
     async markAsArrived(appId) { await db.from('appointments').update({ status: 'chegou' }).eq('id', appId); UI.toast('Cliente chegou!'); Render.agenda(); },
 

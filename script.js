@@ -67,26 +67,31 @@ const U = {
     // dentro de um mesmo fechamento de ticket: Comissão -> Custo -> Recebimento.
     // Agrupa pelo número do ticket (via c.ticket / "Ref: TKT-XXXX" na descrição da despesa) em vez de
     // confiar em timestamps idênticos, que antes misturavam os registros de tickets diferentes.
+    // Também usa o created_at REAL da comanda (timestamp completo) como data de exibição do Custo/Comissão
+    // do mesmo ticket, em vez de despesas.date (que fica gravado sem hora e "puxava" um dia/horário errado).
     buildExtrato(comand, desp) {
         let groups = {};
+        let ticketDate = {}; // ticket -> data real de fechamento (da própria comanda)
         let avulsos = []; // despesas manuais sem ticket associado
 
         (comand || []).forEach(c => {
             if (c.total > 0) {
                 const tk = c.ticket || `SEMTKT-${c.created_at}`;
+                const dt = new Date(c.created_at);
+                ticketDate[tk] = dt;
                 groups[tk] = groups[tk] || {};
-                groups[tk].date = new Date(c.created_at);
-                groups[tk].in = { type: 'in', desc: `Comanda Fechada ${c.ticket || '-'}`, val: c.total, date: new Date(c.created_at) };
+                groups[tk].date = dt;
+                groups[tk].in = { type: 'in', desc: `Comanda Fechada ${c.ticket || '-'}`, val: c.total, date: dt };
             }
         });
 
         (desp || []).forEach(d => {
-            const item = { type: 'out', desc: d.description, val: d.amount, date: new Date(d.date) };
             const m = (d.description || '').match(/Ref:\s*(TKT-\d+)/);
-            if (m) {
-                const tk = m[1];
-                groups[tk] = groups[tk] || {};
-                if (!groups[tk].date) groups[tk].date = item.date;
+            const tk = m ? m[1] : null;
+            const dt = (tk && ticketDate[tk]) ? ticketDate[tk] : new Date(d.date);
+            const item = { type: 'out', desc: d.description, val: d.amount, date: dt };
+            if (tk) {
+                groups[tk] = groups[tk] || { date: dt };
                 if (d.category === 'Comissões' || /comiss/i.test(d.description || '')) groups[tk].comissao = item;
                 else groups[tk].custo = item;
             } else {
@@ -123,17 +128,23 @@ const U = {
 
     // Ordena listas que mostram SOMENTE despesas (Controle de Despesas / Relatório de Despesas):
     // agrupa pelo ticket para garantir Comissão sempre acima do Custo do mesmo fechamento, mais recente em cima.
-    orderDespesas(desp) {
+    // Recebe opcionalmente as comandas do mesmo período para corrigir a data exibida do Custo/Comissão,
+    // usando o created_at real da comanda (mesma correção aplicada em buildExtrato).
+    orderDespesas(desp, comand) {
+        let ticketDate = {};
+        (comand || []).forEach(c => { if (c.ticket) ticketDate[c.ticket] = new Date(c.created_at); });
+
         let groups = {}; let avulsos = [];
         (desp || []).forEach(d => {
             const m = (d.description || '').match(/Ref:\s*(TKT-\d+)/);
-            if (m) {
-                const tk = m[1]; const dt = new Date(d.date);
+            const tk = m ? m[1] : null;
+            const dt = (tk && ticketDate[tk]) ? ticketDate[tk] : new Date(d.date);
+            const displayItem = { ...d, date: dt }; // sobrescreve a data exibida para bater com o fechamento real
+            if (tk) {
                 groups[tk] = groups[tk] || { date: dt };
-                if (dt > groups[tk].date) groups[tk].date = dt;
-                if (d.category === 'Comissões' || /comiss/i.test(d.description || '')) groups[tk].comissao = d;
-                else groups[tk].custo = d;
-            } else avulsos.push(d);
+                if (d.category === 'Comissões' || /comiss/i.test(d.description || '')) groups[tk].comissao = displayItem;
+                else groups[tk].custo = displayItem;
+            } else avulsos.push(displayItem);
         });
         let blocks = [];
         Object.keys(groups).forEach(tk => {
@@ -216,12 +227,6 @@ const Auth = {
         document.getElementById('header-user').textContent = App.user.name.split(' ')[0]; 
         document.getElementById('header-avatar').textContent = App.user.name.substring(0,2).toUpperCase();
         document.body.classList.toggle('is-owner', App.role === 'owner');
-
-        // Cobranças é uma área exclusiva de proprietário: colaboradores/freelancers não devem
-        // ver esse item no menu (nem lateral, nem mobile), mesmo que o HTML/CSS não trate isso.
-        document.querySelectorAll('[data-view="cobrancas"]').forEach(el => {
-            el.style.display = (App.role === 'owner') ? '' : 'none';
-        });
         
         const { data: set } = await db.from('settings').select('*').single();
         if(set) { App.settings = set; document.getElementById('brand-name').textContent = set.studio_name; }
@@ -251,13 +256,6 @@ const Nav = {
         });
     },
     showView(id) {
-        // Trava de segurança: mesmo que alguém force a navegação (ex: clique programático,
-        // hash na URL), colaborador/freelancer nunca acessa a tela de Cobranças.
-        if (id === 'cobrancas' && App.role !== 'owner') {
-            UI.toast('Acesso restrito a proprietários.', 'error');
-            id = 'agenda';
-        }
-
         App.view = id;
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
         document.getElementById(`view-${id}`).classList.add('active');
@@ -546,17 +544,18 @@ const Render = {
     
     // TELAS OPERACIONAIS FIXADAS NA QUINZENA ATUAL
     async despesas() {
-        let query = db.from('despesas').select('*');
         const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); // Busca SOMENTE a quinzena atual
-        query = query.gte('date', range.start).lte('date', range.end);
-
-        const { data: rawData } = await query;
-        const data = U.orderDespesas(rawData); // Comissão sempre acima do Custo do mesmo ticket, mais recente em cima
+        const [ {data: rawData}, {data: comand} ] = await Promise.all([
+            db.from('despesas').select('*').gte('date', range.start).lte('date', range.end),
+            db.from('comandas').select('ticket, created_at').eq('status', 'fechada').gte('created_at', range.start).lte('created_at', range.end)
+        ]);
+        const data = U.orderDespesas(rawData, comand); // Comissão sempre acima do Custo do mesmo ticket, mesma data/hora do fechamento
         let totais = { 'Custos Fixos': 0, 'Comissões': 0, 'Pessoal/Pagamentos': 0, 'Custos Variáveis': 0 };
         data.forEach(d => { if(totais[d.category] !== undefined) totais[d.category] += d.amount; else totais['Custos Variáveis'] += d.amount; });
         
         document.getElementById('despesas-list').innerHTML = `
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:20px">
+            <p style="color:var(--muted); font-size:0.9rem; margin-bottom:1.5rem"><i class="ph ph-info"></i> Registros de quinzenas anteriores foram arquivados em <b>Relatórios & Arquivos</b>.</p>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:20px">
                 <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #d32f2f"><p style="font-size:0.8rem">Custos Fixos</p><div class="val" style="color:#d32f2f; font-size:1.2rem">-${U.money(totais['Custos Fixos'])}</div></div>
                 <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #cd7f32"><p style="font-size:0.8rem">Comissões Autom.</p><div class="val" style="color:#cd7f32; font-size:1.2rem">-${U.money(totais['Comissões'])}</div></div>
                 <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #8e24aa"><p style="font-size:0.8rem">Pessoal/Equipe</p><div class="val" style="color:#8e24aa; font-size:1.2rem">-${U.money(totais['Pessoal/Pagamentos'])}</div></div>
@@ -638,18 +637,6 @@ const Render = {
             <div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custos Gerais (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(gasto)}</div></div>
             <div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
         
-        // Aviso de arquivamento: fica UMA única vez, acima dos cards (fora do innerHTML de #resumo-cards,
-        // que agora só contém os 3 cartões). Reaproveita/injeta o elemento com id fixo para nunca duplicar
-        // mesmo que esta função rode várias vezes (ex: via realtime subscription).
-        let aviso = document.getElementById('resumo-aviso-arquivamento');
-        if (!aviso) {
-            aviso = document.createElement('p');
-            aviso.id = 'resumo-aviso-arquivamento';
-            aviso.style.cssText = 'color:var(--muted); font-size:0.9rem; margin-bottom:1.5rem';
-            document.getElementById('resumo-cards').insertAdjacentElement('beforebegin', aviso);
-        }
-        aviso.innerHTML = `<i class="ph ph-info"></i> Registros de quinzenas anteriores foram arquivados em <b>Relatórios & Arquivos</b>.`;
-        
         const { extrato } = U.buildExtrato(comand, desp);
         
         document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações na quinzena atual.</p>' :
@@ -681,7 +668,7 @@ const Render = {
         let htmlDesp = '';
         if(desp.length === 0) { htmlDesp = '<p style="color:var(--muted); text-align:center;">Sem gastos registrados na quinzena.</p>'; }
         else {
-            let despArr = U.orderDespesas(desp);
+            let despArr = U.orderDespesas(desp, comand);
             htmlDesp = despArr.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${d.description}</b><br><span style="font-size:0.8rem; color:#888">${new Date(d.date).toLocaleString('pt-BR')} - ${d.category}</span></div><div style="color:#d32f2f; font-weight:bold">-${U.money(d.amount)}</div></div>`).join('');
         }
         document.getElementById('relatorio-despesas-conteudo').innerHTML = htmlDesp;
@@ -996,10 +983,9 @@ const Actions = {
         e.preventDefault(); 
         if (!idCliente || idCliente === 'undefined') { UI.toast('Erro de ID. Volte e clique na Ficha novamente.', 'error'); return; }
 
-        // Tabela "anamnesis" no Supabase só tem: id, client_id, history, habits, objectives, notes, created_at.
-        // NÃO existe coluna "user_id" — por isso o insert quebrava com "Could not find the 'user_id' column".
         const payload = { 
             client_id: idCliente, 
+            user_id: App.user.id, 
             history: document.getElementById('fa-hist').value, 
             habits: document.getElementById('fa-hab').value, 
             objectives: document.getElementById('fa-obj').value, 
@@ -1011,9 +997,11 @@ const Actions = {
         Modals.close(); UI.toast('Ficha clínica registrada!'); this.loadAnamnese(idCliente);
     },
     async loadAnamnese(id) {
-        const { data } = await db.from('anamnesis').select('*, users(name)').eq('client_id', id).order('created_at', {ascending: false});
         const div = document.getElementById('anamnese-history-list');
-        if(!data || !data.length) { div.innerHTML = "<p style='color:var(--muted); text-align:center; padding:2rem'>Nenhum registro clínico.</p>"; return; }
+        if(!id || id === 'undefined') { div.innerHTML = "<p style='color:#d32f2f; text-align:center; padding:2rem'>ID do cliente não identificado. Volte e clique em Ficha novamente.</p>"; return; }
+        const { data, error } = await db.from('anamnesis').select('*, users(name)').eq('client_id', id).order('created_at', {ascending: false});
+        if(error) { div.innerHTML = `<p style='color:#d32f2f; text-align:center; padding:2rem'>Erro ao carregar histórico: ${error.message}</p>`; return; }
+        if(!data || !data.length) { div.innerHTML = "<p style='color:var(--muted); text-align:center; padding:2rem'>Nenhum registro clínico para este cliente.</p>"; return; }
         div.innerHTML = data.map(d => `<div class="card" style="border-left: 4px solid var(--primary); background:#fffafb"><h4 style="font-size:0.9rem; color:var(--muted); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px"><i class="ph ph-calendar-blank"></i> ${new Date(d.created_at).toLocaleString('pt-BR')} &nbsp;•&nbsp; <i class="ph ph-user"></i> Prof: ${d.users?.name || 'Sistema'}</h4><p style="margin-bottom:8px"><b>Histórico:</b> ${d.history}</p><p style="margin-bottom:8px"><b>Hábitos:</b> ${d.habits}</p><p style="margin-bottom:8px"><b>Objetivo:</b> ${d.objectives}</p><p style="padding:15px; background:white; border:1px solid #eee; border-radius:12px; margin-top:15px"><b style="color:var(--primary-dark)">Diagnóstico:</b><br>${d.notes}</p></div>`).join('');
     },
 
@@ -1070,9 +1058,19 @@ const Actions = {
 
     async createComanda(e) {
         e.preventDefault(); 
-        const { data } = await db.from('comandas').select('ticket').order('id', {ascending: false}).limit(1);
-        let nxt = 1; if(data.length && data[0].ticket) { nxt = parseInt(data[0].ticket.split('-')[1]) + 1; }
-        const tk = 'TKT-' + String(nxt).padStart(4, '0');
+        // Antes ordenava por "id" (UUID) esperando pegar o último ticket criado, mas UUID não segue ordem
+        // cronológica — o resultado podia ser qualquer linha, repetindo números de ticket (ex: TKT-0003 três vezes).
+        // Agora calcula o maior número de ticket já existente em toda a tabela, garantindo um número sempre novo.
+        const { data, error } = await db.from('comandas').select('ticket');
+        if(error) return UI.toast(`Erro ao gerar comanda: ${error.message}`, 'error');
+        let maxNum = 0;
+        (data || []).forEach(c => {
+            if (c.ticket) {
+                const n = parseInt(c.ticket.split('-')[1], 10);
+                if (!isNaN(n) && n > maxNum) maxNum = n;
+            }
+        });
+        const tk = 'TKT-' + String(maxNum + 1).padStart(4, '0');
         await db.from('comandas').insert({ client_id: document.getElementById('fcom-cli').value, user_id: App.user.id, ticket: tk });
         Modals.close(); UI.toast(`Comanda ${tk} gerada!`); Render.comandas();
     },
@@ -1117,10 +1115,6 @@ const Actions = {
                     }
                 });
             }
-            // dataHoraExata = momento do FECHAMENTO da comanda. É o mesmo valor usado tanto para
-            // atualizar o created_at da comanda quanto para o "date" das despesas geradas
-            // (Custo Fixo Serviço / Comissão Automática), garantindo que o histórico mostre sempre
-            // a data/hora em que o ticket foi fechado, e não o momento em que a comanda foi aberta.
             const dataHoraExata = new Date().toISOString();
             await db.from('comandas').update({ status: 'fechada', created_at: dataHoraExata }).eq('id', comandaId);
             
@@ -1172,16 +1166,10 @@ const Actions = {
         inputNome.value = "Buscando nas bases online...";
         inputNome.disabled = true;
 
-        // Cosmos (Bluesoft) é de longe a base com melhor cobertura de EAN de produtos BRASILEIROS
-        // (ex: higiene/beleza como Monange, Seda, O Boticário). Exige token gratuito:
-        // 1) crie conta em https://cosmos.bluesoft.com.br
-        // 2) copie o token gerado
-        // 3) cole aqui em COSMOS_TOKEN (ou defina window.COSMOS_TOKEN antes de carregar este script)
-        const COSMOS_TOKEN = window.COSMOS_TOKEN || '';
-
-        // Bases gratuitas em cascata, da mais assertiva para produtos BR até o fallback internacional.
+        // Bases gratuitas e sem necessidade de chave de API. Produto XYZ é brasileira/colaborativa (melhor
+        // chance para itens nacionais como os de um salão); as Open X Facts reforçam com cobertura internacional.
         const bases = [
-            ...(COSMOS_TOKEN ? [{ url: `https://api.cosmos.bluesoft.com.br/gtins/${val}.json`, tipo: 'cosmos' }] : []),
+            { url: `https://api.produto.xyz/v1/gtin/${val}`, tipo: 'pxyz' },
             { url: `https://world.openbeautyfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
             { url: `https://world.openfoodfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
             { url: `https://world.openproductsfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
@@ -1190,15 +1178,13 @@ const Actions = {
 
         for (const base of bases) {
             try {
-                const opts = base.tipo === 'cosmos' ? { headers: { 'X-Cosmos-Token': COSMOS_TOKEN } } : {};
-                const res = await fetch(base.url, opts);
+                const res = await fetch(base.url);
                 if(!res.ok) continue;
                 const json = await res.json();
 
-                if (base.tipo === 'cosmos' && json && json.description) {
-                    const nome = [json.description, json.brand?.name].filter(Boolean).join(' - ');
-                    inputNome.value = nome; inputNome.disabled = false;
-                    UI.toast('Produto encontrado (Cosmos)!', 'success'); return;
+                if (base.tipo === 'pxyz' && json.Product && json.Product.name) {
+                    inputNome.value = json.Product.name; inputNome.disabled = false;
+                    UI.toast('Produto encontrado!', 'success'); return;
                 } else if (base.tipo === 'off' && json.status === 1 && json.product) {
                     const nome = [json.product.product_name, json.product.brands].filter(Boolean).join(' - ');
                     if (nome) {

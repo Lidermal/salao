@@ -24,8 +24,6 @@ const U = {
     iso: d => { const tzOffset = d.getTimezoneOffset() * 60000; return (new Date(d.getTime() - tzOffset)).toISOString().split('T')[0]; },
     date: d => new Date(d).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}),
 
-    // Substitui placeholders {cliente}, {data}, {hora}, {profissional}, {servico}, {salao} pelo valor real.
-    // Chaves que começam com "_" (ex: _kind) são metadados internos e nunca entram na mensagem.
     fillTemplate(text, vars) {
         let out = text || '';
         Object.keys(vars || {}).forEach(k => {
@@ -70,20 +68,14 @@ const U = {
         const opts = this.generateQuinzenasOptions();
         document.querySelectorAll('.quinzena-select').forEach(sel => {
             sel.innerHTML = opts;
-            sel.value = this.getCurrentQuinzenaValue(); // Seta sempre para a atual
+            sel.value = this.getCurrentQuinzenaValue(); 
         });
     },
 
-    // Monta o extrato (Fluxo de Caixa) já ordenado: registros mais recentes em cima e,
-    // dentro de um mesmo fechamento de ticket: Comissão -> Custo -> Recebimento.
-    // Agrupa pelo número do ticket (via c.ticket / "Ref: TKT-XXXX" na descrição da despesa) em vez de
-    // confiar em timestamps idênticos, que antes misturavam os registros de tickets diferentes.
-    // Também usa o created_at REAL da comanda (timestamp completo) como data de exibição do Custo/Comissão
-    // do mesmo ticket, em vez de despesas.date (que fica gravado sem hora e "puxava" um dia/horário errado).
     buildExtrato(comand, desp) {
         let groups = {};
-        let ticketDate = {}; // ticket -> data real de fechamento (da própria comanda)
-        let avulsos = []; // despesas manuais sem ticket associado
+        let ticketDate = {}; 
+        let avulsos = []; 
 
         (comand || []).forEach(c => {
             if (c.total > 0) {
@@ -110,8 +102,6 @@ const U = {
             }
         });
 
-        // Blocos em ordem cronológica ASCENDENTE (mais antigo primeiro) para calcular o saldo corretamente.
-        // Ordem real dentro de cada ticket: Recebimento -> Custo -> Comissão.
         let blocks = [];
         Object.keys(groups).forEach(tk => {
             const g = groups[tk]; const items = [];
@@ -132,15 +122,10 @@ const U = {
             return { ...item, saldo: saldoAtual };
         });
 
-        // Inverte para exibição: mais recente em cima (Comissão -> Custo -> Recebimento dentro do grupo).
         extrato.reverse();
         return { extrato, totalIn, totalOut };
     },
 
-    // Ordena listas que mostram SOMENTE despesas (Controle de Despesas / Relatório de Despesas):
-    // agrupa pelo ticket para garantir Comissão sempre acima do Custo do mesmo fechamento, mais recente em cima.
-    // Recebe opcionalmente as comandas do mesmo período para corrigir a data exibida do Custo/Comissão,
-    // usando o created_at real da comanda (mesma correção aplicada em buildExtrato).
     orderDespesas(desp, comand) {
         let ticketDate = {};
         (comand || []).forEach(c => { if (c.ticket) ticketDate[c.ticket] = new Date(c.created_at); });
@@ -150,7 +135,7 @@ const U = {
             const m = (d.description || '').match(/Ref:\s*(TKT-\d+)/);
             const tk = m ? m[1] : null;
             const dt = (tk && ticketDate[tk]) ? ticketDate[tk] : new Date(d.date);
-            const displayItem = { ...d, date: dt }; // sobrescreve a data exibida para bater com o fechamento real
+            const displayItem = { ...d, date: dt }; 
             if (tk) {
                 groups[tk] = groups[tk] || { date: dt };
                 if (d.category === 'Comissões' || /comiss/i.test(d.description || '')) groups[tk].comissao = displayItem;
@@ -186,7 +171,8 @@ const UI = {
     },
     handleFabClick() {
         const v = App.view;
-        if(v === 'agenda') Modals.open('agendamento');
+        // MODIFICADO AQUI: Abre o menu mobile para agenda ao invés de direto o agendamento.
+        if(v === 'agenda') Modals.open('menu_agenda_mobile');
         else if(v === 'comandas') Modals.open('comanda');
         else if(v === 'clientes') Modals.open('cliente');
         else if(v === 'funcionarios' && App.role === 'owner') Modals.open('funcionario');
@@ -276,9 +262,6 @@ const Nav = {
         const titles = { agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', anamnese:'Ficha de Avaliação', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', relatorios:'Relatórios & Arquivos', notificacoes:'Notificações' };
         document.getElementById('page-title').textContent = titles[id] || 'Amor que Cuida';
         
-        // Telas de DETALHE (Anamnese/Perfil) já são renderizadas por quem as chama (Render.anamnese/Render.perfilCliente),
-        // pois precisam do ID do cliente como parâmetro. Chamar Render[id]() aqui de novo (sem parâmetros) sobrescrevia
-        // o ID já salvo com "undefined" e recriava a tela em loop. Por isso ficam de fora do auto-render genérico.
         const detailViews = ['anamnese', 'perfil-cliente'];
         if(Render[id] && !detailViews.includes(id)) Render[id]();
     },
@@ -290,8 +273,6 @@ const Render = {
     async agenda() {
         this.buildCalendar();
         try {
-            // Agora também busca o telefone do cliente (clients(name, phone)) para permitir o botão
-            // "Confirmar via WhatsApp" direto no card do agendamento.
             let query = db.from('appointments').select('*, clients(name, phone), services(name), users!user_id(name)').eq('date', U.iso(App.currentDate)).order('time', {ascending: true});
             if (App.role !== 'owner') query = query.eq('user_id', App.user.id);
 
@@ -391,9 +372,6 @@ const Render = {
         
         const { data: comandas } = await db.from('comandas').select('*, users(name)').eq('client_id', id).eq('status', 'fechada').order('created_at', {ascending: false});
 
-        // Busca a anamnese SEM tentar embutir "users(...)" via relacionamento do PostgREST: quando não existe
-        // (ou não está reconhecida no cache de schema) uma FK entre anamnesis.user_id e users.id, o embed falha
-        // com "Could not find a relationship...". Buscamos o nome do profissional à parte e montamos manualmente.
         const { data: anamneseRaw } = await db.from('anamnesis').select('notes, created_at, user_id').eq('client_id', id).order('created_at', {ascending: false}).limit(1);
         let anamnese = anamneseRaw;
         if (anamnese && anamnese.length && anamnese[0].user_id) {
@@ -439,7 +417,6 @@ const Render = {
         }).join('');
     },
 
-    // Ticket Visual de Cobranças Exclusivas
     async cobrancas() {
         const { data: debts, error } = await db.from('debts').select('*, clients(name)').gt('remaining_amount', 0).order('created_at', {ascending: false});
         const cont = document.getElementById('cobrancas-list');
@@ -448,7 +425,7 @@ const Render = {
         
         let htmlFinal = '';
         for (let d of debts) {
-            const fTkt = `FAT-${d.id.substring(0,5).toUpperCase()}`; // Fatura Exclusiva
+            const fTkt = `FAT-${d.id.substring(0,5).toUpperCase()}`; 
             const ticketsArr = d.comanda_ticket ? d.comanda_ticket.split(', ').map(t => t.trim()) : [];
             const { data: relatedComandas } = await db.from('comandas').select('items, created_at, ticket').in('ticket', ticketsArr);
             
@@ -547,12 +524,9 @@ const Render = {
             </div></div>`).join('');
     },
     
-    // FUNCIONÁRIOS (Sempre esconde o admin.teste)
     async funcionarios() {
         const { data } = await db.from('users').select('*').neq('username', 'admin.teste').order('name');
         document.getElementById('funcionarios-list').innerHTML = data.map(u => {
-            // Trata registros antigos/sem o campo "active" preenchido (null/undefined) como ATIVOS por padrão.
-            // Só é considerado desativado quando o valor for explicitamente "false".
             const isActive = u.active !== false;
             return `
             <div class="card" style="border-left: 4px solid ${isActive ? 'var(--primary)' : '#999'}; opacity: ${isActive ? '1' : '0.6'}">
@@ -569,14 +543,13 @@ const Render = {
         }).join('');
     },
     
-    // TELAS OPERACIONAIS FIXADAS NA QUINZENA ATUAL
     async despesas() {
-        const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); // Busca SOMENTE a quinzena atual
+        const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); 
         const [ {data: rawData}, {data: comand} ] = await Promise.all([
             db.from('despesas').select('*').gte('date', range.start).lte('date', range.end),
             db.from('comandas').select('ticket, created_at').eq('status', 'fechada').gte('created_at', range.start).lte('created_at', range.end)
         ]);
-        const data = U.orderDespesas(rawData, comand); // Comissão sempre acima do Custo do mesmo ticket, mesma data/hora do fechamento
+        const data = U.orderDespesas(rawData, comand); 
         let totais = { 'Custos Fixos': 0, 'Comissões': 0, 'Pessoal/Pagamentos': 0, 'Custos Variáveis': 0 };
         data.forEach(d => { if(totais[d.category] !== undefined) totais[d.category] += d.amount; else totais['Custos Variáveis'] += d.amount; });
         
@@ -649,7 +622,7 @@ const Render = {
         let qComand = db.from('comandas').select('total, ticket, created_at').eq('status', 'fechada');
         let qDesp = db.from('despesas').select('description, amount, date');
         
-        const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); // Busca SOMENTE a quinzena atual
+        const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); 
         qComand = qComand.gte('created_at', range.start).lte('created_at', range.end);
         qDesp = qDesp.gte('date', range.start).lte('date', range.end);
 
@@ -681,7 +654,6 @@ const Render = {
             </div>`).join('');
     },
 
-    // NOVA RENDERIZAÇÃO: RELATÓRIOS & ARQUIVOS
     async relatorios() {
         const qFilter = document.getElementById('filter-relatorios').value;
         const range = U.getQuinzenaDates(qFilter);
@@ -691,7 +663,6 @@ const Render = {
         
         const [ {data:comand}, {data:desp} ] = await Promise.all([qComand, qDesp]);
 
-        // Processa Despesas (Comissão sempre acima do Custo do mesmo ticket, mais recente em cima)
         let htmlDesp = '';
         if(desp.length === 0) { htmlDesp = '<p style="color:var(--muted); text-align:center;">Sem gastos registrados na quinzena.</p>'; }
         else {
@@ -701,7 +672,6 @@ const Render = {
         document.getElementById('relatorio-despesas-conteudo').innerHTML = htmlDesp;
         window.currentDespesasData = desp;
 
-        // Processa Fluxo (mesma ordenação robusta usada em Fluxo de Caixa)
         const { extrato, totalIn, totalOut } = U.buildExtrato(comand, desp);
         
         let htmlFluxo = '';
@@ -748,13 +718,10 @@ const Render = {
         document.getElementById('cfg-phone').value = App.settings.official_phone || '';
     },
 
-    // NOVA TELA: NOTIFICAÇÕES
-    // Proprietário vê tudo (aniversariantes, confirmações pendentes de todos, estoque baixo, cobranças em aberto).
-    // Colaborador vê apenas aniversariantes e as confirmações pendentes dos SEUS próprios agendamentos.
     async notificacoes() {
         const isOwner = App.role === 'owner';
         const todayIso = U.iso(new Date());
-        const todayMD = todayIso.slice(5); // "MM-DD"
+        const todayMD = todayIso.slice(5); 
 
         let qAgenda = db.from('appointments').select('*, clients(name, phone), services(name), users!user_id(name)').eq('date', todayIso).eq('status', 'agendado');
         if(!isOwner) qAgenda = qAgenda.eq('user_id', App.user.id);
@@ -820,7 +787,22 @@ const Modals = {
         const cont = document.getElementById('modal-container');
         let html = `<div class="modal"><button class="modal-close" onclick="Modals.close()"><i class="ph ph-x"></i></button>`;
         
-        if(type === 'first_login') {
+        // MODIFICADO AQUI: Inserido o novo case para o Menu Mobile
+        if(type === 'menu_agenda_mobile') {
+            html += `
+            <div style="text-align: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: var(--primary-dark);">Opções da Agenda</h3>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:15px; margin-bottom: 10px;">
+                <button class="btn-primary" style="padding:1.2rem; font-size:1.1rem" onclick="Modals.open('agendamento')">
+                    <i class="ph ph-calendar-plus" style="font-size:1.5rem"></i> Novo Agendamento
+                </button>
+                <button class="btn-secondary" style="padding:1.2rem; font-size:1.1rem; border: 1px solid #d32f2f; color: #d32f2f; background: #ffebee;" onclick="Modals.open('bloquear_agenda')">
+                    <i class="ph ph-prohibit" style="font-size:1.5rem"></i> Bloquear Horário
+                </button>
+            </div>`;
+        }
+        else if(type === 'first_login') {
             html += `
             <div style="text-align: center; margin-bottom: 20px;">
                 <h3 style="margin: 0; color: var(--primary-dark);">Definir Nova Senha</h3>
@@ -834,8 +816,6 @@ const Modals = {
         else if(type === 'whatsapp') {
             const { data: templates } = await db.from('message_templates').select('*');
 
-            // param3, quando presente, é um JSON com dados para personalizar a mensagem automaticamente
-            // (ex: {cliente, data, hora, profissional, servico, salao, _kind: 'confirmacao'|'aniversario'}).
             let vars = {};
             try { vars = param3 ? JSON.parse(param3) : {}; } catch(e) { vars = {}; }
             window.currentWppVars = vars;
@@ -1026,8 +1006,6 @@ const Modals = {
         
         html += `</div>`; cont.innerHTML = html; cont.classList.remove('hidden');
 
-        // Se o modal do WhatsApp foi aberto com dados de contexto (agendamento ou aniversário),
-        // pré-seleciona automaticamente o modelo mais adequado ("Confirmação" ou "Aniversário").
         if(type === 'whatsapp' && window.currentWppVars && window.currentWppVars._kind) {
             const { data: templates } = await db.from('message_templates').select('*');
             const pattern = window.currentWppVars._kind === 'aniversario' ? /anivers/i : /confirma/i;
@@ -1092,8 +1070,6 @@ const Actions = {
         App.user.first_login = false; Modals.close(); UI.toast('Senha salva com sucesso!'); 
     },
 
-    // Preenche a textarea da mensagem com o template escolhido, substituindo os placeholders
-    // ({cliente}, {data}, {hora}, {profissional}, {servico}, {salao}) pelos valores do contexto atual.
     applyTemplate(templateId) {
         const box = document.getElementById('wpp-msg');
         if(!box) return;
@@ -1104,8 +1080,6 @@ const Actions = {
         });
     },
 
-    // Abre o WhatsApp já com os dados do agendamento (cliente, data, hora, profissional, serviço)
-    // para preencher automaticamente o modelo de "Confirmação".
     async sendConfirmacao(appId) {
         const { data: a, error } = await db.from('appointments').select('*, clients(name, phone), services(name), users!user_id(name)').eq('id', appId).single();
         if(error || !a) { UI.toast('Erro ao buscar agendamento.', 'error'); return; }
@@ -1122,7 +1096,6 @@ const Actions = {
         Modals.open('whatsapp', a.clients.phone, a.clients.name, JSON.stringify(vars));
     },
 
-    // Abre o WhatsApp já com os dados do cliente para preencher automaticamente o modelo de "Aniversário".
     async sendParabens(clientId) {
         const { data: c, error } = await db.from('clients').select('name, phone').eq('id', clientId).single();
         if(error || !c) { UI.toast('Cliente não encontrado.', 'error'); return; }
@@ -1165,9 +1138,6 @@ const Actions = {
         const div = document.getElementById('anamnese-history-list');
         if(!id || id === 'undefined') { div.innerHTML = "<p style='color:#d32f2f; text-align:center; padding:2rem'>ID do cliente não identificado. Volte e clique em Ficha novamente.</p>"; return; }
 
-        // Busca a anamnese sem embutir "users(...)" via relacionamento do PostgREST (evita o erro
-        // "Could not find a relationship between 'anamnesis' and 'users' in the schema cache" quando a
-        // FK ainda não existe/não foi recarregada no cache). Os nomes dos profissionais são buscados à parte.
         const { data, error } = await db.from('anamnesis').select('*').eq('client_id', id).order('created_at', {ascending: false});
         if(error) { div.innerHTML = `<p style='color:#d32f2f; text-align:center; padding:2rem'>Erro ao carregar histórico: ${error.message}</p>`; return; }
         if(!data || !data.length) { div.innerHTML = "<p style='color:var(--muted); text-align:center; padding:2rem'>Nenhum registro clínico para este cliente.</p>"; return; }
@@ -1235,9 +1205,6 @@ const Actions = {
 
     async createComanda(e) {
         e.preventDefault(); 
-        // Antes ordenava por "id" (UUID) esperando pegar o último ticket criado, mas UUID não segue ordem
-        // cronológica — o resultado podia ser qualquer linha, repetindo números de ticket (ex: TKT-0003 três vezes).
-        // Agora calcula o maior número de ticket já existente em toda a tabela, garantindo um número sempre novo.
         const { data, error } = await db.from('comandas').select('ticket');
         if(error) return UI.toast(`Erro ao gerar comanda: ${error.message}`, 'error');
         let maxNum = 0;
@@ -1335,12 +1302,6 @@ const Actions = {
         await db.from('services').insert({ name: document.getElementById('fs-nome').value, price: document.getElementById('fs-valor').value, cost: document.getElementById('fs-custo').value, commission: document.getElementById('fs-com').value, has_assistant: aux, assistant_commission: aux ? document.getElementById('fs-auxcom').value : 0 }); Modals.close(); UI.toast('Serviço adicionado!'); Render.servicos();
     },
     
-    // Busca o nome do produto pelo código de barras (GTIN/EAN) em várias bases gratuitas, em cascata.
-    // Ordem pensada para produtos de salão/cosmético: Open Beauty Facts primeiro (base específica de
-    // cosmético/higiene, com boa cobertura), depois bases brasileiras/gerais como fallback. Quando uma base
-    // pode não expor cabeçalho CORS (ex.: produto.xyz), tenta também via proxy CORS público como reforço.
-    // Erros de cada base ficam registrados no console (F12) para facilitar diagnóstico, em vez de serem
-    // silenciosamente ignorados como antes.
     async fetchBarcode(val) {
         val = (val || '').trim().replace(/\D/g, '');
         if(val.length < 8) return UI.toast('Digite um código de barras válido (mínimo 8 dígitos).', 'warning');

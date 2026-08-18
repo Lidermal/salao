@@ -1103,20 +1103,20 @@ const Actions = {
     },
     
     async createClient(e) {
-    e.preventDefault();
-    const nasc = document.getElementById('fc-nasc').value;
-    const { error } = await db.from('clients').insert({
-        name: document.getElementById('fc-nome').value,
-        phone: document.getElementById('fc-fone').value,
-        birth_date: nasc || null
-    });
-    if (error) {
-        console.error('Erro ao criar cliente:', error);
-        UI.toast(`Erro: ${error.message}`, 'error');
-        return;
+        e.preventDefault();
+        const nasc = document.getElementById('fc-nasc').value;
+        const { error } = await db.from('clients').insert({
+            name: document.getElementById('fc-nome').value,
+            phone: document.getElementById('fc-fone').value,
+            birth_date: nasc || null
+        });
+        if (error) {
+            console.error('Erro ao criar cliente:', error);
+            UI.toast(`Erro: ${error.message}`, 'error');
+            return;
     }
-    Modals.close(); UI.toast('Cliente adicionado!'); Render.clientes();
-}
+        Modals.close(); UI.toast('Cliente adicionado!'); Render.clientes();
+    }
     async updateClient(e, id) {
         e.preventDefault();
         const nasc = document.getElementById('fce-nasc').value;

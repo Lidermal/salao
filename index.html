@@ -102,11 +102,16 @@
                         <div class="cal-header"><button onclick="Render.changeWeek(-1)"><i class="ph ph-caret-left"></i></button><h3 id="cal-month-year">...</h3><button onclick="Render.changeWeek(1)"><i class="ph ph-caret-right"></i></button></div>
                         <div class="cal-days" id="cal-days-row"></div>
                     </div>
-                    <div id="agenda-list" class="data-list"></div>
-                    <div style="display:flex; gap:10px; margin-top:20px;">
-                        <button class="btn-primary desktop-only" style="width:auto;" onclick="Modals.open('agendamento')">+ Novo Agendamento</button>
-                        <button class="btn-secondary desktop-only" style="width:auto; border: 1px solid #d32f2f; color: #d32f2f;" onclick="Modals.open('bloquear_agenda')"><i class="ph ph-prohibit"></i> Bloquear Horário</button>
+
+                    <!-- BOTOES MOVIDOS PARA O TOPO -->
+                    <div style="display:flex; gap:10px; margin-bottom:20px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
+                        <div style="display: flex; gap: 10px;">
+                            <button class="btn-primary desktop-only" style="width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('agendamento')">+ Novo Agendamento</button>
+                            <button class="btn-secondary desktop-only" style="width:auto; padding: 0.8rem 1.5rem; border: 1px solid #d32f2f; color: #d32f2f;" onclick="Modals.open('bloquear_agenda')"><i class="ph ph-prohibit"></i> Bloquear Horário</button>
+                        </div>
                     </div>
+
+                    <div id="agenda-list"></div>
                 </section>
                 
                 <section id="view-cobrancas" class="view">
@@ -170,7 +175,7 @@
                     <div id="funcionarios-list" class="data-grid"></div>
                 </section>
                 
-                <!-- Telas Operacionais (Mostram APENAS a Quinzena Atual limpa) -->
+                <!-- Telas Operacionais -->
                 <section id="view-despesas" class="view">
                     <div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center; flex-wrap:wrap; gap:10px;">
                         <h2>Custos da Quinzena Atual</h2>
@@ -201,7 +206,6 @@
                     </div>
                 </section>
 
-                <!-- NOVA SUBPÁGINA: RELATÓRIOS -->
                 <section id="view-relatorios" class="view">
                     <div style="background:var(--surface); padding:20px; border-radius:12px; margin-bottom:20px; border:1px solid var(--border); box-shadow:var(--shadow);">
                         <h3 style="margin-bottom:15px;"><i class="ph ph-folder-open"></i> Gerenciador de Arquivos</h3>
@@ -260,7 +264,6 @@
     <!-- CONTAINER DE MODAIS -->
     <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
     
-    <!-- VERSÃO DO CACHE ATUALIZADA AQUI: -->
-    <script src="script.js?v=2"></script>
+    <script src="script.js?v=3"></script>
 </body>
 </html>

@@ -1112,15 +1112,24 @@ const Actions = {
         });
         if (error) {
             console.error('Erro ao criar cliente:', error);
-            UI.toast(`Erro: ${error.message}`, 'error');
+            UI.toast(`Erro ao salvar cliente: ${error.message}`, 'error');
             return;
-    }
+        }
         Modals.close(); UI.toast('Cliente adicionado!'); Render.clientes();
-    }
+    },
     async updateClient(e, id) {
         e.preventDefault();
         const nasc = document.getElementById('fce-nasc').value;
-        await db.from('clients').update({ name: document.getElementById('fce-nome').value, phone: document.getElementById('fce-fone').value, birth_date: nasc || null }).eq('id', id);
+        const { error } = await db.from('clients').update({
+            name: document.getElementById('fce-nome').value,
+            phone: document.getElementById('fce-fone').value,
+            birth_date: nasc || null
+        }).eq('id', id);
+        if (error) {
+            console.error('Erro ao atualizar cliente:', error);
+            UI.toast(`Erro ao salvar alterações: ${error.message}`, 'error');
+            return;
+        }
         Modals.close(); UI.toast('Cliente alterado!'); Render.clientes();
     },
     

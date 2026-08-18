@@ -8,7 +8,6 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://unpkg.com/@phosphor-icons/web"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Bibliotecas para Gerar PDF Compatíveis com Mobile -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     
@@ -64,7 +63,8 @@
                 <div class="nav-section">ATENDIMENTO</div>
                 <a href="#" class="nav-link active" data-view="agenda"><i class="ph ph-calendar"></i> Agenda</a>
                 <a href="#" class="nav-link" data-view="comandas"><i class="ph ph-receipt"></i> Comandas</a>
-                <a href="#" class="nav-link owner-only" data-view="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
+                <!-- Cobranças liberada para colaboradores e freelancers também -->
+                <a href="#" class="nav-link" data-view="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
                 <a href="#" class="nav-link" data-view="clientes"><i class="ph ph-users"></i> Clientes</a>
                 
                 <div class="nav-section owner-only">GESTÃO DE ESTOQUE</div>
@@ -98,12 +98,8 @@
 
             <div class="views-container">
                 <section id="view-agenda" class="view active">
-                    <div class="ios-calendar">
-                        <div class="cal-header"><button onclick="Render.changeWeek(-1)"><i class="ph ph-caret-left"></i></button><h3 id="cal-month-year">...</h3><button onclick="Render.changeWeek(1)"><i class="ph ph-caret-right"></i></button></div>
-                        <div class="cal-days" id="cal-days-row"></div>
-                    </div>
-
-                    <!-- BOTOES MOVIDOS PARA O TOPO -->
+                    
+                    <!-- BOTOES NO TOPO -->
                     <div style="display:flex; gap:10px; margin-bottom:20px; align-items: center; justify-content: space-between; flex-wrap: wrap;">
                         <div style="display: flex; gap: 10px;">
                             <button class="btn-primary desktop-only" style="width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('agendamento')">+ Novo Agendamento</button>
@@ -111,7 +107,34 @@
                         </div>
                     </div>
 
-                    <div id="agenda-list"></div>
+                    <!-- VISÃO DO MÊS COMPLETO -->
+                    <div id="agenda-month-view" class="ios-calendar">
+                        <div class="cal-header">
+                            <button onclick="Render.changeMonth(-1)"><i class="ph ph-caret-left"></i></button>
+                            <h3 id="cal-month-year" style="text-transform: capitalize;">...</h3>
+                            <button onclick="Render.changeMonth(1)"><i class="ph ph-caret-right"></i></button>
+                        </div>
+                        <div class="cal-grid" id="cal-grid"></div>
+                        <div class="cal-legend">
+                            <div><span class="dot livre"></span> Livre</div>
+                            <div><span class="dot agendado"></span> Agendado</div>
+                            <div><span class="dot bloqueado"></span> Bloqueado</div>
+                        </div>
+                    </div>
+
+                    <!-- VISÃO DA LINHA DO TEMPO (DIÁRIA) -->
+                    <div id="agenda-day-view" class="hidden">
+                        <div style="display: flex; gap: 15px; margin-bottom: 15px; align-items: center;">
+                            <button class="btn-secondary" style="width:auto; padding: 0.5rem 1rem;" onclick="Render.showMonthView()"><i class="ph ph-arrow-left"></i> Voltar ao Mês</button>
+                        </div>
+                        
+                        <div class="ios-calendar" style="margin-bottom: 15px; padding: 0.5rem 0;">
+                            <div class="cal-days" id="cal-days-row" style="padding-bottom: 0;"></div>
+                        </div>
+
+                        <h3 id="day-view-title" style="text-align: center; margin-bottom: 15px; color: var(--primary-dark);">...</h3>
+                        <div id="agenda-list"></div>
+                    </div>
                 </section>
                 
                 <section id="view-cobrancas" class="view">
@@ -175,7 +198,6 @@
                     <div id="funcionarios-list" class="data-grid"></div>
                 </section>
                 
-                <!-- Telas Operacionais -->
                 <section id="view-despesas" class="view">
                     <div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center; flex-wrap:wrap; gap:10px;">
                         <h2>Custos da Quinzena Atual</h2>
@@ -213,7 +235,6 @@
                             <select id="filter-relatorios" class="quinzena-select" onchange="Render.relatorios()" style="padding:1rem; border-radius:8px; border:1px solid var(--border); flex:1; font-size:1.1rem; font-weight:bold;"></select>
                         </div>
                     </div>
-
                     <div class="card" style="margin-bottom: 20px;">
                         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--border); padding-bottom:10px; margin-bottom:15px;">
                             <h3 style="color:#d32f2f"><i class="ph ph-trend-down"></i> Relatório de Despesas</h3>
@@ -221,7 +242,6 @@
                         </div>
                         <div id="relatorio-despesas-conteudo"></div>
                     </div>
-
                     <div class="card">
                         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--border); padding-bottom:10px; margin-bottom:15px;">
                             <h3 style="color:#2e7d32"><i class="ph ph-bank"></i> Relatório de Fluxo de Caixa</h3>
@@ -264,6 +284,6 @@
     <!-- CONTAINER DE MODAIS -->
     <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
     
-    <script src="script.js?v=3"></script>
+    <script src="script.js?v=4"></script>
 </body>
 </html>

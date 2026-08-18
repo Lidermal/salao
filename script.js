@@ -1,6 +1,6 @@
 /** 
  * SISTEMA ESTÚDIO AMOR QUE CUIDA
- * Atualizado com Grade Diária (Timeline), Duração de Serviços, Travas e Múltiplos Níveis.
+ * Lógica Completa, Duração Flexível, Encaixes, Segurança de Colunas e Modal de Detalhes.
  */
 
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
@@ -15,7 +15,7 @@ const App = {
     role: 'colaborador', 
     view: 'agenda', 
     currentDate: new Date(), 
-    calendarMonth: new Date(), // Usado para o controle do mês na view primária
+    calendarMonth: new Date(),
     charts: {}, 
     settings: {}
 };
@@ -74,10 +74,7 @@ const U = {
     },
 
     buildExtrato(comand, desp) {
-        let groups = {};
-        let ticketDate = {}; 
-        let avulsos = []; 
-
+        let groups = {}; let ticketDate = {}; let avulsos = []; 
         (comand || []).forEach(c => {
             if (c.total > 0) {
                 const tk = c.ticket || `SEMTKT-${c.created_at}`;
@@ -88,7 +85,6 @@ const U = {
                 groups[tk].in = { type: 'in', desc: `Comanda Fechada ${c.ticket || '-'}`, val: c.total, date: dt };
             }
         });
-
         (desp || []).forEach(d => {
             const m = (d.description || '').match(/Ref:\s*(TKT-\d+)/);
             const tk = m ? m[1] : null;
@@ -98,11 +94,8 @@ const U = {
                 groups[tk] = groups[tk] || { date: dt };
                 if (d.category === 'Comissões' || /comiss/i.test(d.description || '')) groups[tk].comissao = item;
                 else groups[tk].custo = item;
-            } else {
-                avulsos.push(item);
-            }
+            } else { avulsos.push(item); }
         });
-
         let blocks = [];
         Object.keys(groups).forEach(tk => {
             const g = groups[tk]; const items = [];
@@ -112,17 +105,15 @@ const U = {
             if (items.length) blocks.push({ sortDate: g.date, items });
         });
         avulsos.forEach(a => blocks.push({ sortDate: a.date, items: [a] }));
-
         blocks.sort((a, b) => a.sortDate - b.sortDate);
+        
         let extrato = blocks.flatMap(b => b.items);
-
         let saldoAtual = 0, totalIn = 0, totalOut = 0;
         extrato = extrato.map(item => {
             if (item.type === 'in') totalIn += item.val; else totalOut += item.val;
             saldoAtual += item.type === 'in' ? item.val : -item.val;
             return { ...item, saldo: saldoAtual };
         });
-
         extrato.reverse();
         return { extrato, totalIn, totalOut };
     },
@@ -130,7 +121,6 @@ const U = {
     orderDespesas(desp, comand) {
         let ticketDate = {};
         (comand || []).forEach(c => { if (c.ticket) ticketDate[c.ticket] = new Date(c.created_at); });
-
         let groups = {}; let avulsos = [];
         (desp || []).forEach(d => {
             const m = (d.description || '').match(/Ref:\s*(TKT-\d+)/);
@@ -200,8 +190,7 @@ const Auth = {
             if (data.password !== p) throw new Error("Senha incorreta.");
             
             App.user = data; 
-            // Normalize rules
-            App.role = data.role === 'freelancer' ? 'colaborador' : data.role;
+            App.role = (data.role === 'freelancer' || data.role === 'colaborador') ? 'colaborador' : 'owner';
             
             document.getElementById('login-form').reset();
             this.success();
@@ -231,8 +220,7 @@ const Auth = {
         
         U.initFilters();
         Nav.init(); 
-        
-        Render.showMonthView(); // Inicializa mostrando o mês
+        Render.showMonthView(); 
         
         db.channel('custom-all-channel').on('postgres_changes', { event: '*', schema: 'public' }, payload => {
             if(App.view === 'agenda') {
@@ -305,7 +293,6 @@ const Render = {
         const startDate = U.iso(firstDay);
         const endDate = U.iso(lastDay);
         
-        // Puxa as bolinhas do mês
         let monthApps = [];
         try {
             let query = db.from('appointments').select('date, status').gte('date', startDate).lte('date', endDate).neq('status', 'cancelado');
@@ -317,16 +304,13 @@ const Render = {
         const grid = document.getElementById('cal-grid');
         let html = '';
         
-        // Cabeçalhos dos dias da semana
         const weekDays = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
         weekDays.forEach(d => { html += `<div class="cal-grid-header">${d}</div>`; });
         
-        // Espaços em branco antes do dia 1
         for (let i = 0; i < firstDay.getDay(); i++) {
             html += `<div class="cal-day empty"></div>`;
         }
         
-        // Dias do mês
         for (let i = 1; i <= lastDay.getDate(); i++) {
             const currentIso = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
             const isToday = currentIso === U.iso(new Date());
@@ -341,7 +325,6 @@ const Render = {
                 if(hasAgendado) indicators += '<span class="dot agendado"></span>';
                 if(hasBloqueado) indicators += '<span class="dot bloqueado"></span>';
             } else {
-                // Se for futuro ou hoje, pode estar livre. Passado livre não interessa muito, mas pomos verde igual.
                 indicators = '<span class="dot livre"></span>';
             }
 
@@ -361,17 +344,16 @@ const Render = {
     },
     
     changeWeek(dir) { 
-        App.currentDate.setDate(App.currentDate.getDate() + (dir*1)); // Move 1 dia por vez no cabeçalho
+        App.currentDate.setDate(App.currentDate.getDate() + (dir*1)); 
         this.agendaDay(); 
     },
 
     async agendaDay() {
-        this.buildWeekStrip(); // Constrói a faixa de dias no topo da linha do tempo
+        this.buildWeekStrip(); 
         
         try {
             const dateStr = U.iso(App.currentDate);
             
-            // Puxa agendamentos + Duração do serviço juntamente com inner join
             let query = db.from('appointments')
                 .select('*, clients(name, phone), services(name, duration), users!user_id(name)')
                 .eq('date', dateStr)
@@ -391,27 +373,25 @@ const Render = {
                 cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Nenhum profissional encontrado.</p></div>`; return;
             }
 
-            // CRIAÇÃO DA TIMELINE (Formato de Grade com Horários)
+            const pixelsPerMin = 2;
+            const horaInicio = 7;
+            const horaFim = 21;
+
             let html = `<div class="timeline-wrapper">`;
-            html += `<div class="timeline-header"><div class="time-col"></div>`;
+            html += `<div class="timeline-header"><div class="time-col" style="background:transparent; border:none;"></div>`;
             usersData.forEach(u => { html += `<div class="prof-col-header">${u.name.split(' ')[0]}</div>`; });
             html += `</div><div class="timeline-body">`;
 
-            // Horários na lateral Esquerda (De 08:00 a 20:00)
-            const horaInicio = 8;
-            const horaFim = 20;
             html += `<div class="time-col">`;
             for(let i=horaInicio; i<=horaFim; i++) {
                 html += `<div class="time-slot"><span>${String(i).padStart(2,'0')}:00</span></div>`;
             }
             html += `</div>`;
 
-            // Colunas dos profissionais e blocos
             html += `<div class="tracks-container">`;
             usersData.forEach(u => {
                 html += `<div class="prof-track">`;
                 
-                // Linhas de fundo marcando horas
                 for(let i=horaInicio; i<=horaFim; i++) { html += `<div class="track-line"></div>`; }
                 
                 const userApps = (agData || []).filter(a => a.user_id === u.id);
@@ -419,53 +399,58 @@ const Render = {
                 userApps.forEach(a => {
                     const [sh, sm] = (a.time||'00:00').split(':').map(Number);
                     
-                    // Se não tiver duração salva, usamos a do serviço vinculado ou 60 padrão.
-                    let durationMins = 60;
-                    if(a.services && a.services.duration) durationMins = a.services.duration;
+                    let endStr;
+                    let originalNotes = a.notes || '';
                     
-                    let endStr = a.end_time;
-                    if(!endStr) { // Caso a base antiga não tenha gerado end_time
-                         let mF = sm + durationMins;
-                         let hF = sh + Math.floor(mF/60);
-                         mF = mF % 60;
-                         endStr = `${String(hF).padStart(2,'0')}:${String(mF).padStart(2,'0')}`;
+                    if (a.status === 'bloqueado' && originalNotes.includes('BLOQUEIO_ATE:')) {
+                        const parts = originalNotes.split('|');
+                        endStr = parts[0].replace('BLOQUEIO_ATE:', '').trim();
+                        originalNotes = parts.length > 1 ? parts[1].trim() : '';
+                        a.notes = originalNotes; 
+                    } else {
+                        let durationMins = (a.services && a.services.duration) ? a.services.duration : 60;
+                        let mF = sm + durationMins;
+                        let hF = sh + Math.floor(mF/60);
+                        endStr = `${String(hF).padStart(2,'0')}:${String(mF%60).padStart(2,'0')}`;
                     }
 
                     const [eh, em] = endStr.split(':').map(Number);
                     
-                    // Cálculo da altura e topo
-                    // 1 hora = 60px (1px = 1 minuto para cálculo facilitado visual)
-                    const pixelsPerMin = 1.2; // 1h = 72px de altura
-                    
                     const startMins = (sh * 60 + sm) - (horaInicio * 60);
                     let blockDuration = (eh * 60 + em) - (sh * 60 + sm);
-                    if (blockDuration <= 0) blockDuration = 60; // fallback segurança
+                    if (blockDuration <= 0) blockDuration = 60;
 
                     const top = startMins * pixelsPerMin; 
                     const height = blockDuration * pixelsPerMin;
 
                     const isBlocked = a.status === 'bloqueado';
-                    const isEncaixe = false; // Pode customizar caso tenha um campo no banco depois
+                    const isEncaixe = a.is_encaixe;
+                    const isCompact = blockDuration <= 45; 
                     
-                    let bg = isBlocked ? '#f5f5f5' : '#ff9eb5';
-                    let color = isBlocked ? '#616161' : '#880024';
-                    let border = isBlocked ? '#9e9e9e' : '#ff4d6d';
-                    if(a.status === 'chegou') { bg = '#e8f5e9'; border = '#4caf50'; color = '#2e7d32'; }
+                    let bg = isBlocked ? '#f0f0f0' : '#ffe3e8';
+                    let color = isBlocked ? '#616161' : '#880e4f';
+                    let border = isBlocked ? '#9e9e9e' : '#d81b60';
+                    if(a.status === 'chegou') { bg = '#dcedc8'; border = '#689f38'; color = '#33691e'; }
 
-                    const wppBtn = (!isBlocked && a.status === 'agendado') ? `<button onclick="Actions.sendConfirmacao('${a.id}')"><i class="ph ph-whatsapp-logo"></i></button>` : '';
-                    const chkBtn = (!isBlocked && a.status === 'agendado') ? `<button onclick="Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i></button>` : '';
+                    // Aqui está a MUDANÇA PRINCIPAL DOS BOTÕES (stopPropagation adicionado)
+                    const wppBtn = (!isBlocked && a.status === 'agendado') ? `<button onclick="event.stopPropagation(); Actions.sendConfirmacao('${a.id}')"><i class="ph ph-whatsapp-logo"></i></button>` : '';
+                    const chkBtn = (!isBlocked && a.status === 'agendado') ? `<button onclick="event.stopPropagation(); Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i></button>` : '';
+                    
+                    let extraStyle = isEncaixe ? 'width: 80%; left: 15%; z-index: 10; box-shadow: -4px 4px 15px rgba(0,0,0,0.15); border-left-width: 6px;' : '';
+                    let compactClass = isCompact ? 'compact' : '';
 
+                    // O CARD AGORA TEM O ONCLICK PARA ABRIR O MODAL DE DETALHES
                     html += `
-                    <div class="agenda-card" style="top:${top}px; height:${height}px; background:${bg}; border-left:4px solid ${border}; color:${color}; ${isEncaixe ? 'width:85%; left:10%; z-index:2; box-shadow:0 4px 12px rgba(0,0,0,0.2)' : ''}">
+                    <div class="agenda-card ${compactClass}" style="top:${top}px; height:${height}px; background:${bg}; border-left:4px solid ${border}; color:${color}; ${extraStyle}" onclick="Modals.open('detalhes_agendamento', '${a.id}')">
                         <div class="ac-time">${a.time.slice(0,5)} - ${endStr.slice(0,5)}</div>
                         <div class="ac-title"><i class="ph ${isBlocked ? 'ph-prohibit' : 'ph-user'}"></i> ${isBlocked ? 'Bloqueado' : (a.clients?.name || 'Cliente')}</div>
-                        ${!isBlocked ? `<div class="ac-sub">${a.services?.name || ''}</div>` : `<div class="ac-sub">${a.notes||''}</div>`}
+                        <div class="ac-sub">${!isBlocked ? (a.services?.name || '') : (a.notes || '')}</div>
                         <div class="ac-actions">${chkBtn} ${wppBtn}</div>
                     </div>`;
                 });
                 html += `</div>`;
             });
-            html += `</div></div></div>`; // Fechamento das divs do grid
+            html += `</div></div></div>`;
             cont.innerHTML = html;
 
         } catch (e) { UI.toast(`Erro na agenda: ${e.message}`, 'error'); }
@@ -474,10 +459,8 @@ const Render = {
     buildWeekStrip() {
         const d = App.currentDate;
         
-        // Título formatado "Amanhã, 18 de Agosto, 2026"
         const optionsTitle = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
         let strTitle = d.toLocaleDateString('pt-BR', optionsTitle);
-        // Capitalizando a primeira letra
         strTitle = strTitle.charAt(0).toUpperCase() + strTitle.slice(1);
         document.getElementById('day-view-title').textContent = strTitle;
 
@@ -612,7 +595,6 @@ const Render = {
                 </div>
                 <div style="padding:15px; display:flex; gap:10px; background:#fff">
                     <button class="btn-primary" style="flex:1; background:#2e7d32;" onclick="Modals.open('debitar', '${d.id}', ${d.remaining_amount}, '${fTkt}')"><i class="ph ph-money"></i> Receber Pagamento</button>
-                    <!-- Proprietários, Colaboradores e Freelancers podem dar desconto agora, então removemos a restrição de role -->
                     <button class="btn-secondary" style="width:auto;" onclick="Modals.open('desconto', '${d.id}', ${d.remaining_amount})"><i class="ph ph-percent"></i> Desc.</button>
                 </div>
             </div>`;
@@ -876,7 +858,67 @@ const Modals = {
         const cont = document.getElementById('modal-container');
         let html = `<div class="modal"><button class="modal-close" onclick="Modals.close()"><i class="ph ph-x"></i></button>`;
         
-        if(type === 'menu_agenda_mobile') {
+        // NOVO: MODAL DE DETALHES DO AGENDAMENTO
+        if(type === 'detalhes_agendamento') {
+            const { data: a, error } = await db.from('appointments').select('*, clients(name, phone), services(name, price, duration), users!user_id(name)').eq('id', param1).single();
+            if(error || !a) return UI.toast('Erro ao carregar detalhes.', 'error');
+            
+            const isBlocked = a.status === 'bloqueado';
+            
+            if (isBlocked) {
+                let endStr = '';
+                let motivo = a.notes;
+                if (a.notes && a.notes.includes('BLOQUEIO_ATE:')) {
+                    const parts = a.notes.split('|');
+                    endStr = parts[0].replace('BLOQUEIO_ATE:', '').trim();
+                    motivo = parts.length > 1 ? parts[1].trim() : '';
+                }
+                html += `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0; color: #d32f2f;"><i class="ph ph-prohibit"></i> Horário Bloqueado</h3>
+                </div>
+                <div style="background: #fafafa; border: 1px solid var(--border); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
+                    <p style="margin-bottom:8px"><strong>Data:</strong> ${new Date(a.date + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                    <p style="margin-bottom:8px"><strong>Início:</strong> ${a.time.slice(0,5)}</p>
+                    <p style="margin-bottom:8px"><strong>Término:</strong> ${endStr}</p>
+                    <p><strong>Motivo/Anotação:</strong> ${motivo}</p>
+                </div>
+                <button class="btn-primary" style="background:#d32f2f; padding:1.2rem; width:100%" onclick="Actions.deleteAppointment('${a.id}')"><i class="ph ph-trash"></i> Remover Bloqueio</button>
+                `;
+            } else {
+                let dur = a.services?.duration || 60;
+                const [sh, sm] = (a.time||'00:00').split(':').map(Number);
+                let mF = sm + dur;
+                let hF = sh + Math.floor(mF/60);
+                let endStr = `${String(hF).padStart(2,'0')}:${String(mF%60).padStart(2,'0')}`;
+                
+                html += `
+                <div style="text-align: center; margin-bottom: 20px;">
+                    <h3 style="margin: 0; color: var(--primary-dark);">Detalhes do Agendamento</h3>
+                    <span style="font-size:0.8rem; font-weight:bold; padding: 4px 10px; border-radius:20px; background:${a.status === 'chegou' ? '#dcedc8' : 'var(--primary-light)'}; color:${a.status === 'chegou' ? '#33691e' : 'var(--primary-dark)'}; display:inline-block; margin-top:10px;">${a.status.toUpperCase()}</span>
+                </div>
+                <div style="background: #fafafa; border: 1px solid var(--border); border-radius: 12px; padding: 15px; margin-bottom: 20px; display:flex; flex-direction:column; gap:10px;">
+                    <p><strong><i class="ph ph-user"></i> Cliente:</strong> ${a.clients?.name}</p>
+                    <p><strong><i class="ph ph-phone"></i> Telefone:</strong> ${a.clients?.phone || 'Não informado'} 
+                        ${a.clients?.phone ? `<button onclick="Actions.sendConfirmacao('${a.id}')" style="background:var(--primary-light); border:none; padding:4px 8px; border-radius:6px; color:#25D366; cursor:pointer; margin-left:10px;"><i class="ph ph-whatsapp-logo" style="font-size:1.1rem; vertical-align:middle;"></i> Abrir</button>` : ''}
+                    </p>
+                    <p><strong><i class="ph ph-sparkle"></i> Serviço:</strong> ${a.services?.name}</p>
+                    <p><strong><i class="ph ph-money"></i> Valor Base:</strong> ${U.money(a.services?.price)}</p>
+                    <p><strong><i class="ph ph-identification-badge"></i> Profissional:</strong> ${a.users?.name}</p>
+                    <div style="background:#fff; border:1px solid #eee; padding:10px; border-radius:8px; margin-top:5px;">
+                        <p style="margin-bottom:5px;"><strong><i class="ph ph-calendar"></i> Data:</strong> ${new Date(a.date + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                        <p><strong><i class="ph ph-clock"></i> Horário:</strong> ${a.time.slice(0,5)} às ${endStr}</p>
+                    </div>
+                    ${a.is_encaixe ? `<p style="color:#e65100; font-weight:bold; background:#fff3e0; padding:10px; border-radius:8px; text-align:center;"><i class="ph ph-warning"></i> Encaixe Forçado</p>` : ''}
+                </div>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    ${a.status === 'agendado' ? `<button class="btn-primary" style="background:#2e7d32; padding:1.2rem; width:100%" onclick="Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i> Confirmar Chegada do Cliente</button>` : ''}
+                    <button class="btn-secondary" style="color:#d32f2f; border:1px solid #d32f2f; padding:1.2rem; width:100%" onclick="Actions.cancelAppointment('${a.id}')"><i class="ph ph-x"></i> Cancelar Agendamento</button>
+                </div>
+                `;
+            }
+        }
+        else if(type === 'menu_agenda_mobile') {
             html += `
             <div style="text-align: center; margin-bottom: 20px;">
                 <h3 style="margin: 0; color: var(--primary-dark);">O que deseja fazer?</h3>
@@ -1211,7 +1253,6 @@ const Actions = {
             birth_date: nasc || null
         });
         if (error) {
-            console.error('Erro ao criar cliente:', error);
             UI.toast(`Erro ao salvar cliente: ${error.message}`, 'error');
             return;
         }
@@ -1226,7 +1267,6 @@ const Actions = {
             birth_date: nasc || null
         }).eq('id', id);
         if (error) {
-            console.error('Erro ao atualizar cliente:', error);
             UI.toast(`Erro ao salvar alterações: ${error.message}`, 'error');
             return;
         }
@@ -1322,17 +1362,9 @@ const Actions = {
         const date = document.getElementById('fa-date').value;
         const user_id = document.getElementById('fa-user').value;
 
-        // Calcula o horário final baseado na duração
-        let [h, m] = time.split(':').map(Number);
-        m += dur;
-        h += Math.floor(m / 60);
-        m = m % 60;
-        const end_time = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-
         if(!encaixe) {
-            // Se NÃO está forçando encaixe, checa se tem sobreposição
             const { data: over } = await db.from('appointments')
-                .select('time, end_time, services(duration)')
+                .select('time, status, notes, services(duration)')
                 .eq('date', date)
                 .eq('user_id', user_id)
                 .neq('status', 'cancelado');
@@ -1343,24 +1375,23 @@ const Actions = {
                 const endMins = startMins + dur;
                 
                 over.forEach(a => {
-                    const [sh, sm] = (a.time||'00:00').split(':').map(Number);
+                    const [ash, asm] = (a.time||'00:00').split(':').map(Number);
+                    let aEndMins;
                     
-                    let aEndStr = a.end_time;
-                    if(!aEndStr) {
-                         let durBd = (a.services && a.services.duration) ? a.services.duration : 60;
-                         let hf = sh + Math.floor((sm + durBd)/60);
-                         let mf = (sm + durBd)%60;
-                         aEndStr = `${hf}:${mf}`;
+                    if(a.status === 'bloqueado' && a.notes && a.notes.includes('BLOQUEIO_ATE:')) {
+                        const eStr = a.notes.split('|')[0].replace('BLOQUEIO_ATE:', '').trim();
+                        aEndMins = (eStr.split(':')[0] * 60) + Number(eStr.split(':')[1]);
+                    } else {
+                        let durBd = (a.services && a.services.duration) ? a.services.duration : 60;
+                        aEndMins = (ash * 60 + asm) + durBd;
                     }
-                    const [eh, em] = aEndStr.split(':').map(Number);
-                    const aStart = sh * 60 + sm;
-                    const aEnd = eh * 60 + em;
+                    const aStartMins = ash * 60 + asm;
                     
-                    if(startMins < aEnd && endMins > aStart) temConflito = true;
+                    if(startMins < aEndMins && endMins > aStartMins) temConflito = true;
                 });
             }
             if(temConflito) {
-                UI.toast('Horário ocupado/bloqueado! Marque "Forçar Encaixe" se for um encaixe no meio de outro serviço.', 'error');
+                UI.toast('Horário ocupado/bloqueado! Marque "Forçar Encaixe" para pular a trava.', 'error');
                 return;
             }
         }
@@ -1374,8 +1405,7 @@ const Actions = {
             assistant_id: auxId || null, 
             date: date, 
             time: time, 
-            end_time: end_time, 
-            is_encaixe: encaixe, // Se a sua coluna não existir ainda no supabase vai ser ignorado/rejeitado. O Supabase ignora com preferência, se der erro é só dropar essa chave is_encaixe daqui.
+            is_encaixe: encaixe,
             status: 'agendado' 
         });
         
@@ -1391,57 +1421,69 @@ const Actions = {
 
         if (start >= end) return UI.toast('A hora de término deve ser maior que o início.', 'error');
 
-        // Checar conflito no bloqueio também
-        const { data: existing, error: errCheck } = await db.from('appointments')
-            .select('time, end_time, services(duration)')
+        const { data: over, error: errCheck } = await db.from('appointments')
+            .select('time, status, notes, services(duration)')
             .eq('date', date)
             .eq('user_id', App.user.id)
             .neq('status', 'cancelado');
             
         let temConflito = false;
-        if(existing) {
-            const [sh, sm] = start.split(':').map(Number);
-            const [eh, em] = end.split(':').map(Number);
-            const startMins = sh * 60 + sm;
-            const endMins = eh * 60 + em;
+        if(over) {
+            const startMins = (start.split(':')[0] * 60) + Number(start.split(':')[1]);
+            const endMins = (end.split(':')[0] * 60) + Number(end.split(':')[1]);
             
-            existing.forEach(a => {
+            over.forEach(a => {
                 const [ash, asm] = (a.time||'00:00').split(':').map(Number);
-                
-                let aEndStr = a.end_time;
-                if(!aEndStr) {
-                     let durBd = (a.services && a.services.duration) ? a.services.duration : 60;
-                     let hf = ash + Math.floor((asm + durBd)/60);
-                     let mf = (asm + durBd)%60;
-                     aEndStr = `${hf}:${mf}`;
+                let aEndMins;
+                if(a.status === 'bloqueado' && a.notes && a.notes.includes('BLOQUEIO_ATE:')) {
+                    const eStr = a.notes.split('|')[0].replace('BLOQUEIO_ATE:', '').trim();
+                    aEndMins = (eStr.split(':')[0] * 60) + Number(eStr.split(':')[1]);
+                } else {
+                    let durBd = (a.services && a.services.duration) ? a.services.duration : 60;
+                    aEndMins = (ash * 60 + asm) + durBd;
                 }
-                const [aeh, aem] = aEndStr.split(':').map(Number);
-                const aStart = ash * 60 + asm;
-                const aEnd = aeh * 60 + aem;
+                const aStartMins = ash * 60 + asm;
                 
-                if(startMins < aEnd && endMins > aStart) temConflito = true;
+                if(startMins < aEndMins && endMins > aStartMins) temConflito = true;
             });
         }
-        if(temConflito) return UI.toast('Conflito: Já existe cliente ou bloqueio neste horário. Cancele e tente novamente.', 'error');
+        if(temConflito) return UI.toast('Conflito: Já existe cliente ou bloqueio neste horário.', 'error');
 
         const { error: insertError } = await db.from('appointments').insert({
             user_id: App.user.id, 
             date: date, 
             time: start, 
-            end_time: end,
             status: 'bloqueado', 
-            notes: motivo 
+            notes: `BLOQUEIO_ATE:${end} | ${motivo}` 
         });
         
-        if (insertError) {
-            return UI.toast(`Erro ao salvar no banco: ${insertError.message}`, 'error');
-        }
-
-        Modals.close(); 
-        UI.toast('Horário bloqueado com sucesso!', 'success'); 
-        Render.agendaDay(); 
+        if (insertError) { return UI.toast(`Erro ao salvar no banco: ${insertError.message}`, 'error'); }
+        Modals.close(); UI.toast('Horário bloqueado com sucesso!', 'success'); Render.agendaDay(); 
     },
-    async markAsArrived(appId) { await db.from('appointments').update({ status: 'chegou' }).eq('id', appId); UI.toast('Cliente chegou!'); Render.agendaDay(); },
+    
+    async markAsArrived(appId) { 
+        await db.from('appointments').update({ status: 'chegou' }).eq('id', appId); 
+        UI.toast('Cliente chegou!'); 
+        Render.agendaDay(); 
+        const modal = document.getElementById('modal-container');
+        if (modal && !modal.classList.contains('hidden')) Modals.close();
+    },
+
+    async deleteAppointment(id) {
+        UI.confirm('Deseja realmente remover este bloqueio?', async () => {
+            const { error } = await db.from('appointments').delete().eq('id', id);
+            if (error) { UI.toast(`Erro: ${error.message}`, 'error'); return; }
+            Modals.close(); UI.toast('Bloqueio removido.'); Render.agendaDay();
+        });
+    },
+
+    async cancelAppointment(id) {
+        UI.confirm('Deseja cancelar este agendamento?', async () => {
+            const { error } = await db.from('appointments').update({ status: 'cancelado' }).eq('id', id);
+            if (error) { UI.toast(`Erro: ${error.message}`, 'error'); return; }
+            Modals.close(); UI.toast('Agendamento cancelado.'); Render.agendaDay();
+        });
+    },
 
     async createComanda(e) {
         e.preventDefault(); 
@@ -1504,14 +1546,11 @@ const Actions = {
             
             if(total > 0) { 
                 const { data: existingDebt, error: errFind } = await db.from('debts').select('*').eq('client_id', clientId).gt('remaining_amount', 0).maybeSingle();
-                if(errFind) UI.toast(`Erro ao consultar cobrança: ${errFind.message}`, 'error');
                 
                 if (existingDebt) {
-                    const { error: errUp } = await db.from('debts').update({ total_amount: existingDebt.total_amount + total, remaining_amount: existingDebt.remaining_amount + total, comanda_ticket: existingDebt.comanda_ticket + ', ' + ticketNum, created_at: dataHoraExata }).eq('id', existingDebt.id);
-                    if(errUp) UI.toast(`Erro ao atualizar cobrança: ${errUp.message}`, 'error');
+                    await db.from('debts').update({ total_amount: existingDebt.total_amount + total, remaining_amount: existingDebt.remaining_amount + total, comanda_ticket: existingDebt.comanda_ticket + ', ' + ticketNum, created_at: dataHoraExata }).eq('id', existingDebt.id);
                 } else {
-                    const { error: errIns } = await db.from('debts').insert({ client_id: clientId, total_amount: total, remaining_amount: total, comanda_ticket: ticketNum, created_at: dataHoraExata }); 
-                    if(errIns) UI.toast(`Erro ao gerar cobrança: ${errIns.message}`, 'error');
+                    await db.from('debts').insert({ client_id: clientId, total_amount: total, remaining_amount: total, comanda_ticket: ticketNum, created_at: dataHoraExata }); 
                 }
             }
             if(totalCustoFixo > 0) await db.from('despesas').insert({ description: `Custo Fixo Serviço - Ref: ${ticketNum}`, amount: totalCustoFixo, category: 'Custos Fixos', date: dataHoraExata });
@@ -1552,49 +1591,32 @@ const Actions = {
     
     async fetchBarcode(val) {
         val = (val || '').trim().replace(/\D/g, '');
-        if(val.length < 8) return UI.toast('Digite um código de barras válido (mínimo 8 dígitos).', 'warning');
-
+        if(val.length < 8) return UI.toast('Digite um código de barras válido.', 'warning');
         const inputNome = document.getElementById('fp-nome');
         inputNome.value = "Buscando nas bases online...";
         inputNome.disabled = true;
 
         const corsProxy = u => `https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`;
-
         const bases = [
             { url: `https://world.openbeautyfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
             { url: `https://world.openproductsfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
-            { url: `https://world.openfoodfacts.org/api/v2/product/${val}.json`, tipo: 'off' },
             { url: `https://api.produto.xyz/v1/gtin/${val}`, tipo: 'pxyz' },
-            { url: corsProxy(`https://api.produto.xyz/v1/gtin/${val}`), tipo: 'pxyz' },
-            { url: `https://api.upcitemdb.com/prod/trial/lookup?upc=${val}`, tipo: 'upc' },
+            { url: corsProxy(`https://api.produto.xyz/v1/gtin/${val}`), tipo: 'pxyz' }
         ];
-
         for (const base of bases) {
             try {
                 const res = await fetch(base.url);
-                if(!res.ok) { console.warn('[fetchBarcode] base retornou erro HTTP', res.status, base.url); continue; }
+                if(!res.ok) continue;
                 const json = await res.json();
-
                 if (base.tipo === 'pxyz' && json.Product && json.Product.name) {
-                    inputNome.value = json.Product.name; inputNome.disabled = false;
-                    UI.toast('Produto encontrado!', 'success'); return;
+                    inputNome.value = json.Product.name; inputNome.disabled = false; UI.toast('Produto encontrado!', 'success'); return;
                 } else if (base.tipo === 'off' && json.status === 1 && json.product) {
                     const nome = [json.product.product_name, json.product.brands].filter(Boolean).join(' - ');
-                    if (nome) {
-                        inputNome.value = nome; inputNome.disabled = false;
-                        UI.toast('Produto encontrado!', 'success'); return;
-                    }
-                } else if (base.tipo === 'upc' && json.items && json.items.length > 0) {
-                    inputNome.value = json.items[0].title; inputNome.disabled = false;
-                    UI.toast('Produto encontrado!', 'success'); return;
+                    if (nome) { inputNome.value = nome; inputNome.disabled = false; UI.toast('Encontrado!', 'success'); return; }
                 }
-            } catch(e) { console.warn('[fetchBarcode] falha ao consultar', base.url, e.message); }
+            } catch(e) {}
         }
-
-        inputNome.value = ""; 
-        inputNome.disabled = false;
-        inputNome.placeholder = "Não encontrado online. Digite o nome aqui...";
-        UI.toast('Não localizado nas bases gratuitas. Digite o nome manualmente.', 'warning');
+        inputNome.value = ""; inputNome.disabled = false; inputNome.placeholder = "Não encontrado online. Digite o nome aqui..."; UI.toast('Não localizado. Digite manualmente.', 'warning');
     },
     async saveProduct(e) { e.preventDefault(); await db.from('products').insert({ barcode: document.getElementById('fp-bar').value, name: document.getElementById('fp-nome').value, price: document.getElementById('fp-preco').value, commission: document.getElementById('fp-com').value, stock: document.getElementById('fp-qtd').value, min_stock: document.getElementById('fp-min').value }); Modals.close(); UI.toast('Produto salvo!'); Render.produtos(); },
     async updateStock(e, id, curStock) { e.preventDefault(); const v = parseInt(document.getElementById('fa-qtd').value); await db.from('products').update({stock: curStock + v}).eq('id', id); Modals.close(); UI.toast('Estoque atualizado!'); Render.produtos(); },

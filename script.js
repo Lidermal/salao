@@ -12,7 +12,7 @@ const db = window.supabase.createClient(DB_URL, DB_KEY, {
 
 const App = { 
     user: null, 
-    role: 'freelancer', 
+    role: 'colaborador', 
     view: 'agenda', 
     currentDate: new Date(), 
     charts: {}, 
@@ -272,69 +272,119 @@ const Render = {
     async agenda() {
         this.buildCalendar();
         try {
-            let query = db.from('appointments').select('*, clients(name, phone), services(name), users!user_id(name)').eq('date', U.iso(App.currentDate)).order('time', {ascending: true});
+            const dateStr = U.iso(App.currentDate);
+            let query = db.from('appointments').select('*, clients(name, phone), services(name), users!user_id(name)').eq('date', dateStr).neq('status', 'cancelado').order('time', {ascending: true});
             if (App.role !== 'owner') query = query.eq('user_id', App.user.id);
+            const { data: agData, error: errAg } = await query;
+            if(errAg) throw errAg;
 
-            const { data, error } = await query;
-            if(error) throw error;
+            let uQuery = db.from('users').select('id, name').neq('username', 'admin.teste').eq('active', true);
+            if(App.role !== 'owner') uQuery = uQuery.eq('id', App.user.id);
+            const { data: usersData } = await uQuery;
+
             const cont = document.getElementById('agenda-list');
-            if(!data || !data.length) { cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Sua agenda está livre neste dia.</p></div>`; return; }
-            
-            let groupedData = [];
-            let lastBlock = null;
+            if(!usersData || usersData.length === 0) {
+                cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Nenhum profissional encontrado.</p></div>`; return;
+            }
 
-            data.forEach(a => {
-                if (a.status === 'bloqueado') {
-                    if (lastBlock && lastBlock.user_id === a.user_id && lastBlock.notes === a.notes) {
-                        let [h, m] = a.time.split(':').map(Number);
-                        m += 30; if(m >= 60) { h+=1; m-=60; }
-                        lastBlock.endTimeDisplay = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-                    } else {
-                        let [h, m] = a.time.split(':').map(Number);
-                        m += 30; if(m >= 60) { h+=1; m-=60; }
-                        lastBlock = { ...a, isGroupedBlock: true, endTimeDisplay: `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}` };
-                        groupedData.push(lastBlock);
+            // CRIAÇÃO DA TIMELINE (Formato de Grade c/ Horários Verticais)
+            let html = `<div class="timeline-wrapper">`;
+            html += `<div class="timeline-header"><div class="time-col"></div>`;
+            usersData.forEach(u => { html += `<div class="prof-col-header">${u.name.split(' ')[0]}</div>`; });
+            html += `</div><div class="timeline-body">`;
+
+            // Horários na lateral Esquerda (De 07:00 a 21:00)
+            const horaInicio = 7;
+            const horaFim = 21;
+            html += `<div class="time-col">`;
+            for(let i=horaInicio; i<=horaFim; i++) {
+                html += `<div class="time-slot"><span>${String(i).padStart(2,'0')}:00</span></div>`;
+            }
+            html += `</div>`;
+
+            // Colunas dos profissionais e blocos
+            html += `<div class="tracks-container">`;
+            usersData.forEach(u => {
+                html += `<div class="prof-track">`;
+                
+                // Linhas de background
+                for(let i=horaInicio; i<=horaFim; i++) { html += `<div class="track-line"></div>`; }
+                
+                const userApps = (agData || []).filter(a => a.user_id === u.id);
+                userApps.forEach(a => {
+                    const [sh, sm] = (a.time||'00:00').split(':').map(Number);
+                    let endStr = a.end_time;
+                    if(!endStr) { // Fallback se não existir end_time
+                         endStr = `${String(sh+1).padStart(2,'0')}:${String(sm).padStart(2,'0')}`;
                     }
-                } else {
-                    lastBlock = null;
-                    groupedData.push(a);
-                }
-            });
+                    const [eh, em] = endStr.split(':').map(Number);
+                    
+                    const startMins = sh * 60 + sm - (horaInicio * 60);
+                    const durationMins = (eh * 60 + em) - (sh * 60 + sm);
+                    
+                    // 1 hora = 120px height -> 2px por minuto
+                    const top = startMins * 2; 
+                    const height = durationMins * 2;
 
-            cont.innerHTML = groupedData.map(a => {
-                const isBlocked = a.status === 'bloqueado';
-                const isArrived = a.status === 'chegou';
-                let statusColor = isBlocked ? '#616161' : (isArrived ? '#2e7d32' : 'var(--primary-dark)');
-                let statusBg = isBlocked ? '#e0e0e0' : (isArrived ? '#e8f5e9' : 'var(--primary-light)');
-                let borderColor = isBlocked ? '#9e9e9e' : (isArrived ? '#4caf50' : 'var(--primary)');
-                
-                const displayTime = isBlocked ? `${a.time.slice(0,5)} até ${a.endTimeDisplay}` : a.time.slice(0,5);
-                const titleText = isBlocked ? 'Horário Bloqueado' : (a.clients?.name || 'Cliente');
-                const reasonText = a.notes || 'Sem justificativa';
-                
-                return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${borderColor}; background: ${isBlocked ? '#f5f5f5' : '#fff'};">
-                    <div>
-                        <h4 style="font-size:1.2rem; color: ${isBlocked ? 'var(--muted)' : 'var(--text)'}">${displayTime} - ${titleText}</h4>
-                        ${isBlocked ? `<p style="margin:5px 0; color:var(--muted); font-style:italic;">Indisponível<br>Motivo: ${reasonText}</p>` : `<p style="margin:5px 0; color:var(--muted)">${a.services?.name || '-'}</p>`}
-                        <p style="font-size:0.8rem">Profissional: <b>${a.users?.name || '-'}</b></p>
-                        ${(!isBlocked && a.status === 'agendado') ? `
-                            <button class="btn-primary" style="padding: 5px 15px; font-size: 0.8rem; margin-top: 10px; margin-right:8px; width: auto;" onclick="Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i> Marcar como Chegou</button>
-                            <button class="btn-secondary" style="padding: 5px 15px; font-size: 0.8rem; margin-top: 10px; width: auto; background:#e8f5e9; color:#1b8a4a; border:1px solid #25D366" onclick="Actions.sendConfirmacao('${a.id}')"><i class="ph ph-whatsapp-logo"></i> Confirmar via WhatsApp</button>
-                        ` : ''}
-                    </div>
-                    <div style="background:${statusBg}; color:${statusColor}; padding:5px 12px; border-radius:20px; font-size:0.8rem; font-weight:bold; text-align:center;">${a.status.toUpperCase()}</div>
-                </div>`;
-            }).join('');
+                    const isBlocked = a.status === 'bloqueado';
+                    const isEncaixe = a.is_encaixe;
+                    
+                    let bg = isBlocked ? '#f5f5f5' : 'var(--primary-light)';
+                    let color = isBlocked ? '#616161' : 'var(--primary-dark)';
+                    let border = isBlocked ? '#9e9e9e' : 'var(--primary)';
+                    if(a.status === 'chegou') { bg = '#e8f5e9'; border = '#4caf50'; color = '#2e7d32'; }
+
+                    const wppBtn = (!isBlocked && a.status === 'agendado') ? `<button onclick="Actions.sendConfirmacao('${a.id}')"><i class="ph ph-whatsapp-logo"></i></button>` : '';
+                    const chkBtn = (!isBlocked && a.status === 'agendado') ? `<button onclick="Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i></button>` : '';
+
+                    html += `
+                    <div class="agenda-card" style="top:${top}px; height:${height}px; background:${bg}; border-left:4px solid ${border}; color:${color}; ${isEncaixe ? 'width:85%; left:10%; z-index:2; box-shadow:0 4px 12px rgba(0,0,0,0.2)' : ''}">
+                        <div class="ac-time">${a.time.slice(0,5)} - ${endStr.slice(0,5)}</div>
+                        <div class="ac-title"><i class="ph ${isBlocked ? 'ph-prohibit' : 'ph-user'}"></i> ${isBlocked ? 'Bloqueado' : (a.clients?.name || 'Cliente')}</div>
+                        ${!isBlocked ? `<div class="ac-sub">${a.services?.name || ''}</div>` : `<div class="ac-sub">${a.notes||''}</div>`}
+                        <div class="ac-actions">${chkBtn} ${wppBtn}</div>
+                    </div>`;
+                });
+                html += `</div>`;
+            });
+            html += `</div></div></div>`; // Fechamento das divs do grid
+            cont.innerHTML = html;
+
         } catch (e) { UI.toast(`Erro na agenda: ${e.message}`, 'error'); }
     },
-    buildCalendar() {
+
+    async buildCalendar() {
         const d = App.currentDate; document.getElementById('cal-month-year').textContent = d.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
         const start = new Date(d); start.setDate(d.getDate() - d.getDay());
+        
+        const firstDay = U.iso(start);
+        const endDayObj = new Date(start); endDayObj.setDate(endDayObj.getDate() + 7);
+        const endDay = U.iso(endDayObj);
+        
+        let monthApps = [];
+        try {
+            const { data } = await db.from('appointments').select('date, status').gte('date', firstDay).lte('date', endDay);
+            if(data) monthApps = data;
+        } catch(e) {}
+
         let html = ''; const days = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
         for(let i=0; i<7; i++) {
             const cur = new Date(start); cur.setDate(start.getDate() + i);
-            const isSel = U.iso(cur) === U.iso(App.currentDate) ? 'active' : '';
-            html += `<div class="cal-day ${isSel}" onclick="Render.selectDate('${U.iso(cur)}')"><span>${days[i]}</span><span>${cur.getDate()}</span></div>`;
+            const isoCur = U.iso(cur);
+            const isSel = isoCur === U.iso(App.currentDate) ? 'active' : '';
+            
+            let indicator = '';
+            const dayApps = monthApps.filter(a => a.date === isoCur);
+            if(dayApps.length > 0) {
+                const hasAgendado = dayApps.some(a => a.status === 'agendado' || a.status === 'chegou');
+                const hasBloqueado = dayApps.some(a => a.status === 'bloqueado');
+                if(hasAgendado) indicator = '<div class="cal-dot agendado"></div>';
+                else if(hasBloqueado) indicator = '<div class="cal-dot bloqueado"></div>';
+            } else {
+                indicator = '<div class="cal-dot livre"></div>';
+            }
+
+            html += `<div class="cal-day ${isSel}" onclick="Render.selectDate('${isoCur}')"><span>${days[i]}</span><span>${cur.getDate()}</span><div class="cal-dot-container">${indicator}</div></div>`;
         }
         document.getElementById('cal-days-row').innerHTML = html;
     },
@@ -469,7 +519,7 @@ const Render = {
 
     async servicos() {
         const { data } = await db.from('services').select('*').order('name');
-        document.getElementById('servicos-list').innerHTML = data.map(s => `<div class="card"><h4 style="font-size:1.2rem; border-bottom:1px solid #eee; padding-bottom:10px">${s.name}</h4><div style="margin:10px 0; color:var(--muted)"><p>Comissão: <b style="color:var(--text)">${s.commission}%</b></p>${s.has_assistant?`<p>Auxiliar: <b style="color:var(--text)">${s.assistant_commission}%</b></p>`:''}<p>Custo Fixo Lançado: <b style="color:#d32f2f">${U.money(s.cost)}</b></p></div><div class="val" style="font-size:1.5rem">${U.money(s.price)}</div></div>`).join('');
+        document.getElementById('servicos-list').innerHTML = data.map(s => `<div class="card"><h4 style="font-size:1.2rem; border-bottom:1px solid #eee; padding-bottom:10px">${s.name} <span style="font-size:0.8rem; font-weight:normal; color:#888;">(${s.duration || 60}min)</span></h4><div style="margin:10px 0; color:var(--muted)"><p>Comissão: <b style="color:var(--text)">${s.commission}%</b></p>${s.has_assistant?`<p>Auxiliar: <b style="color:var(--text)">${s.assistant_commission}%</b></p>`:''}<p>Custo Fixo Lançado: <b style="color:#d32f2f">${U.money(s.cost)}</b></p></div><div class="val" style="font-size:1.5rem">${U.money(s.price)}</div></div>`).join('');
     },
     async produtos() {
         const { data } = await db.from('products').select('*').order('name');
@@ -872,8 +922,8 @@ const Modals = {
             }
         }
         else if(type === 'agendamento') {
-            const [c, s, u] = await Promise.all([db.from('clients').select('id,name').order('name'), db.from('services').select('id,name,price,has_assistant'), db.from('users').select('id,name').neq('username', 'admin.teste')]);
-            const sOpts = s.data.map(x => `<option value="${x.id}" data-aux="${x.has_assistant}">${x.name}</option>`).join('');
+            const [c, s, u] = await Promise.all([db.from('clients').select('id,name').order('name'), db.from('services').select('id,name,price,has_assistant,duration'), db.from('users').select('id,name').neq('username', 'admin.teste').eq('active', true)]);
+            const sOpts = s.data.map(x => `<option value="${x.id}" data-aux="${x.has_assistant}" data-dur="${x.duration || 60}">${x.name} (${x.duration||60}min)</option>`).join('');
             html += `
             <div style="text-align: center; margin-bottom: 20px;">
                 <h3 style="margin: 0; color: var(--primary-dark);">Novo Agendamento</h3>
@@ -883,6 +933,13 @@ const Modals = {
                 <div class="input-group"><label style="margin-bottom: 5px;">Serviço Desejado</label><select id="fa-serv" required onchange="document.getElementById('aux-div').style.display = this.options[this.selectedIndex].dataset.aux==='true'?'block':'none'" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);"><option value="">-- Escolha o serviço --</option>${sOpts}</select></div>
                 <div class="input-group"><label style="margin-bottom: 5px;">Profissional</label><select id="fa-user" required style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);"><option value="">-- Atendente Principal --</option>${u.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select></div>
                 <div class="input-group" id="aux-div" style="display:none"><label style="margin-bottom: 5px;">Auxiliar (Opcional)</label><select id="fa-aux" style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);"><option value="">-- Selecione caso precise --</option>${u.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select></div>
+                
+                <div class="input-group" style="background:#fff3e0; padding:10px; border-radius:8px; border:1px solid #ffb74d;">
+                    <label style="display:flex; align-items:center; gap:10px; margin:0; color:#e65100; cursor:pointer;">
+                        <input type="checkbox" id="fa-encaixe" style="width:20px; height:20px;"> Forçar Encaixe (Ignora horário ocupado)
+                    </label>
+                </div>
+
                 <div style="display:flex; gap:10px; margin-bottom: 20px;">
                     <div style="flex:1"><label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:5px;">Data</label><input type="date" id="fa-date" required style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);"></div>
                     <div style="flex:1"><label style="display:block; font-size:0.85rem; font-weight:700; margin-bottom:5px;">Horário</label><input type="time" id="fa-time" required style="width:100%; padding:12px; border-radius:8px; border:1px solid var(--border);"></div>
@@ -917,7 +974,7 @@ const Modals = {
             html += `<h3>Cadastrar Serviço</h3><form onsubmit="Actions.createService(event)">
                 <div class="input-group"><label>Nome</label><input type="text" id="fs-nome" required></div>
                 <div style="display:flex; gap:10px;"><div class="input-group" style="flex:1"><label>Valor Final (R$)</label><input type="number" id="fs-valor" step="0.01" required></div><div class="input-group" style="flex:1"><label>Custo Fixo (R$)</label><input type="number" id="fs-custo" step="0.01" required></div></div>
-                <div class="input-group"><label>Comissão do Profissional (%)</label><input type="number" id="fs-com" max="100" required></div>
+                <div style="display:flex; gap:10px;"><div class="input-group" style="flex:1"><label>Duração Média (minutos)</label><input type="number" id="fs-duracao" placeholder="Ex: 60" required></div><div class="input-group" style="flex:1"><label>Comissão do Profissional (%)</label><input type="number" id="fs-com" max="100" required></div></div>
                 <div class="input-group" style="background:#f9f9f9; padding:15px; border-radius:12px"><label style="display:flex; align-items:center; gap:10px; cursor:pointer; margin:0"><input type="checkbox" id="fs-aux" onchange="document.getElementById('aux-com-div').style.display=this.checked?'block':'none'" style="width:20px; height:20px"> Com Auxiliar?</label></div>
                 <div class="input-group" id="aux-com-div" style="display:none; margin-top:15px"><label>Comissão Auxiliar (%)</label><input type="number" id="fs-auxcom" max="100"></div>
                 <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar</button></form>`;
@@ -987,12 +1044,12 @@ const Modals = {
                 <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar Alterações</button></form>`;
         }
         else if(type === 'funcionario' || type === 'edit_funcionario') {
-            let f = { name: '', role: 'freelancer', active: true };
+            let f = { name: '', role: 'colaborador', active: true };
             if(param1) { const { data } = await db.from('users').select('*').eq('id', param1).single(); f = data; }
             
             html += `<h3>${param1 ? 'Editar Colaborador' : 'Novo Colaborador'}</h3><form onsubmit="Actions.saveFuncionario(event, '${param1 || ''}')">
-                <div class="input-group"><label>Nome Completo</label><input type="text" id="ff-nome" value="${f.name}" required style="padding:1.2rem; border-radius:8px"></div>
-                <div class="input-group"><label>Nível de Acesso</label><select id="ff-role" required style="padding:1.2rem; border-radius:8px"><option value="freelancer" ${f.role==='freelancer'?'selected':''}>Freelancer (Colaborador)</option><option value="owner" ${f.role==='owner'?'selected':''}>Proprietário (Acesso Total)</option></select></div>
+                <div class="input-group"><label>Nome Completo (Para Login vai gerar o ex: fulano.silva)</label><input type="text" id="ff-nome" value="${f.name}" required style="padding:1.2rem; border-radius:8px"></div>
+                <div class="input-group"><label>Nível de Acesso</label><select id="ff-role" required style="padding:1.2rem; border-radius:8px"><option value="colaborador" ${f.role==='colaborador'||f.role==='freelancer'?'selected':''}>Colaborador (Mesmo acesso Freelancer)</option><option value="owner" ${f.role==='owner'?'selected':''}>Proprietário (Acesso Total)</option></select></div>
                 ${param1 ? `
                     <div class="input-group" style="background:#f9f9f9; padding:15px; border-radius:12px">
                         <label style="display:flex; align-items:center; gap:10px; cursor:pointer; margin:0"><input type="checkbox" id="ff-ativo" ${f.active !== false ? 'checked' : ''} style="width:20px; height:20px"> Conta Ativa e Permitida Logar</label>
@@ -1170,16 +1227,25 @@ const Actions = {
 
     async saveFuncionario(e, id) {
         e.preventDefault();
-        const nome = document.getElementById('ff-nome').value;
+        const nomeStr = document.getElementById('ff-nome').value.toLowerCase().trim();
+        const palavras = nomeStr.split(/\s+/);
+        const ignorar = ['de', 'da', 'do', 'dos', 'das'];
+        const primeiro = palavras[0];
+        let sobrenome = '';
+        for(let i=1; i<palavras.length; i++){
+            if(!ignorar.includes(palavras[i])) { sobrenome = palavras[i]; break; }
+        }
+        
+        const username = `${primeiro}${sobrenome ? '.'+sobrenome : ''}`.replace(/[^a-z0-9.]/g, '');
+        const nomeDisplay = document.getElementById('ff-nome').value.trim();
         const role = document.getElementById('ff-role').value;
-        const username = nome.toLowerCase().trim().replace(/\s+/g, '.').replace(/[^a-z0-9.]/g, '');
         
         if(id) {
             const ativo = document.getElementById('ff-ativo').checked;
-            await db.from('users').update({ name: nome, role: role, active: ativo }).eq('id', id);
+            await db.from('users').update({ name: nomeDisplay, role: role, active: ativo }).eq('id', id);
             Modals.close(); UI.toast('Colaborador atualizado!'); Render.funcionarios();
         } else {
-            const { error } = await db.from('users').insert({ name: nome, username: username, password: '123456', role: role, first_login: true, active: true });
+            const { error } = await db.from('users').insert({ name: nomeDisplay, username: username, password: '123456', role: role, first_login: true, active: true });
             if(error) return UI.toast('Erro ao criar usuário.', 'error');
             UI.confirm(`Colaborador criado!\nUsuário: ${username}\nSenha Temp: 123456`, () => { Modals.close(); Render.funcionarios(); });
         }
@@ -1203,10 +1269,49 @@ const Actions = {
     },
 
     async createAppointment(e) {
-        e.preventDefault(); const auxId = document.getElementById('fa-aux').value;
-        await db.from('appointments').insert({ client_id: document.getElementById('fa-cli').value, service_id: document.getElementById('fa-serv').value, user_id: document.getElementById('fa-user').value, assistant_id: auxId || null, date: document.getElementById('fa-date').value, time: document.getElementById('fa-time').value, status: 'agendado' });
+        e.preventDefault(); 
+        
+        const servSel = document.getElementById('fa-serv');
+        const opt = servSel.options[servSel.selectedIndex];
+        const dur = parseInt(opt.dataset.dur || 60);
+        const encaixe = document.getElementById('fa-encaixe').checked;
+        const time = document.getElementById('fa-time').value;
+        const date = document.getElementById('fa-date').value;
+        const user_id = document.getElementById('fa-user').value;
+
+        let [h, m] = time.split(':').map(Number);
+        m += dur;
+        h += Math.floor(m / 60);
+        m = m % 60;
+        const end_time = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
+
+        if(!encaixe) {
+            const { data: over } = await db.from('appointments')
+                .select('time, end_time')
+                .eq('date', date)
+                .eq('user_id', user_id)
+                .neq('status', 'cancelado');
+            
+            let temConflito = false;
+            if(over) {
+                const startMins = h * 60 + (m - dur); // recupera original
+                const endMins = h * 60 + m;
+                over.forEach(a => {
+                    const [sh, sm] = (a.time||'00:00').split(':').map(Number);
+                    const [eh, em] = (a.end_time||a.time).split(':').map(Number);
+                    const aStart = sh * 60 + sm;
+                    const aEnd = eh * 60 + em;
+                    if(startMins < aEnd && endMins > aStart) temConflito = true;
+                });
+            }
+            if(temConflito) return UI.toast('Horário ocupado/bloqueado! Marque "Forçar Encaixe" se for um encaixe no meio de outro serviço.', 'error');
+        }
+
+        const auxId = document.getElementById('fa-aux').value;
+        await db.from('appointments').insert({ client_id: document.getElementById('fa-cli').value, service_id: servSel.value, user_id: user_id, assistant_id: auxId || null, date: date, time: time, end_time: end_time, is_encaixe: encaixe, status: 'agendado' });
         Modals.close(); UI.toast('Horário salvo!'); Render.agenda(); 
     },
+    
     async blockAppointment(e) {
         e.preventDefault();
         const date = document.getElementById('fb-date').value; 
@@ -1216,52 +1321,42 @@ const Actions = {
 
         if (start >= end) return UI.toast('A hora de término deve ser maior que o início.', 'error');
 
-        // 1. Verifica se já existe agendamento no meio desse horário
         const { data: existing, error: errCheck } = await db.from('appointments')
-            .select('time')
+            .select('time, end_time')
             .eq('date', date)
-            .gte('time', start)
-            .lt('time', end)
-            .neq('status', 'cancelado'); // Ignora os cancelados
-
-        if (errCheck) return UI.toast(`Falha ao checar agenda: ${errCheck.message}`, 'error');
-        if (existing && existing.length > 0) return UI.toast('Conflito: Já existe cliente ou bloqueio neste horário.', 'error');
-
-        // 2. Calcula os blocos de forma matemática (segura para Mobile/iOS, sem bugar a hora)
-        let [startH, startM] = start.split(':').map(Number);
-        let [endH, endM] = end.split(':').map(Number);
-        
-        let currentMin = (startH * 60) + startM;
-        let finalMin = (endH * 60) + endM;
-        
-        const inserts = [];
-
-        while(currentMin < finalMin) { 
-            let h = Math.floor(currentMin / 60);
-            let m = currentMin % 60;
-            // Formata sempre para o padrão de banco de dados (ex: 09:30, 14:00)
-            let timeStr = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-
-            inserts.push({ 
-                user_id: App.user.id, 
-                date: date, 
-                time: timeStr, 
-                status: 'bloqueado', 
-                notes: motivo 
-            }); 
+            .eq('user_id', App.user.id)
+            .neq('status', 'cancelado');
             
-            currentMin += 30; // Avança de 30 em 30 minutos
+        let temConflito = false;
+        if(existing) {
+            const [sh, sm] = start.split(':').map(Number);
+            const [eh, em] = end.split(':').map(Number);
+            const startMins = sh * 60 + sm;
+            const endMins = eh * 60 + em;
+            existing.forEach(a => {
+                const [ash, asm] = (a.time||'00:00').split(':').map(Number);
+                const [aeh, aem] = (a.end_time||a.time).split(':').map(Number);
+                const aStart = ash * 60 + asm;
+                const aEnd = aeh * 60 + aem;
+                if(startMins < aEnd && endMins > aStart) temConflito = true;
+            });
         }
+        if(temConflito) return UI.toast('Conflito: Já existe cliente ou bloqueio neste horário. Cancele e tente novamente.', 'error');
 
-        // 3. Salva no banco e escuta se deu algum erro de tabela
-        const { error: insertError } = await db.from('appointments').insert(inserts);
+        const { error: insertError } = await db.from('appointments').insert({
+            user_id: App.user.id, 
+            date: date, 
+            time: start, 
+            end_time: end,
+            status: 'bloqueado', 
+            notes: motivo 
+        });
         
         if (insertError) {
             console.error("Erro Supabase:", insertError);
             return UI.toast(`Erro ao salvar no banco: ${insertError.message}`, 'error');
         }
 
-        // 4. Sucesso!
         Modals.close(); 
         UI.toast('Horário bloqueado com sucesso!', 'success'); 
         Render.agenda(); 
@@ -1364,7 +1459,15 @@ const Actions = {
 
     async createService(e) {
         e.preventDefault(); const aux = document.getElementById('fs-aux').checked;
-        await db.from('services').insert({ name: document.getElementById('fs-nome').value, price: document.getElementById('fs-valor').value, cost: document.getElementById('fs-custo').value, commission: document.getElementById('fs-com').value, has_assistant: aux, assistant_commission: aux ? document.getElementById('fs-auxcom').value : 0 }); Modals.close(); UI.toast('Serviço adicionado!'); Render.servicos();
+        await db.from('services').insert({ 
+            name: document.getElementById('fs-nome').value, 
+            price: document.getElementById('fs-valor').value, 
+            cost: document.getElementById('fs-custo').value, 
+            commission: document.getElementById('fs-com').value, 
+            duration: document.getElementById('fs-duracao').value,
+            has_assistant: aux, 
+            assistant_commission: aux ? document.getElementById('fs-auxcom').value : 0 
+        }); Modals.close(); UI.toast('Serviço adicionado!'); Render.servicos();
     },
     
     async fetchBarcode(val) {

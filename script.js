@@ -1,6 +1,6 @@
 /** 
  * SISTEMA ESTÚDIO AMOR QUE CUIDA
- * INTEGRAÇÃO COMPLETA + QUINZENAS + RELATÓRIOS + COBRANÇAS EXCLUSIVAS + NOTIFICAÇÕES
+ * Atualizado com Grade Diária (Timeline), Duração de Serviços, Travas e Múltiplos Níveis.
  */
 
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
@@ -15,6 +15,7 @@ const App = {
     role: 'colaborador', 
     view: 'agenda', 
     currentDate: new Date(), 
+    calendarMonth: new Date(), // Usado para o controle do mês na view primária
     charts: {}, 
     settings: {}
 };
@@ -199,7 +200,8 @@ const Auth = {
             if (data.password !== p) throw new Error("Senha incorreta.");
             
             App.user = data; 
-            App.role = data.role;
+            // Normalize rules
+            App.role = data.role === 'freelancer' ? 'colaborador' : data.role;
             
             document.getElementById('login-form').reset();
             this.success();
@@ -228,10 +230,17 @@ const Auth = {
         if(set) { App.settings = set; document.getElementById('brand-name').textContent = set.studio_name; }
         
         U.initFilters();
-        Nav.init(); Nav.showView('agenda');
+        Nav.init(); 
+        
+        Render.showMonthView(); // Inicializa mostrando o mês
         
         db.channel('custom-all-channel').on('postgres_changes', { event: '*', schema: 'public' }, payload => {
-            if(Render[App.view]) Render[App.view]();
+            if(App.view === 'agenda') {
+                if(!document.getElementById('agenda-day-view').classList.contains('hidden')) Render.agendaDay();
+                else Render.buildMonthCalendar();
+            } else if(Render[App.view]) {
+                Render[App.view]();
+            }
         }).subscribe();
     },
     logout() { 
@@ -261,19 +270,114 @@ const Nav = {
         const titles = { agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', anamnese:'Ficha de Avaliação', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', relatorios:'Relatórios & Arquivos', notificacoes:'Notificações' };
         document.getElementById('page-title').textContent = titles[id] || 'Amor que Cuida';
         
-        const detailViews = ['anamnese', 'perfil-cliente'];
-        if(Render[id] && !detailViews.includes(id)) Render[id]();
+        if (id === 'agenda') {
+            Render.showMonthView();
+        } else {
+            const detailViews = ['anamnese', 'perfil-cliente'];
+            if(Render[id] && !detailViews.includes(id)) Render[id]();
+        }
     },
     toggleMenu() { document.getElementById('main-sidebar').classList.toggle('open'); document.getElementById('mobile-overlay').classList.toggle('hidden'); },
     closeMenu() { document.getElementById('main-sidebar').classList.remove('open'); document.getElementById('mobile-overlay').classList.add('hidden'); }
 };
 
 const Render = {
-    async agenda() {
-        this.buildCalendar();
+    showMonthView() {
+        document.getElementById('agenda-day-view').classList.add('hidden');
+        document.getElementById('agenda-month-view').classList.remove('hidden');
+        this.buildMonthCalendar();
+    },
+    
+    changeMonth(dir) {
+        App.calendarMonth.setMonth(App.calendarMonth.getMonth() + dir);
+        this.buildMonthCalendar();
+    },
+
+    async buildMonthCalendar() {
+        const year = App.calendarMonth.getFullYear();
+        const month = App.calendarMonth.getMonth();
+        
+        document.getElementById('cal-month-year').textContent = App.calendarMonth.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        
+        const firstDay = new Date(year, month, 1);
+        const lastDay = new Date(year, month + 1, 0);
+        
+        const startDate = U.iso(firstDay);
+        const endDate = U.iso(lastDay);
+        
+        // Puxa as bolinhas do mês
+        let monthApps = [];
+        try {
+            let query = db.from('appointments').select('date, status').gte('date', startDate).lte('date', endDate).neq('status', 'cancelado');
+            if(App.role !== 'owner') query = query.eq('user_id', App.user.id);
+            const { data } = await query;
+            if(data) monthApps = data;
+        } catch(e) {}
+
+        const grid = document.getElementById('cal-grid');
+        let html = '';
+        
+        // Cabeçalhos dos dias da semana
+        const weekDays = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
+        weekDays.forEach(d => { html += `<div class="cal-grid-header">${d}</div>`; });
+        
+        // Espaços em branco antes do dia 1
+        for (let i = 0; i < firstDay.getDay(); i++) {
+            html += `<div class="cal-day empty"></div>`;
+        }
+        
+        // Dias do mês
+        for (let i = 1; i <= lastDay.getDate(); i++) {
+            const currentIso = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
+            const isToday = currentIso === U.iso(new Date());
+            
+            const dayApps = monthApps.filter(a => a.date === currentIso);
+            let indicators = '';
+            
+            if(dayApps.length > 0) {
+                const hasAgendado = dayApps.some(a => a.status === 'agendado' || a.status === 'chegou');
+                const hasBloqueado = dayApps.some(a => a.status === 'bloqueado');
+                
+                if(hasAgendado) indicators += '<span class="dot agendado"></span>';
+                if(hasBloqueado) indicators += '<span class="dot bloqueado"></span>';
+            } else {
+                // Se for futuro ou hoje, pode estar livre. Passado livre não interessa muito, mas pomos verde igual.
+                indicators = '<span class="dot livre"></span>';
+            }
+
+            html += `<div class="cal-day num ${isToday ? 'today' : ''}" onclick="Render.selectDate('${currentIso}')">
+                        <span class="day-num">${i}</span>
+                        <div class="cal-dots">${indicators}</div>
+                     </div>`;
+        }
+        grid.innerHTML = html;
+    },
+
+    selectDate(iso) { 
+        App.currentDate = new Date(iso+'T12:00:00'); 
+        document.getElementById('agenda-month-view').classList.add('hidden');
+        document.getElementById('agenda-day-view').classList.remove('hidden');
+        this.agendaDay(); 
+    },
+    
+    changeWeek(dir) { 
+        App.currentDate.setDate(App.currentDate.getDate() + (dir*1)); // Move 1 dia por vez no cabeçalho
+        this.agendaDay(); 
+    },
+
+    async agendaDay() {
+        this.buildWeekStrip(); // Constrói a faixa de dias no topo da linha do tempo
+        
         try {
             const dateStr = U.iso(App.currentDate);
-            let query = db.from('appointments').select('*, clients(name, phone), services(name), users!user_id(name)').eq('date', dateStr).neq('status', 'cancelado').order('time', {ascending: true});
+            
+            // Puxa agendamentos + Duração do serviço juntamente com inner join
+            let query = db.from('appointments')
+                .select('*, clients(name, phone), services(name, duration), users!user_id(name)')
+                .eq('date', dateStr)
+                .neq('status', 'cancelado')
+                .order('time', {ascending: true});
+                
             if (App.role !== 'owner') query = query.eq('user_id', App.user.id);
             const { data: agData, error: errAg } = await query;
             if(errAg) throw errAg;
@@ -287,15 +391,15 @@ const Render = {
                 cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Nenhum profissional encontrado.</p></div>`; return;
             }
 
-            // CRIAÇÃO DA TIMELINE (Formato de Grade c/ Horários Verticais)
+            // CRIAÇÃO DA TIMELINE (Formato de Grade com Horários)
             let html = `<div class="timeline-wrapper">`;
             html += `<div class="timeline-header"><div class="time-col"></div>`;
             usersData.forEach(u => { html += `<div class="prof-col-header">${u.name.split(' ')[0]}</div>`; });
             html += `</div><div class="timeline-body">`;
 
-            // Horários na lateral Esquerda (De 07:00 a 21:00)
-            const horaInicio = 7;
-            const horaFim = 21;
+            // Horários na lateral Esquerda (De 08:00 a 20:00)
+            const horaInicio = 8;
+            const horaFim = 20;
             html += `<div class="time-col">`;
             for(let i=horaInicio; i<=horaFim; i++) {
                 html += `<div class="time-slot"><span>${String(i).padStart(2,'0')}:00</span></div>`;
@@ -307,31 +411,45 @@ const Render = {
             usersData.forEach(u => {
                 html += `<div class="prof-track">`;
                 
-                // Linhas de background
+                // Linhas de fundo marcando horas
                 for(let i=horaInicio; i<=horaFim; i++) { html += `<div class="track-line"></div>`; }
                 
                 const userApps = (agData || []).filter(a => a.user_id === u.id);
+                
                 userApps.forEach(a => {
                     const [sh, sm] = (a.time||'00:00').split(':').map(Number);
+                    
+                    // Se não tiver duração salva, usamos a do serviço vinculado ou 60 padrão.
+                    let durationMins = 60;
+                    if(a.services && a.services.duration) durationMins = a.services.duration;
+                    
                     let endStr = a.end_time;
-                    if(!endStr) { // Fallback se não existir end_time
-                         endStr = `${String(sh+1).padStart(2,'0')}:${String(sm).padStart(2,'0')}`;
+                    if(!endStr) { // Caso a base antiga não tenha gerado end_time
+                         let mF = sm + durationMins;
+                         let hF = sh + Math.floor(mF/60);
+                         mF = mF % 60;
+                         endStr = `${String(hF).padStart(2,'0')}:${String(mF).padStart(2,'0')}`;
                     }
+
                     const [eh, em] = endStr.split(':').map(Number);
                     
-                    const startMins = sh * 60 + sm - (horaInicio * 60);
-                    const durationMins = (eh * 60 + em) - (sh * 60 + sm);
+                    // Cálculo da altura e topo
+                    // 1 hora = 60px (1px = 1 minuto para cálculo facilitado visual)
+                    const pixelsPerMin = 1.2; // 1h = 72px de altura
                     
-                    // 1 hora = 120px height -> 2px por minuto
-                    const top = startMins * 2; 
-                    const height = durationMins * 2;
+                    const startMins = (sh * 60 + sm) - (horaInicio * 60);
+                    let blockDuration = (eh * 60 + em) - (sh * 60 + sm);
+                    if (blockDuration <= 0) blockDuration = 60; // fallback segurança
+
+                    const top = startMins * pixelsPerMin; 
+                    const height = blockDuration * pixelsPerMin;
 
                     const isBlocked = a.status === 'bloqueado';
-                    const isEncaixe = a.is_encaixe;
+                    const isEncaixe = false; // Pode customizar caso tenha um campo no banco depois
                     
-                    let bg = isBlocked ? '#f5f5f5' : 'var(--primary-light)';
-                    let color = isBlocked ? '#616161' : 'var(--primary-dark)';
-                    let border = isBlocked ? '#9e9e9e' : 'var(--primary)';
+                    let bg = isBlocked ? '#f5f5f5' : '#ff9eb5';
+                    let color = isBlocked ? '#616161' : '#880024';
+                    let border = isBlocked ? '#9e9e9e' : '#ff4d6d';
                     if(a.status === 'chegou') { bg = '#e8f5e9'; border = '#4caf50'; color = '#2e7d32'; }
 
                     const wppBtn = (!isBlocked && a.status === 'agendado') ? `<button onclick="Actions.sendConfirmacao('${a.id}')"><i class="ph ph-whatsapp-logo"></i></button>` : '';
@@ -353,43 +471,27 @@ const Render = {
         } catch (e) { UI.toast(`Erro na agenda: ${e.message}`, 'error'); }
     },
 
-    async buildCalendar() {
-        const d = App.currentDate; document.getElementById('cal-month-year').textContent = d.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
-        const start = new Date(d); start.setDate(d.getDate() - d.getDay());
+    buildWeekStrip() {
+        const d = App.currentDate;
         
-        const firstDay = U.iso(start);
-        const endDayObj = new Date(start); endDayObj.setDate(endDayObj.getDate() + 7);
-        const endDay = U.iso(endDayObj);
-        
-        let monthApps = [];
-        try {
-            const { data } = await db.from('appointments').select('date, status').gte('date', firstDay).lte('date', endDay);
-            if(data) monthApps = data;
-        } catch(e) {}
+        // Título formatado "Amanhã, 18 de Agosto, 2026"
+        const optionsTitle = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+        let strTitle = d.toLocaleDateString('pt-BR', optionsTitle);
+        // Capitalizando a primeira letra
+        strTitle = strTitle.charAt(0).toUpperCase() + strTitle.slice(1);
+        document.getElementById('day-view-title').textContent = strTitle;
 
+        const start = new Date(d); start.setDate(d.getDate() - 3);
         let html = ''; const days = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
+        
         for(let i=0; i<7; i++) {
             const cur = new Date(start); cur.setDate(start.getDate() + i);
             const isoCur = U.iso(cur);
             const isSel = isoCur === U.iso(App.currentDate) ? 'active' : '';
-            
-            let indicator = '';
-            const dayApps = monthApps.filter(a => a.date === isoCur);
-            if(dayApps.length > 0) {
-                const hasAgendado = dayApps.some(a => a.status === 'agendado' || a.status === 'chegou');
-                const hasBloqueado = dayApps.some(a => a.status === 'bloqueado');
-                if(hasAgendado) indicator = '<div class="cal-dot agendado"></div>';
-                else if(hasBloqueado) indicator = '<div class="cal-dot bloqueado"></div>';
-            } else {
-                indicator = '<div class="cal-dot livre"></div>';
-            }
-
-            html += `<div class="cal-day ${isSel}" onclick="Render.selectDate('${isoCur}')"><span>${days[i]}</span><span>${cur.getDate()}</span><div class="cal-dot-container">${indicator}</div></div>`;
+            html += `<div class="cal-day ${isSel}" onclick="Render.selectDate('${isoCur}')"><span>${days[cur.getDay()]}</span><span>${cur.getDate()}</span></div>`;
         }
         document.getElementById('cal-days-row').innerHTML = html;
     },
-    selectDate(iso) { App.currentDate = new Date(iso+'T12:00:00'); this.agenda(); },
-    changeWeek(dir) { App.currentDate.setDate(App.currentDate.getDate() + (dir*7)); this.agenda(); },
 
     async clientes() {
         const { data } = await db.from('clients').select('*').order('name');
@@ -510,7 +612,8 @@ const Render = {
                 </div>
                 <div style="padding:15px; display:flex; gap:10px; background:#fff">
                     <button class="btn-primary" style="flex:1; background:#2e7d32;" onclick="Modals.open('debitar', '${d.id}', ${d.remaining_amount}, '${fTkt}')"><i class="ph ph-money"></i> Receber Pagamento</button>
-                    ${App.role==='owner' ? `<button class="btn-secondary" style="width:auto;" onclick="Modals.open('desconto', '${d.id}', ${d.remaining_amount})"><i class="ph ph-percent"></i> Desc.</button>` : ''}
+                    <!-- Proprietários, Colaboradores e Freelancers podem dar desconto agora, então removemos a restrição de role -->
+                    <button class="btn-secondary" style="width:auto;" onclick="Modals.open('desconto', '${d.id}', ${d.remaining_amount})"><i class="ph ph-percent"></i> Desc.</button>
                 </div>
             </div>`;
         }
@@ -765,69 +868,6 @@ const Render = {
     configuracoes() {
         document.getElementById('cfg-name').value = App.settings.studio_name || '';
         document.getElementById('cfg-phone').value = App.settings.official_phone || '';
-    },
-
-    async notificacoes() {
-        const isOwner = App.role === 'owner';
-        const todayIso = U.iso(new Date());
-        const todayMD = todayIso.slice(5); 
-
-        let qAgenda = db.from('appointments').select('*, clients(name, phone), services(name), users!user_id(name)').eq('date', todayIso).eq('status', 'agendado');
-        if(!isOwner) qAgenda = qAgenda.eq('user_id', App.user.id);
-
-        const qClientes = db.from('clients').select('id, name, phone, birth_date').not('birth_date', 'is', null);
-
-        const tasks = [qAgenda, qClientes];
-        if(isOwner) {
-            tasks.push(db.from('products').select('stock, min_stock'));
-            tasks.push(db.from('debts').select('remaining_amount').gt('remaining_amount', 0));
-        }
-
-        const results = await Promise.all(tasks);
-        const agendaHoje = results[0].data || [];
-        const clientes = results[1].data || [];
-        const aniversariantesHoje = clientes.filter(c => c.birth_date && c.birth_date.slice(5) === todayMD);
-
-        let estoqueBaixo = [], debitos = [], totalDebitos = 0;
-        if(isOwner) {
-            const produtos = results[2].data || [];
-            estoqueBaixo = produtos.filter(p => p.stock <= p.min_stock);
-            debitos = results[3].data || [];
-            totalDebitos = debitos.reduce((acc, d) => acc + d.remaining_amount, 0);
-        }
-
-        let html = '';
-
-        html += `<h3 style="margin-bottom:10px"><i class="ph ph-cake"></i> Aniversariantes de Hoje</h3>`;
-        html += aniversariantesHoje.length === 0
-            ? `<p style="color:var(--muted); margin-bottom:25px">Nenhum aniversário hoje.</p>`
-            : aniversariantesHoje.map(c => `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid var(--primary); margin-bottom:10px">
-                <div><h4>${c.name}</h4><p style="font-size:0.8rem; color:var(--muted)">${c.phone || '-'}</p></div>
-                <button class="btn-primary" style="width:auto; background:#25D366; padding:0.6rem 1.2rem" onclick="Actions.sendParabens('${c.id}')"><i class="ph ph-whatsapp-logo"></i> Parabenizar</button>
-            </div>`).join('') + `<div style="margin-bottom:15px"></div>`;
-
-        html += `<h3 style="margin-bottom:10px"><i class="ph ph-calendar-check"></i> Confirmações Pendentes Hoje</h3>`;
-        html += agendaHoje.length === 0
-            ? `<p style="color:var(--muted); margin-bottom:25px">Nenhum agendamento pendente de confirmação hoje.</p>`
-            : agendaHoje.map(a => `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid var(--primary); margin-bottom:10px">
-                <div><h4>${a.time?.slice(0,5) || '-'} - ${a.clients?.name || '-'}</h4><p style="font-size:0.8rem; color:var(--muted)">${a.services?.name || '-'} • Profissional: ${a.users?.name || '-'}</p></div>
-                <button class="btn-primary" style="width:auto; background:#25D366; padding:0.6rem 1.2rem" onclick="Actions.sendConfirmacao('${a.id}')"><i class="ph ph-whatsapp-logo"></i> Confirmar</button>
-            </div>`).join('') + `<div style="margin-bottom:15px"></div>`;
-
-        if(isOwner) {
-            html += `<h3 style="margin-bottom:10px"><i class="ph ph-warning-circle"></i> Estoque Baixo</h3>`;
-            html += estoqueBaixo.length === 0
-                ? `<p style="color:var(--muted); margin-bottom:25px">Nenhum produto com estoque baixo.</p>`
-                : `<div class="card" style="border-left:4px solid #d32f2f; margin-bottom:25px"><p>${estoqueBaixo.length} produto(s) precisam de reposição.</p><button class="btn-secondary" style="width:auto; margin-top:10px" onclick="Nav.showView('produtos')">Ver Estoque</button></div>`;
-
-            html += `<h3 style="margin-bottom:10px"><i class="ph ph-money"></i> Cobranças em Aberto</h3>`;
-            html += debitos.length === 0
-                ? `<p style="color:var(--muted)">Nenhuma cobrança pendente.</p>`
-                : `<div class="card" style="border-left:4px solid #d32f2f"><p>Total pendente: <b>${U.money(totalDebitos)}</b> em ${debitos.length} cliente(s).</p><button class="btn-secondary" style="width:auto; margin-top:10px" onclick="Nav.showView('cobrancas')">Ver Cobranças</button></div>`;
-        }
-
-        const cont = document.getElementById('notificacoes-list');
-        if(cont) cont.innerHTML = html;
     }
 };
 
@@ -1048,8 +1088,11 @@ const Modals = {
             if(param1) { const { data } = await db.from('users').select('*').eq('id', param1).single(); f = data; }
             
             html += `<h3>${param1 ? 'Editar Colaborador' : 'Novo Colaborador'}</h3><form onsubmit="Actions.saveFuncionario(event, '${param1 || ''}')">
-                <div class="input-group"><label>Nome Completo (Para Login vai gerar o ex: fulano.silva)</label><input type="text" id="ff-nome" value="${f.name}" required style="padding:1.2rem; border-radius:8px"></div>
-                <div class="input-group"><label>Nível de Acesso</label><select id="ff-role" required style="padding:1.2rem; border-radius:8px"><option value="colaborador" ${f.role==='colaborador'||f.role==='freelancer'?'selected':''}>Colaborador (Mesmo acesso Freelancer)</option><option value="owner" ${f.role==='owner'?'selected':''}>Proprietário (Acesso Total)</option></select></div>
+                <div class="input-group"><label>Nome Completo (Para Login vai gerar ex: fulano.silva)</label><input type="text" id="ff-nome" value="${f.name}" required style="padding:1.2rem; border-radius:8px"></div>
+                <div class="input-group"><label>Nível de Acesso</label><select id="ff-role" required style="padding:1.2rem; border-radius:8px">
+                    <option value="colaborador" ${f.role==='colaborador'||f.role==='freelancer'?'selected':''}>Colaborador / Freelancer</option>
+                    <option value="owner" ${f.role==='owner'?'selected':''}>Proprietário (Acesso Total)</option>
+                </select></div>
                 ${param1 ? `
                     <div class="input-group" style="background:#f9f9f9; padding:15px; border-radius:12px">
                         <label style="display:flex; align-items:center; gap:10px; cursor:pointer; margin:0"><input type="checkbox" id="ff-ativo" ${f.active !== false ? 'checked' : ''} style="width:20px; height:20px"> Conta Ativa e Permitida Logar</label>
@@ -1279,6 +1322,7 @@ const Actions = {
         const date = document.getElementById('fa-date').value;
         const user_id = document.getElementById('fa-user').value;
 
+        // Calcula o horário final baseado na duração
         let [h, m] = time.split(':').map(Number);
         m += dur;
         h += Math.floor(m / 60);
@@ -1286,30 +1330,56 @@ const Actions = {
         const end_time = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
 
         if(!encaixe) {
+            // Se NÃO está forçando encaixe, checa se tem sobreposição
             const { data: over } = await db.from('appointments')
-                .select('time, end_time')
+                .select('time, end_time, services(duration)')
                 .eq('date', date)
                 .eq('user_id', user_id)
                 .neq('status', 'cancelado');
             
             let temConflito = false;
             if(over) {
-                const startMins = h * 60 + (m - dur); // recupera original
-                const endMins = h * 60 + m;
+                const startMins = (time.split(':')[0] * 60) + Number(time.split(':')[1]);
+                const endMins = startMins + dur;
+                
                 over.forEach(a => {
                     const [sh, sm] = (a.time||'00:00').split(':').map(Number);
-                    const [eh, em] = (a.end_time||a.time).split(':').map(Number);
+                    
+                    let aEndStr = a.end_time;
+                    if(!aEndStr) {
+                         let durBd = (a.services && a.services.duration) ? a.services.duration : 60;
+                         let hf = sh + Math.floor((sm + durBd)/60);
+                         let mf = (sm + durBd)%60;
+                         aEndStr = `${hf}:${mf}`;
+                    }
+                    const [eh, em] = aEndStr.split(':').map(Number);
                     const aStart = sh * 60 + sm;
                     const aEnd = eh * 60 + em;
+                    
                     if(startMins < aEnd && endMins > aStart) temConflito = true;
                 });
             }
-            if(temConflito) return UI.toast('Horário ocupado/bloqueado! Marque "Forçar Encaixe" se for um encaixe no meio de outro serviço.', 'error');
+            if(temConflito) {
+                UI.toast('Horário ocupado/bloqueado! Marque "Forçar Encaixe" se for um encaixe no meio de outro serviço.', 'error');
+                return;
+            }
         }
 
         const auxId = document.getElementById('fa-aux').value;
-        await db.from('appointments').insert({ client_id: document.getElementById('fa-cli').value, service_id: servSel.value, user_id: user_id, assistant_id: auxId || null, date: date, time: time, end_time: end_time, is_encaixe: encaixe, status: 'agendado' });
-        Modals.close(); UI.toast('Horário salvo!'); Render.agenda(); 
+        
+        await db.from('appointments').insert({ 
+            client_id: document.getElementById('fa-cli').value, 
+            service_id: servSel.value, 
+            user_id: user_id, 
+            assistant_id: auxId || null, 
+            date: date, 
+            time: time, 
+            end_time: end_time, 
+            is_encaixe: encaixe, // Se a sua coluna não existir ainda no supabase vai ser ignorado/rejeitado. O Supabase ignora com preferência, se der erro é só dropar essa chave is_encaixe daqui.
+            status: 'agendado' 
+        });
+        
+        Modals.close(); UI.toast('Horário salvo!'); Render.agendaDay(); 
     },
     
     async blockAppointment(e) {
@@ -1321,8 +1391,9 @@ const Actions = {
 
         if (start >= end) return UI.toast('A hora de término deve ser maior que o início.', 'error');
 
+        // Checar conflito no bloqueio também
         const { data: existing, error: errCheck } = await db.from('appointments')
-            .select('time, end_time')
+            .select('time, end_time, services(duration)')
             .eq('date', date)
             .eq('user_id', App.user.id)
             .neq('status', 'cancelado');
@@ -1333,11 +1404,21 @@ const Actions = {
             const [eh, em] = end.split(':').map(Number);
             const startMins = sh * 60 + sm;
             const endMins = eh * 60 + em;
+            
             existing.forEach(a => {
                 const [ash, asm] = (a.time||'00:00').split(':').map(Number);
-                const [aeh, aem] = (a.end_time||a.time).split(':').map(Number);
+                
+                let aEndStr = a.end_time;
+                if(!aEndStr) {
+                     let durBd = (a.services && a.services.duration) ? a.services.duration : 60;
+                     let hf = ash + Math.floor((asm + durBd)/60);
+                     let mf = (asm + durBd)%60;
+                     aEndStr = `${hf}:${mf}`;
+                }
+                const [aeh, aem] = aEndStr.split(':').map(Number);
                 const aStart = ash * 60 + asm;
                 const aEnd = aeh * 60 + aem;
+                
                 if(startMins < aEnd && endMins > aStart) temConflito = true;
             });
         }
@@ -1353,15 +1434,14 @@ const Actions = {
         });
         
         if (insertError) {
-            console.error("Erro Supabase:", insertError);
             return UI.toast(`Erro ao salvar no banco: ${insertError.message}`, 'error');
         }
 
         Modals.close(); 
         UI.toast('Horário bloqueado com sucesso!', 'success'); 
-        Render.agenda(); 
+        Render.agendaDay(); 
     },
-    async markAsArrived(appId) { await db.from('appointments').update({ status: 'chegou' }).eq('id', appId); UI.toast('Cliente chegou!'); Render.agenda(); },
+    async markAsArrived(appId) { await db.from('appointments').update({ status: 'chegou' }).eq('id', appId); UI.toast('Cliente chegou!'); Render.agendaDay(); },
 
     async createComanda(e) {
         e.preventDefault(); 

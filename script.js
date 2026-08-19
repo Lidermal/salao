@@ -122,84 +122,6 @@ const U = {
         });
     }
 };
-    fillTemplate(text, vars) {
-        let out = text || '';
-        Object.keys(vars || {}).forEach(k => {
-            if (k.startsWith('_')) return;
-            out = out.split(`{${k}}`).join(vars[k] ?? '');
-        });
-        return out;
-    },
-    
-    getCurrentQuinzenaValue() {
-        let curr = new Date();
-        let m = String(curr.getMonth() + 1).padStart(2, '0');
-        let y = curr.getFullYear();
-        let q = curr.getDate() <= 15 ? 'Q1' : 'Q2';
-        return `${y}-${m}-${q}`;
-    },
-    
-    generateQuinzenasOptions() {
-        let html = ''; let curr = new Date();
-        for(let i=0; i<8; i++) {
-            let d = new Date(curr.getFullYear(), curr.getMonth() - Math.floor(i/2), 1);
-            let m = String(d.getMonth() + 1).padStart(2, '0');
-            let y = d.getFullYear();
-            let mName = d.toLocaleString('pt-BR', {month:'long'});
-            let q = (i % 2 === 0) ? 'Q2' : 'Q1';
-            if(i === 0 && curr.getDate() <= 15) continue;
-            html += `<option value="${y}-${m}-${q}">${q === 'Q1' ? '1ª' : '2ª'} Quinzena (${mName}/${y})</option>`;
-        }
-        return html;
-    },
-    
-    getQuinzenaDates(val) {
-        if(!val) return { start: '1970-01-01T00:00:00Z', end: '2099-12-31T23:59:59Z' };
-        const [y, m, q] = val.split('-');
-        const lastDay = new Date(y, m, 0).getDate();
-        if (q === 'Q1') return { start: `${y}-${m}-01T00:00:00Z`, end: `${y}-${m}-15T23:59:59Z` };
-        return { start: `${y}-${m}-16T00:00:00Z`, end: `${y}-${m}-${lastDay}T23:59:59Z` };
-    },
-
-    buildExtrato(desp) {
-        let extrato = [];
-        let totalIn = 0, totalOut = 0;
-
-        (desp || []).forEach(d => {
-            const isIncome = App.inflowCategories.includes(d.category);
-            const item = {
-                type: isIncome ? 'in' : 'out',
-                desc: d.description,
-                val: d.amount,
-                date: new Date(d.date),
-                category: d.category
-            };
-            if(isIncome) totalIn += d.amount;
-            else totalOut += d.amount;
-            extrato.push(item);
-        });
-
-        extrato.sort((a, b) => a.date - b.date);
-        
-        let saldoAtual = 0;
-        extrato = extrato.map(item => {
-            saldoAtual += item.type === 'in' ? item.val : -item.val;
-            return { ...item, saldo: saldoAtual };
-        });
-        
-        extrato.reverse();
-        return { extrato, totalIn, totalOut };
-    },
-
-    /* FUNÇÃO AUXILIAR PARA QUEBRAR A LINHA DO CLIENTE NO EXTRATO */
-    formatDesc: (text) => {
-        if(text.includes('| Cliente:')) {
-            const parts = text.split('| Cliente:');
-            return `${parts[0].trim()}<br><span style="font-size:0.85rem; color:var(--muted); font-weight:normal; margin-top:3px; display:inline-block"><i class="ph ph-user"></i> Cliente: ${parts[1].trim()}</span>`;
-        }
-        return text;
-    }
-};
 
 const UI = {
     toast(msg, type='success') {
@@ -263,7 +185,7 @@ const Tour = {
             document.getElementById('tour-desc').textContent = s.text;
             document.getElementById('tour-dots').innerHTML = this.steps.map((_, i) => `<span style="height:8px; width:8px; border-radius:50%; background:${i===this.current?'var(--primary)':'#ccc'}"></span>`).join('');
             document.getElementById('tour-next-btn').innerHTML = this.current === this.steps.length - 1 ? 'Concluir <i class="ph ph-check"></i>' : 'Próximo <i class="ph ph-arrow-right"></i>';
-        }, 300); // tempo para o dom atualizar a view
+        }, 300); 
     },
     positionDialog(targetEl) {
         const dialog = document.getElementById('tour-dialog');
@@ -274,7 +196,7 @@ const Tour = {
         
         if (window.innerWidth < 900) { left = 20; } 
         else if (left + 350 > window.innerWidth) { left = window.innerWidth - 370; }
-        if (top + 200 > window.innerHeight) { top = rect.top - 210; } // se estourar a tela embaixo, joga pra cima
+        if (top + 200 > window.innerHeight) { top = rect.top - 210; } 
         
         dialog.style.top = `${top}px`;
         dialog.style.left = `${left}px`;

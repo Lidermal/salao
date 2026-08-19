@@ -1,6 +1,5 @@
 /** 
  * SISTEMA ESTÚDIO AMOR QUE CUIDA
- * Lógica Completa com Pagamentos Híbridos, Custo em %, Soft Delete e Tour Guiado
  */
 
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
@@ -24,7 +23,9 @@ const App = {
 const U = {
     money: v => new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'}).format(v||0),
     iso: d => { const tzOffset = d.getTimezoneOffset() * 60000; return (new Date(d.getTime() - tzOffset)).toISOString().split('T')[0]; },
-    date: d => new Date(d).toLocaleDateString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}),
+    
+    /* GERA A DATA E A HORA EXATAS PARA O EXTRATO */
+    date: d => new Date(d).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}),
 
     fillTemplate(text, vars) {
         let out = text || '';
@@ -129,30 +130,62 @@ const UI = {
     }
 };
 
+/* LOGICA APRIMORADA DO NOVO TOUR COM HOLOFOTE */
 const Tour = {
     steps: [
-        { view: 'agenda', text: 'Aqui é o coração do estúdio. Arraste as datas, veja os horários agendados e bloqueie intervalos caso precise ausentar-se.' },
-        { view: 'comandas', text: 'Sempre que o cliente chegar, abra uma comanda. Você associa os serviços e o profissional. Fechar a comanda contabiliza os custos na hora!' },
-        { view: 'cobrancas', text: 'Aqui ficam os tickets a receber. Você pode dar descontos ou aceitar pagamentos mistos (ex: R$50 Pix e R$50 Dinheiro) na mesma fatura.' },
-        { view: 'clientes', text: 'Guarde informações valiosas. Crie fichas de anamnese e acompanhe de perto o histórico e o aniversário de cada um.' },
-        { view: 'comissao', text: 'Dashboard 100% automático. Fechou a comanda, o sistema já calcula e separa a comissão do profissional baseado no catálogo.' }
+        { view: 'agenda', target: '#btn-novo-agendamento-tour', title: '1. Sua Agenda', text: 'Aqui você adiciona novos horários na semana e gerencia o dia a dia da equipe. Clicando aqui a comanda AINDA não é criada, é apenas uma reserva.' },
+        { view: 'comandas', target: '#btn-nova-comanda-tour', title: '2. Abrir Comanda', text: 'Quando o cliente sentar na cadeira, crie a comanda! É nela que você lançará os serviços, os produtos utilizados e escolherá o Profissional para dar a comissão.' },
+        { view: 'cobrancas', target: '#tab-pendentes-tour', title: '3. Faturar e Receber', text: 'Depois que a comanda for finalizada, ela vira um Ticket Pendente. Clicando aqui, você informa se o cliente pagou e lança os valores fracionados em Pix, Cartão ou Dinheiro.' },
+        { view: 'comissao', target: '#comissao-dashboard-tour', title: '4. Comissionamento', text: 'Esqueça os cálculos manuais! O sistema puxa os valores percentuais e já separa exatamente quanto cada profissional fez no mês ou na quinzena.' },
+        { view: 'resumo-financeiro', target: '#extrato-caixa-tour', title: '5. Extrato Completo', text: 'No fluxo de caixa, este extrato mostra a Data e a Hora em que o dinheiro entrou, descontando na mesma hora o custo fixo do estúdio. Tudo transparente!' }
     ],
     current: 0,
     start() {
         this.current = 0;
         document.getElementById('tour-overlay').classList.remove('hidden');
+        if(window.innerWidth > 900) { document.getElementById('main-sidebar').classList.add('open'); }
         this.showStep();
     },
     showStep() {
         if(this.current >= this.steps.length) return this.skip();
         const s = this.steps[this.current];
+        
         Nav.showView(s.view);
-        document.getElementById('tour-desc').textContent = s.text;
-        document.getElementById('tour-dots').innerHTML = this.steps.map((_, i) => `<span style="height:8px; width:8px; border-radius:50%; background:${i===this.current?'var(--primary)':'#ccc'}"></span>`).join('');
-        document.getElementById('tour-next-btn').innerHTML = this.current === this.steps.length - 1 ? 'Finalizar Tour <i class="ph ph-check"></i>' : 'Próximo <i class="ph ph-arrow-right"></i>';
+        document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+        
+        setTimeout(() => {
+            const targetEl = document.querySelector(s.target);
+            if(targetEl) {
+                targetEl.classList.add('tour-highlight');
+                this.positionDialog(targetEl);
+            }
+            
+            document.getElementById('tour-title').textContent = s.title;
+            document.getElementById('tour-desc').textContent = s.text;
+            document.getElementById('tour-dots').innerHTML = this.steps.map((_, i) => `<span style="height:8px; width:8px; border-radius:50%; background:${i===this.current?'var(--primary)':'#ccc'}"></span>`).join('');
+            document.getElementById('tour-next-btn').innerHTML = this.current === this.steps.length - 1 ? 'Concluir <i class="ph ph-check"></i>' : 'Próximo <i class="ph ph-arrow-right"></i>';
+        }, 100);
+    },
+    positionDialog(targetEl) {
+        const dialog = document.getElementById('tour-dialog');
+        const rect = targetEl.getBoundingClientRect();
+        
+        let top = rect.bottom + 15;
+        let left = rect.left;
+        
+        if (window.innerWidth < 900) { left = 20; } 
+        else if (left + 350 > window.innerWidth) { left = window.innerWidth - 370; }
+        if (top + 200 > window.innerHeight) { top = rect.top - 210; }
+        
+        dialog.style.top = `${top}px`;
+        dialog.style.left = `${left}px`;
     },
     next() { this.current++; this.showStep(); },
-    skip() { document.getElementById('tour-overlay').classList.add('hidden'); localStorage.setItem('aqc_tour_done', 'true'); }
+    skip() { 
+        document.getElementById('tour-overlay').classList.add('hidden'); 
+        document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+        localStorage.setItem('aqc_tour_done', 'true'); 
+    }
 };
 
 const Auth = {
@@ -178,7 +211,7 @@ const Auth = {
 
             if(data.first_login || p === '123456') { 
                 setTimeout(() => { Modals.open('first_login'); }, 500);
-            } else if (!localStorage.getItem('aqc_tour_done')) {
+            } else if (!localStorage.getItem('aqc_tour_done') && App.role === 'owner') {
                 setTimeout(() => { Tour.start(); }, 1000);
             }
             
@@ -233,7 +266,7 @@ const Nav = {
         else {
             const detailViews = ['anamnese', 'perfil-cliente'];
             if(Render[id] && !detailViews.includes(id)) {
-                if(id === 'cobrancas') Render.cobrancas('pendentes'); // Default Tab
+                if(id === 'cobrancas') Render.cobrancas('pendentes');
                 else Render[id]();
             }
         }
@@ -435,7 +468,7 @@ const Render = {
         list.innerHTML = comandas.map(c => {
             const itens = (c.items||[]).map(i => i.name).join(', ');
             return `<div class="card" style="margin-bottom:10px;">
-                <h4 style="color:var(--primary-dark); font-size:1.1rem; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;"><i class="ph ph-calendar"></i> ${new Date(c.created_at).toLocaleDateString()}</h4>
+                <h4 style="color:var(--primary-dark); font-size:1.1rem; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;"><i class="ph ph-calendar"></i> ${U.date(c.created_at)}</h4>
                 <p style="margin-bottom:5px;"><b>Ticket Associado:</b> ${c.ticket || 'S/N'}</p>
                 <p style="margin-bottom:5px;"><b>Profissional Responsável:</b> ${c.users?.name || 'Não informado'}</p>
                 <p style="margin-bottom:5px;"><b>Serviços/Produtos:</b> ${itens || 'Nenhum detalhe salvo'}</p>
@@ -445,8 +478,8 @@ const Render = {
     },
 
     async cobrancas(tab = 'pendentes') {
-        document.getElementById('tab-pendentes').classList.toggle('active-tab', tab === 'pendentes');
-        document.getElementById('tab-pendentes').style.border = tab === 'pendentes' ? 'none' : '1px solid transparent';
+        document.getElementById('tab-pendentes-tour').classList.toggle('active-tab', tab === 'pendentes');
+        document.getElementById('tab-pendentes-tour').style.border = tab === 'pendentes' ? 'none' : '1px solid transparent';
         document.getElementById('tab-pagos').classList.toggle('active-tab', tab === 'pagos');
         document.getElementById('tab-pagos').style.border = tab === 'pagos' ? 'none' : '1px solid transparent';
         
@@ -468,7 +501,7 @@ const Render = {
             let htmlList = ''; let profsEnvolvidos = [];
             if(relatedComandas) {
                 relatedComandas.forEach(rc => {
-                    const dt = new Date(rc.created_at).toLocaleDateString();
+                    const dt = U.date(rc.created_at);
                     if(rc.users?.name && !profsEnvolvidos.includes(rc.users.name)) profsEnvolvidos.push(rc.users.name);
                     if(rc.items) {
                         htmlList += `<div style="font-size:0.75rem; color:#666; margin-top:10px; border-bottom:1px dashed #ccc; padding-bottom:3px;">Comanda Origem: ${rc.ticket} (${dt})</div>`;
@@ -635,7 +668,7 @@ const Render = {
                 let color = '#d32f2f';
                 if(d.category === 'Comissões') color = '#cd7f32'; else if(d.category === 'Pessoal/Pagamentos') color = '#8e24aa'; else if(d.category === 'Custos Variáveis') color = '#e65100';
                 return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${color}">
-                    <div><h4>${d.description}</h4><p style="font-size:0.8rem; color:var(--muted)">${d.category} • ${new Date(d.date).toLocaleString('pt-BR')}</p></div>
+                    <div><h4>${d.description}</h4><p style="font-size:0.8rem; color:var(--muted)">${d.category} • ${U.date(d.date)}</p></div>
                     <div class="val" style="color:${color}">-${U.money(d.amount)}</div>
                 </div>`;
             }).join('');
@@ -679,7 +712,7 @@ const Render = {
         } else {
             html = `<div class="card" style="margin-bottom:20px; background:var(--primary); color:white; padding:2rem"><h4 style="color:white; font-weight:400">Minha Comissão Total</h4><div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div></div><div class="data-list">` + html + `</div>`;
         }
-        document.getElementById('comissao-dashboard').innerHTML = html;
+        document.getElementById('comissao-dashboard-tour').innerHTML = html;
     },
     
     async 'resumo-financeiro'() {
@@ -709,7 +742,7 @@ const Render = {
                 <div style="flex:1">
                     <b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Saída'} - ${i.category}</b>
                     <p style="margin-top:5px; font-weight:600; font-size:1.1rem">${i.desc}</p>
-                    <span style="font-size:0.8rem; color:var(--muted)">${i.date.toLocaleString('pt-BR')}</span>
+                    <span style="font-size:0.8rem; color:var(--muted)"><i class="ph ph-clock"></i> ${U.date(i.date)}</span>
                 </div>
                 <div style="text-align:right">
                     <span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.3rem; display:block">${i.type==='in'?'+':'-'} ${U.money(i.val)}</span>
@@ -728,7 +761,7 @@ const Render = {
 
         let htmlDesp = '';
         if(despesasOnly.length === 0) { htmlDesp = '<p style="color:var(--muted); text-align:center;">Sem gastos registrados.</p>'; }
-        else { htmlDesp = despesasOnly.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${d.description}</b><br><span style="font-size:0.8rem; color:#888">${new Date(d.date).toLocaleString('pt-BR')} - ${d.category}</span></div><div style="color:#d32f2f; font-weight:bold">-${U.money(d.amount)}</div></div>`).join(''); }
+        else { htmlDesp = despesasOnly.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${d.description}</b><br><span style="font-size:0.8rem; color:#888"><i class="ph ph-clock"></i> ${U.date(d.date)} - ${d.category}</span></div><div style="color:#d32f2f; font-weight:bold">-${U.money(d.amount)}</div></div>`).join(''); }
         
         document.getElementById('relatorio-despesas-conteudo').innerHTML = htmlDesp;
         window.currentDespesasData = despesasOnly;
@@ -737,7 +770,7 @@ const Render = {
         if(extrato.length === 0) { htmlFluxo = '<p style="color:var(--muted); text-align:center;">Nenhuma movimentação.</p>'; }
         else {
             htmlFluxo += `<div style="background:#f9f9f9; padding:15px; border-radius:8px; display:flex; justify-content:space-around; margin-bottom:15px;"><div>Entradas: <b style="color:#2e7d32">${U.money(totalIn)}</b></div><div>Saídas: <b style="color:#d32f2f">-${U.money(totalOut)}</b></div><div>Líquido: <b style="color:${(totalIn-totalOut)>=0?'#2e7d32':'#d32f2f'}">${U.money(totalIn-totalOut)}</b></div></div>`;
-            htmlFluxo += extrato.map(i => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}">${i.type==='in'?'[+]':'[-]'}</b> ${i.desc}<br><span style="font-size:0.8rem; color:#888">${i.date.toLocaleString('pt-BR')}</span></div><div style="text-align:right"><b>${U.money(i.val)}</b><br><span style="font-size:0.75rem; color:#666">Caixa: ${U.money(i.saldo)}</span></div></div>`).join('');
+            htmlFluxo += extrato.map(i => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}">${i.type==='in'?'[+]':'[-]'}</b> ${i.desc}<br><span style="font-size:0.8rem; color:#888"><i class="ph ph-clock"></i> ${U.date(i.date)}</span></div><div style="text-align:right"><b>${U.money(i.val)}</b><br><span style="font-size:0.75rem; color:#666">Caixa: ${U.money(i.saldo)}</span></div></div>`).join('');
         }
         document.getElementById('relatorio-fluxo-conteudo').innerHTML = htmlFluxo;
         window.currentFluxoData = extrato; window.currentTotaisFluxo = { receita: totalIn, gasto: totalOut, lucro: totalIn - totalOut };
@@ -992,16 +1025,16 @@ const Actions = {
         if (viewType === 'despesas') {
             doc.text(`Relatório de Despesas`, 105, 30, null, null, "center");
             if(!window.currentDespesasData || window.currentDespesasData.length === 0) return UI.toast('Sem dados.', 'warning');
-            const rows = window.currentDespesasData.map(d => [ new Date(d.date).toLocaleString('pt-BR'), d.category, d.description, U.money(d.amount) ]);
-            doc.autoTable({ startY: 45, head: [['Data', 'Categoria', 'Descrição', 'Valor (R$)']], body: rows, theme: 'striped', headStyles: { fillColor: [183, 110, 121] } });
+            const rows = window.currentDespesasData.map(d => [ U.date(d.date), d.category, d.description, U.money(d.amount) ]);
+            doc.autoTable({ startY: 45, head: [['Data/Hora', 'Categoria', 'Descrição', 'Valor (R$)']], body: rows, theme: 'striped', headStyles: { fillColor: [183, 110, 121] } });
             doc.save(`AQC_Despesas_${quinzenaStr}.pdf`);
         } else if (viewType === 'fluxo') {
             doc.text(`Relatório de Fluxo de Caixa`, 105, 30, null, null, "center");
             if(!window.currentFluxoData || window.currentFluxoData.length === 0) return UI.toast('Sem dados.', 'warning');
             const r = window.currentTotaisFluxo; doc.setFontSize(10);
             doc.text(`Entradas: ${U.money(r.receita)}   |   Saídas: ${U.money(r.gasto)}   |   Líquido: ${U.money(r.lucro)}`, 105, 45, null, null, "center");
-            const rows = window.currentFluxoData.map(d => [ d.date.toLocaleString('pt-BR'), d.type === 'in' ? 'Entrada' : 'Saída', d.desc, U.money(d.val), U.money(d.saldo) ]);
-            doc.autoTable({ startY: 55, head: [['Data', 'Tipo', 'Descrição', 'Valor', 'Caixa']], body: rows, theme: 'striped', headStyles: { fillColor: [183, 110, 121] } });
+            const rows = window.currentFluxoData.map(d => [ U.date(d.date), d.type === 'in' ? 'Entrada' : 'Saída', d.desc, U.money(d.val), U.money(d.saldo) ]);
+            doc.autoTable({ startY: 55, head: [['Data/Hora', 'Tipo', 'Descrição', 'Valor', 'Caixa']], body: rows, theme: 'striped', headStyles: { fillColor: [183, 110, 121] } });
             doc.save(`AQC_Fluxo_${quinzenaStr}.pdf`);
         }
     },
@@ -1011,7 +1044,7 @@ const Actions = {
         if(newPass.length < 3) return UI.toast('Senha muito curta.', 'error');
         await db.from('users').update({ password: newPass, first_login: false }).eq('id', App.user.id);
         App.user.first_login = false; Modals.close(); UI.toast('Senha salva!');
-        if (!localStorage.getItem('aqc_tour_done')) setTimeout(() => { Tour.start(); }, 500);
+        if (!localStorage.getItem('aqc_tour_done') && App.role === 'owner') setTimeout(() => { Tour.start(); }, 500);
     },
 
     applyTemplate(templateId) {
@@ -1044,7 +1077,7 @@ const Actions = {
         const div = document.getElementById('anamnese-history-list');
         const { data } = await db.from('anamnesis').select('*, users!user_id(name)').eq('client_id', id).order('created_at', {ascending: false});
         if(!data || !data.length) return div.innerHTML = "<p style='color:var(--muted); text-align:center; padding:2rem'>Nenhum registro clínico.</p>";
-        div.innerHTML = data.map(d => `<div class="card" style="border-left: 4px solid var(--primary); background:#fffafb"><h4 style="font-size:0.9rem; color:var(--muted); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px"><i class="ph ph-calendar-blank"></i> ${new Date(d.created_at).toLocaleString('pt-BR')} &nbsp;•&nbsp; <i class="ph ph-user"></i> Prof: ${d.users?.name || 'N/A'}</h4><p style="margin-bottom:8px"><b>Histórico:</b> ${d.history}</p><p style="margin-bottom:8px"><b>Hábitos:</b> ${d.habits}</p><p style="margin-bottom:8px"><b>Objetivo:</b> ${d.objectives}</p><p style="padding:15px; background:white; border:1px solid #eee; border-radius:12px; margin-top:15px"><b style="color:var(--primary-dark)">Diagnóstico:</b><br>${d.notes}</p></div>`).join('');
+        div.innerHTML = data.map(d => `<div class="card" style="border-left: 4px solid var(--primary); background:#fffafb"><h4 style="font-size:0.9rem; color:var(--muted); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px"><i class="ph ph-calendar-blank"></i> ${U.date(d.created_at)} &nbsp;•&nbsp; <i class="ph ph-user"></i> Prof: ${d.users?.name || 'N/A'}</h4><p style="margin-bottom:8px"><b>Histórico:</b> ${d.history}</p><p style="margin-bottom:8px"><b>Hábitos:</b> ${d.habits}</p><p style="margin-bottom:8px"><b>Objetivo:</b> ${d.objectives}</p><p style="padding:15px; background:white; border:1px solid #eee; border-radius:12px; margin-top:15px"><b style="color:var(--primary-dark)">Diagnóstico:</b><br>${d.notes}</p></div>`).join('');
     },
 
     async saveFuncionario(e, id) {

@@ -95,15 +95,19 @@ h1, h2, h3 { font-family: 'Playfair Display', serif; color: var(--primary-dark);
 .modal { background: var(--surface); padding: 2rem; border-radius: var(--radius); width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow); position: relative; }
 .modal-close { position: absolute; top: 1.5rem; right: 1.5rem; background: var(--bg); border: none; width: 35px; height: 35px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; z-index:10;}
 
-/* CLASSE QUE DESTACA O ITEM DURANTE O TOUR (EFEITO HOLOFOTE) */
+/* FIX DO TOUR (SEM FUNDO BRANCO E CLICÁVEL) */
 .tour-highlight {
     position: relative !important;
     z-index: 9999999 !important;
-    box-shadow: 0 0 0 6px rgba(183, 110, 121, 0.4), 0 0 30px rgba(0,0,0,0.4) !important;
-    background: var(--surface) !important;
-    border-radius: 12px;
-    pointer-events: none;
+    box-shadow: 0 0 0 6px rgba(183, 110, 121, 0.4) !important;
+    border-radius: inherit;
     transition: all 0.3s ease;
+}
+#tour-overlay {
+    pointer-events: none; /* Deixa você clicar nas coisas por baixo se precisar */
+}
+#tour-dialog {
+    pointer-events: auto; /* Garante que os botões do balãozinho sejam clicáveis */
 }
 
 .desktop-only { display: block; } .bottom-nav, .mobile-only { display: none; }

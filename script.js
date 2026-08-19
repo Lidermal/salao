@@ -24,8 +24,13 @@ const U = {
     money: v => new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'}).format(v||0),
     iso: d => { const tzOffset = d.getTimezoneOffset() * 60000; return (new Date(d.getTime() - tzOffset)).toISOString().split('T')[0]; },
     
-    /* GERA A DATA E A HORA EXATAS PARA O EXTRATO */
-    date: d => new Date(d).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'}),
+    /* BLINDAGEM DA DATA: Força a leitura do horário exato salvo para o extrato */
+    date: d => {
+        if(!d) return '';
+        let dateObj = new Date(d);
+        if(d.length === 10) dateObj = new Date(d + 'T12:00:00'); // Evita bugs caso o BD ainda esteja mandando só o dia
+        return dateObj.toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
+    },
 
     fillTemplate(text, vars) {
         let out = text || '';
@@ -66,11 +71,6 @@ const U = {
         return { start: `${y}-${m}-16T00:00:00Z`, end: `${y}-${m}-${lastDay}T23:59:59Z` };
     },
 
-    initFilters() {
-        const opts = this.generateQuinzenasOptions();
-        document.querySelectorAll('.quinzena-select').forEach(sel => { sel.innerHTML = opts; sel.value = this.getCurrentQuinzenaValue(); });
-    },
-
     buildExtrato(desp) {
         let extrato = [];
         let totalIn = 0, totalOut = 0;
@@ -99,6 +99,15 @@ const U = {
         
         extrato.reverse();
         return { extrato, totalIn, totalOut };
+    },
+
+    /* FUNÇÃO AUXILIAR PARA QUEBRAR A LINHA DO CLIENTE NO EXTRATO */
+    formatDesc: (text) => {
+        if(text.includes('| Cliente:')) {
+            const parts = text.split('| Cliente:');
+            return `${parts[0].trim()}<br><span style="font-size:0.85rem; color:var(--muted); font-weight:normal; margin-top:3px; display:inline-block"><i class="ph ph-user"></i> Cliente: ${parts[1].trim()}</span>`;
+        }
+        return text;
     }
 };
 
@@ -130,14 +139,14 @@ const UI = {
     }
 };
 
-/* LOGICA APRIMORADA DO NOVO TOUR COM HOLOFOTE */
+/* TOUR REFORMULADO (SEM TRAVAR) */
 const Tour = {
     steps: [
-        { view: 'agenda', target: '#btn-novo-agendamento-tour', title: '1. Sua Agenda', text: 'Aqui você adiciona novos horários na semana e gerencia o dia a dia da equipe. Clicando aqui a comanda AINDA não é criada, é apenas uma reserva.' },
-        { view: 'comandas', target: '#btn-nova-comanda-tour', title: '2. Abrir Comanda', text: 'Quando o cliente sentar na cadeira, crie a comanda! É nela que você lançará os serviços, os produtos utilizados e escolherá o Profissional para dar a comissão.' },
-        { view: 'cobrancas', target: '#tab-pendentes-tour', title: '3. Faturar e Receber', text: 'Depois que a comanda for finalizada, ela vira um Ticket Pendente. Clicando aqui, você informa se o cliente pagou e lança os valores fracionados em Pix, Cartão ou Dinheiro.' },
-        { view: 'comissao', target: '#comissao-dashboard-tour', title: '4. Comissionamento', text: 'Esqueça os cálculos manuais! O sistema puxa os valores percentuais e já separa exatamente quanto cada profissional fez no mês ou na quinzena.' },
-        { view: 'resumo-financeiro', target: '#extrato-caixa-tour', title: '5. Extrato Completo', text: 'No fluxo de caixa, este extrato mostra a Data e a Hora em que o dinheiro entrou, descontando na mesma hora o custo fixo do estúdio. Tudo transparente!' }
+        { view: 'agenda', target: '#btn-novo-agendamento-tour', title: '1. Agendar Cliente', text: 'Clique aqui para reservar um horário. Isso NÃO gera custos ainda, apenas reserva a agenda do profissional.' },
+        { view: 'comandas', target: '#btn-nova-comanda-tour', title: '2. Abrir Comanda', text: 'Quando o cliente chegar, abra a comanda! É aqui que você adiciona os serviços feitos e vincula o profissional para a comissão.' },
+        { view: 'cobrancas', target: '#tab-pendentes-tour', title: '3. Faturar Ticket', text: 'Comandas fechadas viram faturas aqui. Clique em "Receber" para dar baixa e lançar os valores recebidos via Pix, Dinheiro ou Cartão.' },
+        { view: 'comissao', target: '#comissao-dashboard-tour', title: '4. Comissões Automáticas', text: 'Aqui você visualiza quanto cada profissional rendeu na quinzena baseando-se nos fechamentos das comandas.' },
+        { view: 'resumo-financeiro', target: '#extrato-caixa-tour', title: '5. Extrato de Caixa', text: 'Acompanhe todas as entradas e saídas do estúdio em tempo real, com a data, hora exata e o cliente vinculado a cada operação.' }
     ],
     current: 0,
     start() {
@@ -164,7 +173,7 @@ const Tour = {
             document.getElementById('tour-desc').textContent = s.text;
             document.getElementById('tour-dots').innerHTML = this.steps.map((_, i) => `<span style="height:8px; width:8px; border-radius:50%; background:${i===this.current?'var(--primary)':'#ccc'}"></span>`).join('');
             document.getElementById('tour-next-btn').innerHTML = this.current === this.steps.length - 1 ? 'Concluir <i class="ph ph-check"></i>' : 'Próximo <i class="ph ph-arrow-right"></i>';
-        }, 100);
+        }, 300); // tempo para o dom atualizar a view
     },
     positionDialog(targetEl) {
         const dialog = document.getElementById('tour-dialog');
@@ -175,7 +184,7 @@ const Tour = {
         
         if (window.innerWidth < 900) { left = 20; } 
         else if (left + 350 > window.innerWidth) { left = window.innerWidth - 370; }
-        if (top + 200 > window.innerHeight) { top = rect.top - 210; }
+        if (top + 200 > window.innerHeight) { top = rect.top - 210; } // se estourar a tela embaixo, joga pra cima
         
         dialog.style.top = `${top}px`;
         dialog.style.left = `${left}px`;
@@ -741,8 +750,8 @@ const Render = {
             <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;">
                 <div style="flex:1">
                     <b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Saída'} - ${i.category}</b>
-                    <p style="margin-top:5px; font-weight:600; font-size:1.1rem">${i.desc}</p>
-                    <span style="font-size:0.8rem; color:var(--muted)"><i class="ph ph-clock"></i> ${U.date(i.date)}</span>
+                    <p style="margin-top:5px; font-weight:600; font-size:1.1rem">${U.formatDesc(i.desc)}</p>
+                    <span style="font-size:0.8rem; color:var(--muted); display:inline-block; margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(i.date)}</span>
                 </div>
                 <div style="text-align:right">
                     <span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.3rem; display:block">${i.type==='in'?'+':'-'} ${U.money(i.val)}</span>
@@ -761,7 +770,7 @@ const Render = {
 
         let htmlDesp = '';
         if(despesasOnly.length === 0) { htmlDesp = '<p style="color:var(--muted); text-align:center;">Sem gastos registrados.</p>'; }
-        else { htmlDesp = despesasOnly.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${d.description}</b><br><span style="font-size:0.8rem; color:#888"><i class="ph ph-clock"></i> ${U.date(d.date)} - ${d.category}</span></div><div style="color:#d32f2f; font-weight:bold">-${U.money(d.amount)}</div></div>`).join(''); }
+        else { htmlDesp = despesasOnly.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${U.formatDesc(d.description)}</b><br><span style="font-size:0.8rem; color:#888"><i class="ph ph-clock"></i> ${U.date(d.date)} - ${d.category}</span></div><div style="color:#d32f2f; font-weight:bold">-${U.money(d.amount)}</div></div>`).join(''); }
         
         document.getElementById('relatorio-despesas-conteudo').innerHTML = htmlDesp;
         window.currentDespesasData = despesasOnly;
@@ -770,7 +779,7 @@ const Render = {
         if(extrato.length === 0) { htmlFluxo = '<p style="color:var(--muted); text-align:center;">Nenhuma movimentação.</p>'; }
         else {
             htmlFluxo += `<div style="background:#f9f9f9; padding:15px; border-radius:8px; display:flex; justify-content:space-around; margin-bottom:15px;"><div>Entradas: <b style="color:#2e7d32">${U.money(totalIn)}</b></div><div>Saídas: <b style="color:#d32f2f">-${U.money(totalOut)}</b></div><div>Líquido: <b style="color:${(totalIn-totalOut)>=0?'#2e7d32':'#d32f2f'}">${U.money(totalIn-totalOut)}</b></div></div>`;
-            htmlFluxo += extrato.map(i => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}">${i.type==='in'?'[+]':'[-]'}</b> ${i.desc}<br><span style="font-size:0.8rem; color:#888"><i class="ph ph-clock"></i> ${U.date(i.date)}</span></div><div style="text-align:right"><b>${U.money(i.val)}</b><br><span style="font-size:0.75rem; color:#666">Caixa: ${U.money(i.saldo)}</span></div></div>`).join('');
+            htmlFluxo += extrato.map(i => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}">${i.type==='in'?'[+]':'[-]'}</b> ${U.formatDesc(i.desc)}<br><span style="font-size:0.8rem; color:#888; display:inline-block; margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(i.date)}</span></div><div style="text-align:right"><b>${U.money(i.val)}</b><br><span style="font-size:0.75rem; color:#666">Caixa: ${U.money(i.saldo)}</span></div></div>`).join('');
         }
         document.getElementById('relatorio-fluxo-conteudo').innerHTML = htmlFluxo;
         window.currentFluxoData = extrato; window.currentTotaisFluxo = { receita: totalIn, gasto: totalOut, lucro: totalIn - totalOut };
@@ -1163,8 +1172,10 @@ const Actions = {
             const btn = document.getElementById('btn-fechar-com');
             if(btn) { btn.disabled = true; btn.innerHTML = "Processando..."; }
             
-            const { data: comanda } = await db.from('comandas').select('items, users!comandas_professional_id_fkey(name)').eq('id', comandaId).single();
+            const { data: comanda } = await db.from('comandas').select('items, clients(name), users!comandas_professional_id_fkey(name)').eq('id', comandaId).single();
+            const clientName = comanda.clients?.name || 'Cliente';
             let totalCustoFixo = 0; let totalComissao = 0;
+            
             if(comanda.items) {
                 comanda.items.forEach(item => {
                     if (item.type === 'service') {
@@ -1184,8 +1195,10 @@ const Actions = {
                 else await db.from('debts').insert({ client_id: clientId, total_amount: total, remaining_amount: total, comanda_ticket: ticketNum, created_at: dtISO }); 
             }
             const proName = comanda.users?.name || 'Profissional';
-            if(totalCustoFixo > 0) await db.from('despesas').insert({ description: `Custo Fixo Serviço - Ref: ${ticketNum}`, amount: totalCustoFixo, category: 'Custos Fixos', date: dtISO });
-            if(totalComissao > 0) await db.from('despesas').insert({ description: `Comissão Automática (${proName}) - Ref: ${ticketNum}`, amount: totalComissao, category: 'Comissões', date: dtISO });
+            
+            /* Adicionando a Referência da Comanda e o Nome do Cliente no Banco */
+            if(totalCustoFixo > 0) await db.from('despesas').insert({ description: `Custo Retido: Comanda ${ticketNum} | Cliente: ${clientName}`, amount: totalCustoFixo, category: 'Custos Fixos', date: dtISO });
+            if(totalComissao > 0) await db.from('despesas').insert({ description: `Comissão ${proName}: Comanda ${ticketNum} | Cliente: ${clientName}`, amount: totalComissao, category: 'Comissões', date: dtISO });
             Modals.close(); UI.toast('Fechado com sucesso!'); Render.comandas();
         });
     },
@@ -1194,7 +1207,7 @@ const Actions = {
         UI.confirm('ALERTA: Isso exclui os custos automáticos associados. Continuar?', async () => {
             const { data: c } = await db.from('comandas').select('ticket, total').eq('id', id).single();
             if(c?.ticket) {
-                await db.from('despesas').delete().like('description', `%Ref: ${c.ticket}%`);
+                await db.from('despesas').delete().like('description', `%Comanda ${c.ticket}%`);
                 const { data: d } = await db.from('debts').select('*').like('comanda_ticket', `%${c.ticket}%`).maybeSingle();
                 if(d) {
                     let rem = d.comanda_ticket.split(', ').map(t=>t.trim()).filter(t => t !== c.ticket).join(', ');
@@ -1245,12 +1258,17 @@ const Actions = {
 
         const dtISO = new Date().toISOString();
         
-        if(pix > 0) await db.from('despesas').insert({ description: `Recibo Fatura ${refTicket}`, amount: pix, category: 'Pix', date: dtISO });
-        if(din > 0) await db.from('despesas').insert({ description: `Recibo Fatura ${refTicket}`, amount: din, category: 'Dinheiro', date: dtISO });
-        if(cre > 0) await db.from('despesas').insert({ description: `Recibo Fatura ${refTicket}`, amount: cre, category: 'Cartão Crédito', date: dtISO });
-        if(deb > 0) await db.from('despesas').insert({ description: `Recibo Fatura ${refTicket}`, amount: deb, category: 'Cartão Débito', date: dtISO });
+        /* Adicionando a Referência da Comanda e o Nome do Cliente no Pagamento */
+        const { data: currDebt } = await db.from('debts').select('payment_details, comanda_ticket, clients(name)').eq('id', id).single();
+        const clientName = currDebt.clients?.name || 'Não informado';
+        const tkts = currDebt.comanda_ticket || refTicket;
+        const descText = `Pgto Comanda(s): ${tkts} | Cliente: ${clientName}`;
+        
+        if(pix > 0) await db.from('despesas').insert({ description: descText, amount: pix, category: 'Pix', date: dtISO });
+        if(din > 0) await db.from('despesas').insert({ description: descText, amount: din, category: 'Dinheiro', date: dtISO });
+        if(cre > 0) await db.from('despesas').insert({ description: descText, amount: cre, category: 'Cartão Crédito', date: dtISO });
+        if(deb > 0) await db.from('despesas').insert({ description: descText, amount: deb, category: 'Cartão Débito', date: dtISO });
 
-        const { data: currDebt } = await db.from('debts').select('payment_details').eq('id', id).single();
         let pd = currDebt.payment_details || {};
         pd.pix = (pd.pix||0) + pix; pd.dinheiro = (pd.dinheiro||0) + din; pd.credito = (pd.credito||0) + cre; pd.debito = (pd.debito||0) + deb;
 

@@ -108,6 +108,96 @@ const U = {
             return `${parts[0].trim()}<br><span style="font-size:0.85rem; color:var(--muted); font-weight:normal; margin-top:3px; display:inline-block"><i class="ph ph-user"></i> Cliente: ${parts[1].trim()}</span>`;
         }
         return text;
+    },
+
+    /* CORREÇÃO: Função que estava faltando */
+    initFilters() {
+        const opts = this.generateQuinzenasOptions();
+        ['filter-comanda-quinzena', 'filter-comissao-quinzena', 'filter-relatorios'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) {
+                el.innerHTML = opts;
+                el.value = this.getCurrentQuinzenaValue();
+            }
+        });
+    }
+};
+    fillTemplate(text, vars) {
+        let out = text || '';
+        Object.keys(vars || {}).forEach(k => {
+            if (k.startsWith('_')) return;
+            out = out.split(`{${k}}`).join(vars[k] ?? '');
+        });
+        return out;
+    },
+    
+    getCurrentQuinzenaValue() {
+        let curr = new Date();
+        let m = String(curr.getMonth() + 1).padStart(2, '0');
+        let y = curr.getFullYear();
+        let q = curr.getDate() <= 15 ? 'Q1' : 'Q2';
+        return `${y}-${m}-${q}`;
+    },
+    
+    generateQuinzenasOptions() {
+        let html = ''; let curr = new Date();
+        for(let i=0; i<8; i++) {
+            let d = new Date(curr.getFullYear(), curr.getMonth() - Math.floor(i/2), 1);
+            let m = String(d.getMonth() + 1).padStart(2, '0');
+            let y = d.getFullYear();
+            let mName = d.toLocaleString('pt-BR', {month:'long'});
+            let q = (i % 2 === 0) ? 'Q2' : 'Q1';
+            if(i === 0 && curr.getDate() <= 15) continue;
+            html += `<option value="${y}-${m}-${q}">${q === 'Q1' ? '1ª' : '2ª'} Quinzena (${mName}/${y})</option>`;
+        }
+        return html;
+    },
+    
+    getQuinzenaDates(val) {
+        if(!val) return { start: '1970-01-01T00:00:00Z', end: '2099-12-31T23:59:59Z' };
+        const [y, m, q] = val.split('-');
+        const lastDay = new Date(y, m, 0).getDate();
+        if (q === 'Q1') return { start: `${y}-${m}-01T00:00:00Z`, end: `${y}-${m}-15T23:59:59Z` };
+        return { start: `${y}-${m}-16T00:00:00Z`, end: `${y}-${m}-${lastDay}T23:59:59Z` };
+    },
+
+    buildExtrato(desp) {
+        let extrato = [];
+        let totalIn = 0, totalOut = 0;
+
+        (desp || []).forEach(d => {
+            const isIncome = App.inflowCategories.includes(d.category);
+            const item = {
+                type: isIncome ? 'in' : 'out',
+                desc: d.description,
+                val: d.amount,
+                date: new Date(d.date),
+                category: d.category
+            };
+            if(isIncome) totalIn += d.amount;
+            else totalOut += d.amount;
+            extrato.push(item);
+        });
+
+        extrato.sort((a, b) => a.date - b.date);
+        
+        let saldoAtual = 0;
+        extrato = extrato.map(item => {
+            saldoAtual += item.type === 'in' ? item.val : -item.val;
+            return { ...item, saldo: saldoAtual };
+        });
+        
+        extrato.reverse();
+        return { extrato, totalIn, totalOut };
+    },
+
+    /* FUNÇÃO AUXILIAR PARA QUEBRAR A LINHA DO CLIENTE NO EXTRATO */
+    formatDesc: (text) => {
+        if(text.includes('| Cliente:')) {
+            const parts = text.split('| Cliente:');
+            return `${parts[0].trim()}<br><span style="font-size:0.85rem; color:var(--muted); font-weight:normal; margin-top:3px; display:inline-block"><i class="ph ph-user"></i> Cliente: ${parts[1].trim()}</span>`;
+        }
+        return text;
     }
 };
 

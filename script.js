@@ -110,7 +110,7 @@ const U = {
         return text;
     },
 
-    /* CORREÇÃO: Função que estava faltando */
+    /* CORREÇÃO: Função que garante os filtros dinâmicos */
     initFilters() {
         const opts = this.generateQuinzenasOptions();
         ['filter-comanda-quinzena', 'filter-comissao-quinzena', 'filter-relatorios'].forEach(id => {
@@ -151,165 +151,114 @@ const UI = {
     }
 };
 
-    /* TOUR COMPLETO E DINÂMICO (WEB, MOBILE E BASEADO EM PERFIL) */
-    const Tour = {
-        // Banco com todos os passos possíveis do sistema
-        allSteps: [
-            // Comuns a todos (Dono e Colaborador)
-            { role: 'all', view: 'agenda', target: '#btn-novo-agendamento-tour', mobileTarget: '.fab-button', title: '1. Agenda Inteligente', text: 'Aqui você visualiza e gerencia horários. Clique aqui para agendar um cliente, gerar um encaixe ou bloquear a agenda.' },
-            { role: 'all', view: 'comandas', target: '#btn-nova-comanda-tour', mobileTarget: '.fab-button', title: '2. Abertura de Comandas', text: 'O cliente chegou? Abra uma comanda, adicione os serviços/produtos e vincule o profissional que realizou o atendimento.' },
-            { role: 'all', view: 'cobrancas', target: '#tab-pendentes-tour', mobileTarget: '#tab-pendentes-tour', title: '3. Cobranças e Recebimentos', text: 'Comandas fechadas geram faturas. Aqui você dá baixa no pagamento misturando Pix, Cartão, Dinheiro e aplicando descontos.' },
-            { role: 'all', view: 'clientes', target: '#clientes-list', mobileTarget: '#clientes-list', title: '4. Gestão de Clientes', text: 'Veja o histórico de visitas, crie Fichas de Anamnese personalizadas para procedimentos e mande mensagens no WhatsApp.' },
-            
-            // Exclusivos do Owner
-            { role: 'owner', view: 'servicos', target: '#servicos-list', mobileTarget: '.fab-button', title: '5. Catálogo de Serviços', text: 'Cadastre serviços definindo a duração na agenda, preço, custo fixo retido pelo salão e a comissão padrão do profissional.' },
-            { role: 'owner', view: 'produtos', target: '#produtos-list', mobileTarget: '.fab-button', title: '6. Estoque de Produtos', text: 'Controle produtos para venda. O sistema alerta quando o estoque está baixo e calcula a comissão por venda automaticamente.' },
-            
-            // Comum a todos
-            { role: 'all', view: 'comissao', target: '#comissao-dashboard-tour', mobileTarget: '#comissao-dashboard-tour', title: '7. Fechamento de Comissões', text: 'Painel automático. Profissionais vêem apenas seus próprios ganhos na quinzena. O gestor visualiza o Ranking geral do salão.' },
-            
-            // Exclusivos do Owner
-            { role: 'owner', view: 'mensagens', target: '#mensagens-list', mobileTarget: '.fab-button', title: '8. Mensagens Automáticas', text: 'Crie templates para o WhatsApp com variáveis como {cliente}, {data}, {hora}. Ótimo para lembretes e confirmações.' },
-            { role: 'owner', view: 'despesas', target: '#chart-despesas', mobileTarget: '#chart-despesas', title: '9. Gestão de Despesas', text: 'Os custos das comandas vêm pra cá automaticamente. Lembre-se de lançar manualmente gastos como aluguel, luz e vales.' },
-            { role: 'owner', view: 'resumo-financeiro', target: '#resumo-cards', mobileTarget: '#resumo-cards', title: '10. Fluxo de Caixa Líquido', text: 'O coração financeiro do estúdio. Faturamento menos saídas, lucro líquido real e o extrato exato de toda a movimentação.' },
-            { role: 'owner', view: 'performance', target: '#perf-kpis', mobileTarget: '#perf-kpis', title: '11. Performance e KPIs', text: 'Indicadores do negócio: Ticket Médio, Taxa de Ocupação da agenda e os serviços que mais dão lucro (Curva ABC).' },
-            { role: 'owner', view: 'funcionarios', target: '#funcionarios-list', mobileTarget: '.fab-button', title: '12. Equipe do Salão', text: 'Cadastre novos colaboradores, defina níveis de acesso (Gestor ou Atendente), resete senhas ou bloqueie usuários antigos.' },
-            { role: 'owner', view: 'relatorios', target: '#filter-relatorios', mobileTarget: '#filter-relatorios', title: '13. Relatórios e PDF', text: 'Selecione a quinzena desejada e gere relatórios em PDF do Fluxo de Caixa ou Despesas para enviar ao contador.' },
-            { role: 'owner', view: 'configuracoes', target: '#cfg-name', mobileTarget: '#cfg-name', title: '14. Ajustes do Sistema', text: 'Configure o Nome Oficial do estúdio. Isso altera a logo do sistema e a assinatura das mensagens enviadas pelo WhatsApp.' }
-        ],
-        steps: [], // Será preenchido dinamicamente
-        current: 0,
-        start() {
-            // Filtra os passos de acordo com o perfil
-            if (App.role === 'owner') {
-                this.steps = [...this.allSteps];
-            } else {
-                this.steps = this.allSteps.filter(s => s.role === 'all');
-            }
-            
-            // Renumera o título para manter a sequência correta (ex: 1, 2, 3, 4, 5...) mesmo que pule páginas de gestor
-            this.steps.forEach((s, index) => {
-                s.title = s.title.replace(/^\d+\./, `${index + 1}.`);
-            });
-    
-            this.current = 0;
-            document.getElementById('tour-overlay').classList.remove('hidden');
-            
-            if(window.innerWidth > 900) { 
-                document.getElementById('main-sidebar').classList.add('open'); 
-            } else {
-                Nav.closeMenu();
-            }
-            this.showStep();
-        },
-        showStep() {
-            if(this.current >= this.steps.length) return this.skip();
-            const s = this.steps[this.current];
-            
-            Nav.showView(s.view);
-            if(window.innerWidth <= 900) Nav.closeMenu();
-            
-            document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
-            
-            setTimeout(() => {
-                const isMobile = window.innerWidth <= 900;
-                let targetSelector = isMobile && s.mobileTarget ? s.mobileTarget : s.target;
-                let targetEl = document.querySelector(targetSelector);
-                
-                if(targetEl && targetEl.offsetParent === null) {
-                    targetEl = document.querySelector(s.target);
-                }
-    
-                if(targetEl && targetEl.offsetParent !== null) {
-                    targetEl.classList.add('tour-highlight');
-                    this.positionDialog(targetEl);
-                } else {
-                    this.centerDialog(); 
-                }
-                
-                document.getElementById('tour-title').textContent = s.title;
-                document.getElementById('tour-desc').textContent = s.text;
-                document.getElementById('tour-dots').innerHTML = this.steps.map((_, i) => `<span style="height:8px; width:8px; border-radius:50%; background:${i===this.current?'var(--primary)':'#ccc'}"></span>`).join('');
-                document.getElementById('tour-next-btn').innerHTML = this.current === this.steps.length - 1 ? 'Concluir <i class="ph ph-check"></i>' : 'Próximo <i class="ph ph-arrow-right"></i>';
-            }, 400); 
-        },
-        positionDialog(targetEl) {
-            const dialog = document.getElementById('tour-dialog');
-            dialog.style.transform = 'none'; 
-            
-            const rect = targetEl.getBoundingClientRect();
-            let top = rect.bottom + 15;
-            let left = rect.left;
-            
-            if (window.innerWidth <= 900) { 
-                left = 20; 
-                dialog.style.width = 'calc(100% - 40px)'; 
-            } else {
-                dialog.style.width = '350px';
-                if (left + 350 > window.innerWidth) { left = window.innerWidth - 370; }
-            }
-            
-            if (top + 200 > window.innerHeight) { 
-                top = rect.top - 210; 
-                if (top < 20) top = 20; 
-            } 
-            
-            dialog.style.top = `${top}px`;
-            dialog.style.left = `${left}px`;
-        },
-        centerDialog() {
-            const dialog = document.getElementById('tour-dialog');
-            dialog.style.top = '50%';
-            dialog.style.left = '50%';
-            dialog.style.transform = 'translate(-50%, -50%)'; 
-            dialog.style.width = window.innerWidth <= 900 ? 'calc(100% - 40px)' : '350px';
-        },
-        next() { this.current++; this.showStep(); },
-        skip() { 
-            document.getElementById('tour-overlay').classList.add('hidden'); 
-            document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
-            document.getElementById('tour-dialog').style.transform = 'none';
-            localStorage.setItem('aqc_tour_done', 'true'); 
+/* TOUR COMPLETO E DINÂMICO (WEB, MOBILE E BASEADO EM PERFIL) */
+const Tour = {
+    allSteps: [
+        { role: 'all', view: 'agenda', target: '#btn-novo-agendamento-tour', mobileTarget: '.fab-button', title: '1. Agenda Inteligente', text: 'Aqui você visualiza e gerencia horários. Clique aqui para agendar um cliente, gerar um encaixe ou bloquear a agenda.' },
+        { role: 'all', view: 'comandas', target: '#btn-nova-comanda-tour', mobileTarget: '.fab-button', title: '2. Abertura de Comandas', text: 'O cliente chegou? Abra uma comanda, adicione os serviços/produtos e vincule o profissional que realizou o atendimento.' },
+        { role: 'all', view: 'cobrancas', target: '#tab-pendentes-tour', mobileTarget: '#tab-pendentes-tour', title: '3. Cobranças e Recebimentos', text: 'Comandas fechadas geram faturas. Aqui você dá baixa no pagamento misturando Pix, Cartão, Dinheiro e aplicando descontos.' },
+        { role: 'all', view: 'clientes', target: '#clientes-list', mobileTarget: '#clientes-list', title: '4. Gestão de Clientes', text: 'Veja o histórico de visitas, crie Fichas de Anamnese personalizadas para procedimentos e mande mensagens no WhatsApp.' },
+        { role: 'owner', view: 'servicos', target: '#servicos-list', mobileTarget: '.fab-button', title: '5. Catálogo de Serviços', text: 'Cadastre serviços definindo a duração na agenda, preço, custo fixo retido pelo salão e a comissão padrão do profissional.' },
+        { role: 'owner', view: 'produtos', target: '#produtos-list', mobileTarget: '.fab-button', title: '6. Estoque de Produtos', text: 'Controle produtos para venda. O sistema alerta quando o estoque está baixo e calcula a comissão por venda automaticamente.' },
+        { role: 'all', view: 'comissao', target: '#comissao-dashboard-tour', mobileTarget: '#comissao-dashboard-tour', title: '7. Fechamento de Comissões', text: 'Painel automático. Profissionais vêem apenas seus próprios ganhos na quinzena. O gestor visualiza o Ranking geral do salão.' },
+        { role: 'owner', view: 'mensagens', target: '#mensagens-list', mobileTarget: '.fab-button', title: '8. Mensagens Automáticas', text: 'Crie templates para o WhatsApp com variáveis como {cliente}, {data}, {hora}. Ótimo para lembretes e confirmações.' },
+        { role: 'owner', view: 'despesas', target: '#chart-despesas', mobileTarget: '#chart-despesas', title: '9. Gestão de Despesas', text: 'Os custos das comandas vêm pra cá automaticamente. Lembre-se de lançar manualmente gastos como aluguel, luz e vales.' },
+        { role: 'owner', view: 'resumo-financeiro', target: '#resumo-cards', mobileTarget: '#resumo-cards', title: '10. Fluxo de Caixa Líquido', text: 'O coração financeiro do estúdio. Faturamento menos saídas, lucro líquido real e o extrato exato de toda a movimentação.' },
+        { role: 'owner', view: 'performance', target: '#perf-kpis', mobileTarget: '#perf-kpis', title: '11. Performance e KPIs', text: 'Indicadores do negócio: Ticket Médio, Taxa de Ocupação da agenda e os serviços que mais dão lucro (Curva ABC).' },
+        { role: 'owner', view: 'funcionarios', target: '#funcionarios-list', mobileTarget: '.fab-button', title: '12. Equipe do Salão', text: 'Cadastre novos colaboradores, defina níveis de acesso (Gestor ou Atendente), resete senhas ou bloqueie usuários antigos.' },
+        { role: 'owner', view: 'relatorios', target: '#filter-relatorios', mobileTarget: '#filter-relatorios', title: '13. Relatórios e PDF', text: 'Selecione a quinzena desejada e gere relatórios em PDF do Fluxo de Caixa ou Despesas para enviar ao contador.' },
+        { role: 'owner', view: 'configuracoes', target: '#cfg-name', mobileTarget: '#cfg-name', title: '14. Ajustes do Sistema', text: 'Configure o Nome Oficial do estúdio. Isso altera a logo do sistema e a assinatura das mensagens enviadas pelo WhatsApp.' }
+    ],
+    steps: [],
+    current: 0,
+    start() {
+        if (App.role === 'owner') {
+            this.steps = [...this.allSteps];
+        } else {
+            this.steps = this.allSteps.filter(s => s.role === 'all');
         }
-    };
+        
+        this.steps.forEach((s, index) => {
+            s.title = s.title.replace(/^\d+\./, `${index + 1}.`);
+        });
+
+        this.current = 0;
+        document.getElementById('tour-overlay').classList.remove('hidden');
+        
+        if(window.innerWidth > 900) { 
+            document.getElementById('main-sidebar').classList.add('open'); 
+        } else {
+            Nav.closeMenu();
+        }
+        this.showStep();
+    },
     showStep() {
         if(this.current >= this.steps.length) return this.skip();
         const s = this.steps[this.current];
         
         Nav.showView(s.view);
+        if(window.innerWidth <= 900) Nav.closeMenu();
+        
         document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
         
         setTimeout(() => {
-            const targetEl = document.querySelector(s.target);
-            if(targetEl) {
+            const isMobile = window.innerWidth <= 900;
+            let targetSelector = isMobile && s.mobileTarget ? s.mobileTarget : s.target;
+            let targetEl = document.querySelector(targetSelector);
+            
+            if(targetEl && targetEl.offsetParent === null) {
+                targetEl = document.querySelector(s.target);
+            }
+
+            if(targetEl && targetEl.offsetParent !== null) {
                 targetEl.classList.add('tour-highlight');
                 this.positionDialog(targetEl);
+            } else {
+                this.centerDialog(); 
             }
             
             document.getElementById('tour-title').textContent = s.title;
             document.getElementById('tour-desc').textContent = s.text;
             document.getElementById('tour-dots').innerHTML = this.steps.map((_, i) => `<span style="height:8px; width:8px; border-radius:50%; background:${i===this.current?'var(--primary)':'#ccc'}"></span>`).join('');
             document.getElementById('tour-next-btn').innerHTML = this.current === this.steps.length - 1 ? 'Concluir <i class="ph ph-check"></i>' : 'Próximo <i class="ph ph-arrow-right"></i>';
-        }, 300); 
+        }, 400); 
     },
     positionDialog(targetEl) {
         const dialog = document.getElementById('tour-dialog');
-        const rect = targetEl.getBoundingClientRect();
+        dialog.style.transform = 'none'; 
         
+        const rect = targetEl.getBoundingClientRect();
         let top = rect.bottom + 15;
         let left = rect.left;
         
-        if (window.innerWidth < 900) { left = 20; } 
-        else if (left + 350 > window.innerWidth) { left = window.innerWidth - 370; }
-        if (top + 200 > window.innerHeight) { top = rect.top - 210; } 
+        if (window.innerWidth <= 900) { 
+            left = 20; 
+            dialog.style.width = 'calc(100% - 40px)'; 
+        } else {
+            dialog.style.width = '350px';
+            if (left + 350 > window.innerWidth) { left = window.innerWidth - 370; }
+        }
+        
+        if (top + 200 > window.innerHeight) { 
+            top = rect.top - 210; 
+            if (top < 20) top = 20; 
+        } 
         
         dialog.style.top = `${top}px`;
         dialog.style.left = `${left}px`;
+    },
+    centerDialog() {
+        const dialog = document.getElementById('tour-dialog');
+        dialog.style.top = '50%';
+        dialog.style.left = '50%';
+        dialog.style.transform = 'translate(-50%, -50%)'; 
+        dialog.style.width = window.innerWidth <= 900 ? 'calc(100% - 40px)' : '350px';
     },
     next() { this.current++; this.showStep(); },
     skip() { 
         document.getElementById('tour-overlay').classList.add('hidden'); 
         document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+        document.getElementById('tour-dialog').style.transform = 'none';
         localStorage.setItem('aqc_tour_done', 'true'); 
     }
 };
@@ -337,7 +286,7 @@ const Auth = {
 
             if(data.first_login || p === '123456') { 
                 setTimeout(() => { Modals.open('first_login'); }, 500);
-            } else if (!localStorage.getItem('aqc_tour_done') && App.role === 'owner') {
+            } else if (!localStorage.getItem('aqc_tour_done')) { // Alterado para todos verem o Tour na primeira vez
                 setTimeout(() => { Tour.start(); }, 1000);
             }
             
@@ -1170,7 +1119,7 @@ const Actions = {
         if(newPass.length < 3) return UI.toast('Senha muito curta.', 'error');
         await db.from('users').update({ password: newPass, first_login: false }).eq('id', App.user.id);
         App.user.first_login = false; Modals.close(); UI.toast('Senha salva!');
-        if (!localStorage.getItem('aqc_tour_done') && App.role === 'owner') setTimeout(() => { Tour.start(); }, 500);
+        if (!localStorage.getItem('aqc_tour_done')) setTimeout(() => { Tour.start(); }, 500);
     },
 
     applyTemplate(templateId) {

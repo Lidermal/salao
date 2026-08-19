@@ -16,7 +16,6 @@
 </head>
 <body>
 
-    <!-- TELA DE CARREGAMENTO INICIAL -->
     <div id="splash-screen" style="position: fixed; inset: 0; background: var(--primary); z-index: 9999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; transition: opacity 0.5s;">
         <i class="ph ph-scissors" style="font-size: 5rem; margin-bottom: 1rem; animation: pulse 1.5s infinite;"></i>
         <h1 style="color: white; font-size: 2.8rem; margin-bottom: 0.5rem; text-align:center; font-family: 'Playfair Display', serif;">Estúdio Amor Que Cuida</h1>
@@ -24,7 +23,6 @@
     </div>
     <style> @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } } </style>
 
-    <!-- TOASTS E CONFIRMAÇÕES -->
     <div id="toast-container"></div>
     <div id="custom-confirm" class="overlay hidden" style="z-index: 999999;">
         <div class="modal" style="max-width: 400px; text-align: center;">
@@ -37,16 +35,15 @@
         </div>
     </div>
 
-    <!-- ONBOARDING / TOUR GUIADO -->
-    <div id="tour-overlay" class="overlay hidden" style="z-index: 9999998; background: rgba(0,0,0,0.8);">
-        <div class="modal" style="max-width: 450px; text-align: center; border-top: 5px solid var(--primary);">
-            <i class="ph ph-info" style="font-size: 3rem; color: var(--primary); margin-bottom: 15px;"></i>
-            <h3 id="tour-title" style="margin-bottom: 10px;">Bem-vindo ao Sistema</h3>
-            <p id="tour-desc" style="margin-bottom: 25px; color: var(--muted); line-height: 1.5; font-size: 1.05rem;"></p>
+    <!-- ONBOARDING / TOUR GUIADO APRIMORADO -->
+    <div id="tour-overlay" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999998; transition: 0.3s; pointer-events: auto;">
+        <div id="tour-dialog" style="position: absolute; background: var(--surface); padding: 20px; border-radius: 12px; width: 340px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 5px solid var(--primary); transition: all 0.3s ease;">
+            <h3 id="tour-title" style="margin-bottom: 10px; font-size:1.2rem; color:var(--primary-dark)">Título</h3>
+            <p id="tour-desc" style="font-size: 0.95rem; color: var(--muted); margin-bottom: 20px; line-height: 1.4;"></p>
             <div style="display: flex; justify-content: space-between; align-items: center;">
-                <button class="btn-secondary" style="width: auto; padding: 0.8rem 1.5rem;" onclick="Tour.skip()">Pular Tutorial</button>
+                <button class="btn-secondary" style="width: auto; padding: 0.5rem 1rem; font-size:0.8rem" onclick="Tour.skip()">Pular Tour</button>
                 <div id="tour-dots" style="display: flex; gap: 5px;"></div>
-                <button class="btn-primary" style="width: auto; padding: 0.8rem 1.5rem;" id="tour-next-btn" onclick="Tour.next()">Próximo <i class="ph ph-arrow-right"></i></button>
+                <button class="btn-primary" id="tour-next-btn" style="width: auto; padding: 0.5rem 1rem; font-size:0.8rem" onclick="Tour.next()">Próximo <i class="ph ph-arrow-right"></i></button>
             </div>
         </div>
     </div>
@@ -75,19 +72,19 @@
             </div>
             <nav class="sidebar-nav content-scroll">
                 <div class="nav-section">ATENDIMENTO</div>
-                <a href="#" class="nav-link active tour-agenda" data-view="agenda"><i class="ph ph-calendar"></i> Agenda</a>
-                <a href="#" class="nav-link tour-comandas" data-view="comandas"><i class="ph ph-receipt"></i> Comandas</a>
-                <a href="#" class="nav-link tour-cobrancas" data-view="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
-                <a href="#" class="nav-link tour-clientes" data-view="clientes"><i class="ph ph-users"></i> Clientes</a>
+                <a href="#" class="nav-link active" data-view="agenda"><i class="ph ph-calendar"></i> Agenda</a>
+                <a href="#" class="nav-link" data-view="comandas"><i class="ph ph-receipt"></i> Comandas</a>
+                <a href="#" class="nav-link" data-view="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
+                <a href="#" class="nav-link" data-view="clientes"><i class="ph ph-users"></i> Clientes</a>
                 
                 <div class="nav-section owner-only">GESTÃO DE ESTOQUE</div>
-                <a href="#" class="nav-link owner-only tour-servicos" data-view="servicos"><i class="ph ph-sparkle"></i> Catálogo de Serviços</a>
+                <a href="#" class="nav-link owner-only" data-view="servicos"><i class="ph ph-sparkle"></i> Catálogo de Serviços</a>
                 <a href="#" class="nav-link owner-only" data-view="produtos"><i class="ph ph-package"></i> Controle de Produtos</a>
                 
                 <div class="nav-section owner-only">GESTÃO FINANCEIRA</div>
                 <a href="#" class="nav-link owner-only" data-view="despesas"><i class="ph ph-trend-down"></i> Controle de Despesas</a>
-                <a href="#" class="nav-link tour-comissao" data-view="comissao"><i class="ph ph-money"></i> Comissionamento</a>
-                <a href="#" class="nav-link owner-only tour-fluxo" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Fluxo de Caixa</a>
+                <a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Comissionamento</a>
+                <a href="#" class="nav-link owner-only" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Fluxo de Caixa</a>
                 <a href="#" class="nav-link owner-only" data-view="relatorios"><i class="ph ph-folder-open"></i> Relatórios & Arquivos</a>
                 
                 <div class="nav-section owner-only">INTELIGÊNCIA & ADMIN</div>
@@ -119,17 +116,16 @@
                 
                 <!-- VIEW AGENDA -->
                 <section id="view-agenda" class="view active">
-                    <!-- BOTOES NO TOPO REPOSICIONADOS E COMPACTADOS -->
                     <div style="display:flex; justify-content:space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
                         <h2 id="day-view-title" class="hidden" style="color: var(--primary-dark); font-size: 1.3rem;">...</h2>
                         <div style="display: flex; gap: 10px; margin-left: auto;">
-                            <button class="btn-primary desktop-only" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem;" onclick="Modals.open('agendamento')"><i class="ph ph-plus"></i> Novo Agendamento</button>
+                            <!-- ID para o Tour focar na Agenda -->
+                            <button id="btn-novo-agendamento-tour" class="btn-primary desktop-only" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem;" onclick="Modals.open('agendamento')"><i class="ph ph-plus"></i> Novo Agendamento</button>
                             <button class="btn-secondary desktop-only" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem; border: 1px solid #d32f2f; color: #d32f2f;" onclick="Modals.open('bloquear_agenda')"><i class="ph ph-prohibit"></i> Bloquear</button>
                             <button class="btn-secondary hidden" id="btn-voltar-mes" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem;" onclick="Render.showMonthView()"><i class="ph ph-arrow-left"></i> Voltar ao Mês</button>
                         </div>
                     </div>
 
-                    <!-- VISÃO DO MÊS COMPLETO -->
                     <div id="agenda-month-view" class="ios-calendar">
                         <div class="cal-header">
                             <button onclick="Render.changeMonth(-1)"><i class="ph ph-caret-left"></i></button>
@@ -144,7 +140,6 @@
                         </div>
                     </div>
 
-                    <!-- VISÃO DA LINHA DO TEMPO (DIÁRIA) -->
                     <div id="agenda-day-view" class="hidden">
                         <div class="ios-calendar" style="margin-bottom: 10px; padding: 0.5rem 0;">
                             <div class="cal-days" id="cal-days-row" style="padding-bottom: 0;"></div>
@@ -156,7 +151,8 @@
                 <!-- VIEW COBRANÇAS -->
                 <section id="view-cobrancas" class="view">
                     <div style="display:flex; gap:10px; margin-bottom:20px; border-bottom: 2px solid var(--border); padding-bottom: 10px;">
-                        <button class="btn-secondary active-tab" id="tab-pendentes" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px;" onclick="Render.cobrancas('pendentes')">Em Aberto / Pendentes</button>
+                        <!-- ID para o Tour focar nas Cobranças -->
+                        <button class="btn-secondary active-tab" id="tab-pendentes-tour" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px;" onclick="Render.cobrancas('pendentes')">Em Aberto / Pendentes</button>
                         <button class="btn-secondary" id="tab-pagos" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px; background: transparent; border: 1px solid transparent;" onclick="Render.cobrancas('pagos')">Histórico de Pagos</button>
                     </div>
                     <div id="cobrancas-list" class="data-grid"></div>
@@ -164,7 +160,8 @@
                 
                 <!-- VIEW COMANDAS -->
                 <section id="view-comandas" class="view">
-                    <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('comanda')">+ Gerar Nova Comanda</button>
+                    <!-- ID para o Tour focar na Comanda -->
+                    <button id="btn-nova-comanda-tour" class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('comanda')">+ Gerar Nova Comanda</button>
                     <div style="margin-bottom:15px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
                         <label style="font-size:0.9rem; font-weight:bold">Filtrar Quinzena / Mês:</label>
                         <select id="filter-comanda-quinzena" class="quinzena-select" onchange="Render.comandas()" style="padding:0.5rem; border-radius:8px; border:1px solid var(--border); flex:1"></select>
@@ -172,7 +169,6 @@
                     <div id="comandas-list" class="data-grid"></div>
                 </section>
                 
-                <!-- VIEW CLIENTES -->
                 <section id="view-clientes" class="view">
                     <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('cliente')">+ Cadastrar Cliente</button>
                     <div id="clientes-list" class="data-grid"></div>
@@ -201,31 +197,26 @@
                     <div id="perfil-visitas-list" class="data-list"></div>
                 </section>
 
-                <!-- VIEW SERVIÇOS -->
                 <section id="view-servicos" class="view">
                     <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('servico')">+ Cadastrar Serviço</button>
                     <div id="servicos-list" class="data-grid"></div>
                 </section>
                 
-                <!-- VIEW PRODUTOS -->
                 <section id="view-produtos" class="view">
                     <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('produto')">+ Registrar Produto</button>
                     <div id="produtos-list" class="data-grid"></div>
                 </section>
                 
-                <!-- VIEW MENSAGENS -->
                 <section id="view-mensagens" class="view">
                     <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('mensagem')">+ Criar Template</button>
                     <div id="mensagens-list" class="data-grid"></div>
                 </section>
 
-                <!-- VIEW FUNCIONÁRIOS -->
                 <section id="view-funcionarios" class="view">
                     <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('funcionario')">+ Registrar Colaborador</button>
                     <div id="funcionarios-list" class="data-grid"></div>
                 </section>
                 
-                <!-- VIEW DESPESAS -->
                 <section id="view-despesas" class="view">
                     <div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center; flex-wrap:wrap; gap:10px;">
                         <h2>Custos da Quinzena Atual</h2>
@@ -236,16 +227,15 @@
                     <div id="despesas-list" class="data-list"></div>
                 </section>
 
-                <!-- VIEW COMISSÃO -->
                 <section id="view-comissao" class="view">
                     <div style="margin-bottom:15px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
                         <label style="font-size:0.9rem; font-weight:bold">Visualizar Quinzena:</label>
                         <select id="filter-comissao-quinzena" class="quinzena-select" onchange="Render.comissao()" style="padding:0.5rem; border-radius:8px; border:1px solid var(--border); flex:1"></select>
                     </div>
-                    <div id="comissao-dashboard"></div>
+                    <!-- ID para o Tour focar na Comissão -->
+                    <div id="comissao-dashboard-tour"></div>
                 </section>
                 
-                <!-- VIEW RESUMO FINANCEIRO -->
                 <section id="view-resumo-financeiro" class="view">
                     <div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center; flex-wrap:wrap; gap:10px;">
                         <h2>Caixa da Quinzena Atual</h2>
@@ -253,11 +243,11 @@
                     <p style="color:var(--muted); font-size:0.9rem; margin-bottom:1.5rem"><i class="ph ph-info"></i> Comandas faturadas registram os custos. A entrada (Receita) só é contabilizada quando o cliente realiza o pagamento na aba Cobranças.</p>
                     
                     <div id="resumo-cards" class="data-grid" style="margin-bottom:1.5rem"></div>
-                    
                     <h3 style="margin-bottom: 10px; color: var(--primary-dark);">Receitas por Forma de Pagamento</h3>
                     <div id="resumo-pagamentos-cards" class="data-grid" style="margin-bottom:2rem"></div>
 
-                    <div class="card" style="margin-bottom:1rem">
+                    <!-- ID para o Tour focar no Extrato -->
+                    <div class="card" id="extrato-caixa-tour" style="margin-bottom:1rem">
                         <h3 style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:10px">Extrato Detalhado</h3>
                         <div id="extrato-list" class="data-list"></div>
                     </div>
@@ -307,7 +297,6 @@
             </div>
         </main>
 
-        <!-- BOTTOM NAV MOBILE -->
         <nav class="bottom-nav">
             <a href="#" class="b-item active" data-view="agenda"><i class="ph ph-calendar"></i><span>Agenda</span></a>
             <a href="#" class="b-item" data-view="comandas"><i class="ph ph-receipt"></i><span>Comandas</span></a>
@@ -317,9 +306,8 @@
         </nav>
     </div>
 
-    <!-- CONTAINER DE MODAIS DINÂMICOS -->
     <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
     
-    <script src="script.js?v=6"></script>
+    <script src="script.js?v=7"></script>
 </body>
 </html>

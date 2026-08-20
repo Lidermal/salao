@@ -35,7 +35,7 @@
         </div>
     </div>
 
-    <!-- ONBOARDING / TOUR GUIADO APRIMORADO -->
+    <!-- ONBOARDING / TOUR GUIADO -->
     <div id="tour-overlay" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999998; transition: 0.3s; pointer-events: auto;">
         <div id="tour-dialog" style="position: absolute; background: var(--surface); padding: 20px; border-radius: 12px; width: 340px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 5px solid var(--primary); transition: all 0.3s ease;">
             <h3 id="tour-title" style="margin-bottom: 10px; font-size:1.2rem; color:var(--primary-dark)">Título</h3>
@@ -71,6 +71,9 @@
                 <button class="close-sidebar mobile-only" onclick="Nav.closeMenu()"><i class="ph ph-x"></i></button>
             </div>
             <nav class="sidebar-nav content-scroll">
+                <div class="nav-section">MINHA CONTA</div>
+                <a href="#" class="nav-link" data-view="perfil"><i class="ph ph-user-circle"></i> Meu Perfil</a>
+
                 <div class="nav-section">ATENDIMENTO</div>
                 <a href="#" class="nav-link active" data-view="agenda"><i class="ph ph-calendar"></i> Agenda</a>
                 <a href="#" class="nav-link" data-view="comandas"><i class="ph ph-receipt"></i> Comandas</a>
@@ -108,12 +111,28 @@
                 </div>
                 <div style="display: flex; align-items: center; gap: 15px;">
                     <button class="btn-secondary desktop-only" style="padding: 0.5rem; width: auto; border-radius: 50%;" onclick="Tour.start()" title="Ver Tutorial da Tela"><i class="ph ph-question"></i></button>
-                    <div class="user-pill"><span id="header-user">Usuário</span><div class="avatar" id="header-avatar">US</div></div>
+                    <div class="user-pill" style="cursor:pointer" onclick="Nav.showView('perfil')"><span id="header-user">Usuário</span><div class="avatar" id="header-avatar">US</div></div>
                 </div>
             </header>
 
             <div class="views-container">
                 
+                <!-- VIEW PERFIL NOVO -->
+                <section id="view-perfil" class="view">
+                    <div class="card" style="text-align:center; max-width: 450px; margin: 1rem auto; padding: 2rem;">
+                        <div id="perfil-foto-preview" style="width:130px; height:130px; border-radius:50%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-size:3rem; font-weight:bold; margin:0 auto 1.5rem auto; border: 4px solid var(--primary-light)">US</div>
+                        <h3 id="perfil-nome" style="font-size:1.6rem; margin-bottom:5px;">Nome do Usuário</h3>
+                        <p id="perfil-role" style="color:var(--primary); margin-bottom:25px; text-transform:uppercase; font-size:0.85rem; font-weight:bold; letter-spacing:1px;">Função</p>
+                        
+                        <input type="file" id="perfil-foto-input" accept="image/*" style="display:none" onchange="Actions.previewAndSaveAvatar(event)">
+                        
+                        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap">
+                            <button class="btn-primary" style="width:auto; padding:0.8rem 1.5rem" onclick="document.getElementById('perfil-foto-input').click()"><i class="ph ph-camera"></i> Alterar / Nova Foto</button>
+                            <button class="btn-secondary" style="width:auto; padding:0.8rem 1.5rem; color:#d32f2f" onclick="Actions.deleteAvatar()"><i class="ph ph-trash"></i> Remover</button>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- VIEW AGENDA -->
                 <section id="view-agenda" class="view active">
                     <div style="display:flex; justify-content:space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
@@ -308,6 +327,6 @@
 
     <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
     
-    <script src="script.js?v=7"></script>
+    <script src="script.js?v=9"></script>
 </body>
 </html>

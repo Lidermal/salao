@@ -255,7 +255,7 @@ const Auth = {
         try {
             const { data: avData } = await db.from('user_avatars').select('*');
             if(avData) { avData.forEach(av => { App.avatars[av.user_id] = av.avatar_base64; }); }
-        } catch (e) { console.log('Tabela user_avatars ainda não existe. Será ignorada no carregamento inicial.'); }
+        } catch (e) { console.log('Tabela user_avatars ignorada.'); }
     },
     async success() {
         document.getElementById('auth-layer').classList.add('hidden'); 
@@ -469,7 +469,8 @@ const Render = {
                     if (a.status === 'bloqueado' && originalNotes.includes('BLOQUEIO_ATE:')) {
                         const parts = originalNotes.split('|');
                         endStr = parts[0].replace('BLOQUEIO_ATE:', '').trim();
-                        a.notes = parts.length > 1 ? parts[1].trim() : ''; 
+                        // Remove o selo de ADMIN_BLOCK visualmente no card da agenda
+                        a.notes = parts.slice(1).filter(p => !p.includes('ADMIN_BLOCK')).join(' | ').trim(); 
                     } else {
                         let durationMins = (a.services && a.services.duration) ? a.services.duration : 60;
                         let mF = sm + durationMins; let hF = sh + Math.floor(mF/60);
@@ -684,7 +685,6 @@ const Render = {
             </div>`).join('');
     },
     
-    // TELA DE PRODUTOS ATUALIZADA COM O FILTRO E BUSCA
     async produtos() {
         const { data } = await db.from('products').select('*').order('name');
         window.allProdutos = data || [];
@@ -958,17 +958,30 @@ const Modals = {
             const isBlocked = a.status === 'bloqueado';
             
             if (isBlocked) {
-                let endStr = ''; let motivo = a.notes;
-                if (a.notes && a.notes.includes('BLOQUEIO_ATE:')) {
-                    const parts = a.notes.split('|');
-                    endStr = parts[0].replace('BLOQUEIO_ATE:', '').trim(); motivo = parts.length > 1 ? parts[1].trim() : '';
+                let isAdminBlock = a.notes && a.notes.includes('ADMIN_BLOCK');
+                let endStr = ''; 
+                let motivo = a.notes || '';
+                
+                if (motivo.includes('BLOQUEIO_ATE:')) {
+                    const parts = motivo.split('|');
+                    endStr = parts[0].replace('BLOQUEIO_ATE:', '').trim(); 
+                    // Limpa a tag ADMIN_BLOCK para não aparecer para o usuário
+                    motivo = parts.slice(1).filter(p => !p.includes('ADMIN_BLOCK')).join(' | ').trim();
                 }
+
+                let removerBtnHtml = '';
+                if (isAdminBlock && App.role !== 'owner') {
+                    removerBtnHtml = `<p style="color: #d32f2f; text-align:center; font-weight:bold; margin-top:10px;"><i class="ph ph-lock"></i> Bloqueio Administrativo (Apenas gestor pode remover)</p>`;
+                } else {
+                    removerBtnHtml = `<button class="btn-primary" style="background:#d32f2f; padding:1.2rem; width:100%" onclick="Actions.deleteAppointment('${a.id}')"><i class="ph ph-trash"></i> Remover Bloqueio</button>`;
+                }
+
                 html += `<div style="text-align: center; margin-bottom: 20px;"><h3 style="margin: 0; color: #d32f2f;"><i class="ph ph-prohibit"></i> Horário Bloqueado</h3></div>
                 <div style="background: #fafafa; border: 1px solid var(--border); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
                     <p style="margin-bottom:8px"><strong>Data:</strong> ${new Date(a.date + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
                     <p style="margin-bottom:8px"><strong>Horário:</strong> ${a.time.slice(0,5)} até ${endStr}</p>
                     <p><strong>Motivo:</strong> ${motivo}</p>
-                </div><button class="btn-primary" style="background:#d32f2f; padding:1.2rem; width:100%" onclick="Actions.deleteAppointment('${a.id}')"><i class="ph ph-trash"></i> Remover Bloqueio</button>`;
+                </div>${removerBtnHtml}`;
             } else {
                 let dur = a.services?.duration || 60; const [sh, sm] = (a.time||'00:00').split(':').map(Number);
                 let endStr = `${String(sh + Math.floor((sm + dur)/60)).padStart(2,'0')}:${String((sm + dur)%60).padStart(2,'0')}`;
@@ -1064,7 +1077,6 @@ const Modals = {
         }
         else if(type === 'bloquear_agenda') {
             let profSelectHtml = '';
-            // Se for Gestor/Owner, ele pode escolher quem bloquear
             if (App.role === 'owner') {
                 const { data: users } = await db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true);
                 profSelectHtml = `
@@ -1292,19 +1304,42 @@ const Actions = {
             const dur = parseInt(opt.dataset.dur || 60); const encaixe = document.getElementById('fa-encaixe').checked;
             const time = document.getElementById('fa-time').value; const date = document.getElementById('fa-date').value; const user_id = document.getElementById('fa-user').value;
 
-            if(!encaixe) {
-                const { data: over } = await db.from('appointments').select('time, status, notes, services(duration)').eq('date', date).eq('user_id', user_id).neq('status', 'cancelado');
-                let conflito = false;
-                if(over) {
-                    const sM = (time.split(':')[0]*60)+Number(time.split(':')[1]); const eM = sM + dur;
-                    over.forEach(a => {
-                        const [ash, asm] = (a.time||'00:00').split(':').map(Number);
-                        let aEM; if(a.status === 'bloqueado' && a.notes?.includes('BLOQUEIO_ATE:')) { aEM = (a.notes.split('|')[0].replace('BLOQUEIO_ATE:','').trim().split(':')[0]*60)+Number(a.notes.split('|')[0].replace('BLOQUEIO_ATE:','').trim().split(':')[1]); } else { aEM = (ash*60+asm) + (a.services?.duration||60); }
-                        const aSM = ash*60+asm; if(sM < aEM && eM > aSM) conflito = true;
-                    });
-                }
-                if(conflito) throw new Error('Horário ocupado! Marque Encaixe se necessário.');
+            // Busca os agendamentos já existentes naquele dia para o profissional
+            const { data: over } = await db.from('appointments').select('time, status, notes, services(duration)').eq('date', date).eq('user_id', user_id).neq('status', 'cancelado');
+            let conflitoNormal = false;
+            let conflitoAdmin = false;
+            
+            if(over) {
+                const sM = (time.split(':')[0]*60)+Number(time.split(':')[1]); const eM = sM + dur;
+                over.forEach(a => {
+                    const [ash, asm] = (a.time||'00:00').split(':').map(Number);
+                    let aEM; 
+                    if(a.status === 'bloqueado' && a.notes?.includes('BLOQUEIO_ATE:')) { 
+                        aEM = (a.notes.split('|')[0].replace('BLOQUEIO_ATE:','').trim().split(':')[0]*60)+Number(a.notes.split('|')[0].replace('BLOQUEIO_ATE:','').trim().split(':')[1]); 
+                    } else { 
+                        aEM = (ash*60+asm) + (a.services?.duration||60); 
+                    }
+                    const aSM = ash*60+asm; 
+                    
+                    // Se houver conflito de horário
+                    if(sM < aEM && eM > aSM) {
+                        if (a.status === 'bloqueado' && a.notes?.includes('ADMIN_BLOCK')) {
+                            conflitoAdmin = true;
+                        } else {
+                            conflitoNormal = true;
+                        }
+                    }
+                });
             }
+
+            // Regras de bloqueio rígidas:
+            if (conflitoAdmin && App.role !== 'owner') {
+                throw new Error('Horário bloqueado pelo Gestor. O Encaixe não é permitido neste caso.');
+            }
+            if ((conflitoNormal || conflitoAdmin) && !encaixe) {
+                throw new Error('Horário ocupado! Marque a opção "Forçar Encaixe" se for estritamente necessário.');
+            }
+
             await db.from('appointments').insert({ client_id: clientId, service_id: servSel.value, user_id: user_id, date: date, time: time, is_encaixe: encaixe, status: 'agendado' });
             
             Modals.close(); 
@@ -1325,9 +1360,11 @@ const Actions = {
         const end = document.getElementById('fb-end').value; 
         const motivo = document.getElementById('fb-motivo').value;
         
-        // Se houver a opção do Admin escolhendo o profissional, pega o valor dela. Caso contrário é o próprio usuário.
         const userTargetObj = document.getElementById('fb-user');
         const targetUserId = userTargetObj ? userTargetObj.value : App.user.id;
+        
+        // Se quem está bloqueando é o dono, adicionamos o selo invisível ADMIN_BLOCK no motivo
+        const isAdminBlock = App.role === 'owner' ? ' | ADMIN_BLOCK' : '';
 
         if (start >= end) return UI.toast('Término deve ser maior que início.', 'error');
         
@@ -1336,11 +1373,11 @@ const Actions = {
             date: date, 
             time: start, 
             status: 'bloqueado', 
-            notes: `BLOQUEIO_ATE:${end} | ${motivo}` 
+            notes: `BLOQUEIO_ATE:${end} | ${motivo}${isAdminBlock}` 
         });
         
         Modals.close(); 
-        UI.toast('Horário da agenda bloqueado!'); 
+        UI.toast('Horário bloqueado com sucesso!'); 
         Render.agendaDay(); 
     },
     

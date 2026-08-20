@@ -272,7 +272,6 @@ const Auth = {
         U.initFilters(); Nav.init(); Render.showMonthView(); 
         
         db.channel('custom-all-channel').on('postgres_changes', { event: '*', schema: 'public' }, payload => {
-            // Se alguém atualizar uma foto de perfil, baixe de novo para todos e atualiza a agenda em tempo real
             if(payload.table === 'user_avatars') {
                 this.fetchAllAvatars().then(() => {
                     this.updateHeaderAvatar();
@@ -429,23 +428,19 @@ const Render = {
             const cont = document.getElementById('agenda-list');
             if(!usersData || usersData.length === 0) { cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Nenhum profissional encontrado.</p></div>`; return; }
 
-            // NOVO ESPAÇAMENTO DA AGENDA
             const isDesktop = window.innerWidth > 900;
             const pixelsPerMin = isDesktop ? 1 : 1.3; 
             const slotHeight = isDesktop ? 60 : 78; 
             const horaInicio = 7; const horaFim = 21;
             
-            // CORREÇÃO: ADICIONADO overflow-x e sticky na coluna de tempo para scroll horizontal no Mobile
             let html = `<div class="timeline-wrapper" style="overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border: 1px solid var(--border); border-radius: 8px;">
                 <div class="timeline-header" style="display: flex; min-width: max-content; border-bottom: 1px solid var(--border);">
                     <div class="time-col" style="position: sticky; left: 0; z-index: 20; background: var(--surface); border:none; min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);"></div>`;
             
-            // CABEÇALHOS COM A FOTO DOS PROFISSIONAIS
             usersData.forEach(u => { 
                 let bgImage = (App.avatars && App.avatars[u.id]) ? `background-image: url(${App.avatars[u.id]}); background-size: cover; background-position: center; color: transparent;` : '';
                 let init = bgImage ? '' : u.name.substring(0,2).toUpperCase();
                 
-                // CORREÇÃO: min-width: 140px garante que não esprema no celular
                 html += `<div class="prof-col-header" style="display:flex; flex-direction:column; align-items:center; gap:5px; padding: 15px 10px; min-width: 140px; flex: 1; border-right: 1px solid var(--border);">
                     <div style="width: 45px; height: 45px; border-radius: 50%; background-color: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight:bold; border: 2px solid var(--primary-light); ${bgImage}">${init}</div>
                     <span style="font-size:0.95rem; font-weight: bold; margin-bottom:5px;">${u.name.split(' ')[0]}</span>
@@ -454,14 +449,12 @@ const Render = {
             html += `</div><div class="timeline-body" style="display: flex; min-width: max-content; position: relative;">
                 <div class="time-col" style="position: sticky; left: 0; z-index: 10; background: var(--surface); min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);">`;
             
-            // LINHAS DE HORÁRIOS
             for(let i=horaInicio; i<=horaFim; i++) { 
                 html += `<div class="time-slot" style="height:${slotHeight}px; min-height:${slotHeight}px; display:flex; justify-content:center; padding-top:8px; color:var(--muted); font-size:0.8rem; border-bottom: 1px solid var(--border);"><span>${String(i).padStart(2,'0')}:00</span></div>`; 
             }
             html += `</div><div class="tracks-container" style="display: flex; flex: 1;">`;
             
             usersData.forEach(u => {
-                // CORREÇÃO: min-width: 140px no bloco do profissional também
                 html += `<div class="prof-track" style="position: relative; min-width: 140px; flex: 1; border-right: 1px solid var(--border);">`;
                 
                 for(let i=horaInicio; i<=horaFim; i++) { 
@@ -527,10 +520,9 @@ const Render = {
         document.getElementById('cal-days-row').innerHTML = html;
     },
 
-    // FUNÇÕES DE CLIENTES (COM BARRA DE PESQUISA)
     async clientes() {
         const { data } = await db.from('clients').select('*').order('name');
-        window.allClientes = data || []; // Salva em memória para o filtro rápido
+        window.allClientes = data || [];
         this.renderClientesList(window.allClientes);
     },
     
@@ -692,12 +684,33 @@ const Render = {
             </div>`).join('');
     },
     
+    // TELA DE PRODUTOS ATUALIZADA COM O FILTRO E BUSCA
     async produtos() {
         const { data } = await db.from('products').select('*').order('name');
-        document.getElementById('produtos-list').innerHTML = data.map(p => `
+        window.allProdutos = data || [];
+        
+        const htmlTop = `
+            <div class="card" style="margin-bottom:20px; padding: 10px;">
+                <div class="input-group" style="margin:0;">
+                    <input type="text" placeholder="Buscar produto pelo nome..." onkeyup="Render.filterProdutos(this.value)" style="padding:1rem; border-radius:8px; border:1px solid var(--border); font-size: 1rem;">
+                </div>
+            </div>
+            <div id="produtos-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;"></div>
+        `;
+        document.getElementById('produtos-list').innerHTML = htmlTop;
+        this.renderProdutosList(window.allProdutos);
+    },
+    
+    renderProdutosList(data) {
+        const grid = document.getElementById('produtos-grid');
+        if(!grid) return;
+        if(data.length === 0) {
+            grid.innerHTML = '<p style="color:var(--muted); padding: 1rem;">Nenhum produto encontrado.</p>';
+            return;
+        }
+        grid.innerHTML = data.map(p => `
             <div class="card" style="border-top: 4px solid ${p.stock <= p.min_stock ? '#d32f2f' : 'var(--primary)'}">
                 <h4 style="font-size:1.1rem; margin-bottom:5px">${p.name}</h4>
-                <p style="font-size:0.8rem; color:var(--muted)">EAN: ${p.barcode}</p>
                 <div style="margin:10px 0; background:#f9f9f9; padding:10px; border-radius:8px; display:flex; justify-content:space-between">
                     <div><span style="font-size:0.7rem; color:var(--muted)">Preço Venda</span><p style="font-weight:bold">${U.money(p.price)}</p></div>
                     <div style="text-align:right"><span style="font-size:0.7rem; color:var(--muted)">Comissão</span><p style="font-weight:bold">${p.commission}%</p></div>
@@ -707,6 +720,12 @@ const Render = {
                     <button class="btn-secondary" style="width:auto; padding:0.6rem 1.2rem" onclick="Modals.open('add_estoque', '${p.id}', '${p.stock}')">+ Repor</button>
                 </div>
             </div>`).join('');
+    },
+    
+    filterProdutos(term) {
+        term = term.toLowerCase();
+        const filtered = (window.allProdutos || []).filter(p => p.name.toLowerCase().includes(term));
+        this.renderProdutosList(filtered);
     },
     
     async comandas() {
@@ -1044,7 +1063,22 @@ const Modals = {
                 <button type="submit" class="btn-primary" style="padding:1.2rem;">Confirmar Horário</button></form>`;
         }
         else if(type === 'bloquear_agenda') {
+            let profSelectHtml = '';
+            // Se for Gestor/Owner, ele pode escolher quem bloquear
+            if (App.role === 'owner') {
+                const { data: users } = await db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true);
+                profSelectHtml = `
+                    <div class="input-group" style="background:#fff3e0; border: 1px solid #ffb74d; padding:15px; border-radius:12px;">
+                        <label style="color:#e65100; font-weight:bold"><i class="ph ph-identification-badge"></i> Qual profissional bloquear?</label>
+                        <select id="fb-user" required style="border-color:#ffb74d">
+                            <option value="${App.user.id}">Bloquear a Mim Mesmo(a)</option>
+                            ${users.filter(u => u.id !== App.user.id).map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}
+                        </select>
+                    </div>`;
+            }
+            
             html += `<h3 style="text-align:center; margin-bottom:20px; color:#d32f2f">Bloquear Horário</h3><form onsubmit="Actions.blockAppointment(event)">
+                ${profSelectHtml}
                 <div class="input-group"><label>Data</label><input type="date" id="fb-date" required></div>
                 <div style="display:flex; gap:10px;"><div class="input-group"><label>Início</label><input type="time" id="fb-time" required></div><div class="input-group"><label>Término</label><input type="time" id="fb-end" required></div></div>
                 <div class="input-group"><label>Motivo / Justificativa</label><textarea id="fb-motivo" required rows="2"></textarea></div>
@@ -1070,8 +1104,7 @@ const Modals = {
         }
         else if(type === 'produto') {
             html += `<h3>Novo Produto</h3><form onsubmit="Actions.saveProduct(event)">
-                <div class="input-group"><label>Cód. Barras (Passe leitor ou digite+Enter)</label><input type="text" id="fp-bar" required onkeypress="if(event.key==='Enter'){event.preventDefault(); Actions.fetchBarcode(this.value);}"></div>
-                <div class="input-group"><label>Descrição do Produto</label><input type="text" id="fp-nome" required></div>
+                <div class="input-group"><label>Descrição do Produto</label><input type="text" id="fp-nome" required placeholder="Nome do Produto"></div>
                 <div style="display:flex; gap:10px; background:#f9f9f9; padding:15px; border-radius:12px; margin-bottom:15px"><div class="input-group"><label>Preço Venda (R$)</label><input type="number" id="fp-preco" step="0.01" required></div><div class="input-group"><label>Comissão (%)</label><input type="number" id="fp-com" max="100" required></div></div>
                 <div style="display:flex; gap:10px;"><div class="input-group"><label>Estoque Inicial</label><input type="number" id="fp-qtd" required></div><div class="input-group"><label>Alerta Mínimo</label><input type="number" id="fp-min" value="5" required></div></div>
                 <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar Produto</button></form>`;
@@ -1286,10 +1319,29 @@ const Actions = {
     },
     
     async blockAppointment(e) {
-        e.preventDefault(); const date = document.getElementById('fb-date').value; const start = document.getElementById('fb-time').value; const end = document.getElementById('fb-end').value; const motivo = document.getElementById('fb-motivo').value;
+        e.preventDefault(); 
+        const date = document.getElementById('fb-date').value; 
+        const start = document.getElementById('fb-time').value; 
+        const end = document.getElementById('fb-end').value; 
+        const motivo = document.getElementById('fb-motivo').value;
+        
+        // Se houver a opção do Admin escolhendo o profissional, pega o valor dela. Caso contrário é o próprio usuário.
+        const userTargetObj = document.getElementById('fb-user');
+        const targetUserId = userTargetObj ? userTargetObj.value : App.user.id;
+
         if (start >= end) return UI.toast('Término deve ser maior que início.', 'error');
-        await db.from('appointments').insert({ user_id: App.user.id, date: date, time: start, status: 'bloqueado', notes: `BLOQUEIO_ATE:${end} | ${motivo}` });
-        Modals.close(); UI.toast('Bloqueio feito!'); Render.agendaDay(); 
+        
+        await db.from('appointments').insert({ 
+            user_id: targetUserId, 
+            date: date, 
+            time: start, 
+            status: 'bloqueado', 
+            notes: `BLOQUEIO_ATE:${end} | ${motivo}` 
+        });
+        
+        Modals.close(); 
+        UI.toast('Horário da agenda bloqueado!'); 
+        Render.agendaDay(); 
     },
     
     async markAsArrived(id) { await db.from('appointments').update({ status: 'chegou' }).eq('id', id); Render.agendaDay(); Modals.close(); },
@@ -1429,15 +1481,19 @@ const Actions = {
         }); 
     },
     
-    async fetchBarcode(val) {
-        if(!val) return; document.getElementById('fp-nome').value = "Buscando...";
-        try {
-            const res = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent('https://api.produto.xyz/v1/gtin/'+val)}`);
-            const json = await res.json(); if(json?.Product?.name) { document.getElementById('fp-nome').value = json.Product.name; return; }
-        } catch(e) {}
-        document.getElementById('fp-nome').value = ""; document.getElementById('fp-nome').placeholder = "Digite manualmente..."; UI.toast('Não encontrado automaticamente.', 'warning');
+    async saveProduct(e) { 
+        e.preventDefault(); 
+        await db.from('products').insert({ 
+            name: document.getElementById('fp-nome').value, 
+            price: document.getElementById('fp-preco').value, 
+            commission: document.getElementById('fp-com').value, 
+            stock: document.getElementById('fp-qtd').value, 
+            min_stock: document.getElementById('fp-min').value 
+        }); 
+        Modals.close(); 
+        UI.toast('Salvo!'); 
+        Render.produtos(); 
     },
-    async saveProduct(e) { e.preventDefault(); await db.from('products').insert({ barcode: document.getElementById('fp-bar').value, name: document.getElementById('fp-nome').value, price: document.getElementById('fp-preco').value, commission: document.getElementById('fp-com').value, stock: document.getElementById('fp-qtd').value, min_stock: document.getElementById('fp-min').value }); Modals.close(); UI.toast('Salvo!'); Render.produtos(); },
     async updateStock(e, id, curStock) { e.preventDefault(); await db.from('products').update({stock: curStock + parseInt(document.getElementById('fa-qtd').value)}).eq('id', id); Modals.close(); UI.toast('Estoque atualizado!'); Render.produtos(); },
 
     async saveMensagem(e, id) { e.preventDefault(); const payload = { title: document.getElementById('fm-tit').value, content: document.getElementById('fm-txt').value }; if(id) await db.from('message_templates').update(payload).eq('id', id); else await db.from('message_templates').insert(payload); Modals.close(); Render.mensagens(); },

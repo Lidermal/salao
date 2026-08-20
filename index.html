@@ -188,8 +188,15 @@
                     <div id="comandas-list" class="data-grid"></div>
                 </section>
                 
+                <!-- VIEW CLIENTES (COM BARRA DE PESQUISA NOVA) -->
                 <section id="view-clientes" class="view">
-                    <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('cliente')">+ Cadastrar Cliente</button>
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:20px; flex-wrap:wrap">
+                        <button class="btn-primary desktop-only" style="width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('cliente')">+ Cadastrar Cliente</button>
+                        <div class="input-group" style="margin:0; flex:1; min-width:250px;">
+                            <input type="text" id="search-cliente" placeholder="🔍 Buscar cliente por nome ou telefone..." onkeyup="Render.filterClientes(this.value)" style="padding:0.8rem; border-radius:8px; border: 1px solid var(--border);">
+                        </div>
+                        <button class="btn-primary mobile-only" style="width:100%; padding: 0.8rem 1.5rem; margin-top:10px;" onclick="Modals.open('cliente')">+ Cadastrar Cliente</button>
+                    </div>
                     <div id="clientes-list" class="data-grid"></div>
                 </section>
 
@@ -327,6 +334,6 @@
 
     <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
     
-    <script src="script.js?v=9"></script>
+    <script src="script.js?v=10"></script>
 </body>
 </html>

@@ -17,7 +17,7 @@ const App = {
     calendarMonth: new Date(),
     charts: {}, 
     settings: {},
-    avatars: {}, // NOVO: Armazenar as fotos cacheadas
+    avatars: {}, 
     inflowCategories: ['Pix', 'Dinheiro', 'Cartão Crédito', 'Cartão Débito']
 };
 
@@ -251,28 +251,35 @@ const Auth = {
             
         } catch(e) { UI.toast(e.message, 'error'); btn.textContent = 'Entrar'; }
     },
+    async fetchAllAvatars() {
+        try {
+            const { data: avData } = await db.from('user_avatars').select('*');
+            if(avData) { avData.forEach(av => { App.avatars[av.user_id] = av.avatar_base64; }); }
+        } catch (e) { console.log('Tabela user_avatars ainda não existe. Será ignorada no carregamento inicial.'); }
+    },
     async success() {
         document.getElementById('auth-layer').classList.add('hidden'); 
         document.getElementById('system-layout').classList.remove('hidden');
         document.body.classList.toggle('is-owner', App.role === 'owner');
         
-        // CARREGA AS CONFIGURAÇÕES
         const { data: set } = await db.from('settings').select('*').single();
         if(set) { App.settings = set; document.getElementById('brand-name').textContent = set.studio_name; }
         
-        // CARREGA AVATARES DE TODOS OS USUÁRIOS
         App.avatars = {};
-        try {
-            const { data: avData } = await db.from('user_avatars').select('*');
-            if(avData) { avData.forEach(av => { App.avatars[av.user_id] = av.avatar_base64; }); }
-        } catch (e) { console.log('Tabela user_avatars ainda não existe. Será ignorada no carregamento inicial.'); }
-        
+        await this.fetchAllAvatars();
         this.updateHeaderAvatar();
         
         U.initFilters(); Nav.init(); Render.showMonthView(); 
         
         db.channel('custom-all-channel').on('postgres_changes', { event: '*', schema: 'public' }, payload => {
-            if(App.view === 'agenda') {
+            // Se alguém atualizar uma foto de perfil, baixe de novo para todos e atualiza a agenda em tempo real
+            if(payload.table === 'user_avatars') {
+                this.fetchAllAvatars().then(() => {
+                    this.updateHeaderAvatar();
+                    if(App.view === 'agenda' && !document.getElementById('agenda-day-view').classList.contains('hidden')) Render.agendaDay();
+                });
+            }
+            else if(App.view === 'agenda') {
                 if(!document.getElementById('agenda-day-view').classList.contains('hidden')) Render.agendaDay();
                 else Render.buildMonthCalendar();
             } else if(Render[App.view]) {
@@ -422,15 +429,15 @@ const Render = {
             const cont = document.getElementById('agenda-list');
             if(!usersData || usersData.length === 0) { cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Nenhum profissional encontrado.</p></div>`; return; }
 
-            // NOVO ESPAÇAMENTO DA AGENDA - DINÂMICO PC VS MOBILE
+            // NOVO ESPAÇAMENTO DA AGENDA - AINDA MAIS COMPACTO NO COMPUTADOR
             const isDesktop = window.innerWidth > 900;
-            const pixelsPerMin = isDesktop ? 1.5 : 2; // Menor espaço entre horários no PC
-            const slotHeight = isDesktop ? 90 : 120; // 60 mins * pixelsPerMin
+            const pixelsPerMin = isDesktop ? 1 : 1.3; // 1px por min no PC = slot de 60px (MUITO COMPACTO)
+            const slotHeight = isDesktop ? 60 : 78; // 60 mins * pixelsPerMin
             const horaInicio = 7; const horaFim = 21;
             
             let html = `<div class="timeline-wrapper"><div class="timeline-header"><div class="time-col" style="background:transparent; border:none;"></div>`;
             
-            // CABEÇALHOS COM A FOTO DOS PROFISSIONAIS
+            // CABEÇALHOS COM A FOTO DOS PROFISSIONAIS (AGORA TODO MUNDO VÊ)
             usersData.forEach(u => { 
                 let bgImage = (App.avatars && App.avatars[u.id]) ? `background-image: url(${App.avatars[u.id]}); background-size: cover; background-position: center; color: transparent;` : '';
                 let init = bgImage ? '' : u.name.substring(0,2).toUpperCase();
@@ -508,12 +515,18 @@ const Render = {
         document.getElementById('cal-days-row').innerHTML = html;
     },
 
+    // FUNÇÕES DE CLIENTES (COM BARRA DE PESQUISA)
     async clientes() {
         const { data } = await db.from('clients').select('*').order('name');
+        window.allClientes = data || []; // Salva em memória para o filtro rápido
+        this.renderClientesList(window.allClientes);
+    },
+    
+    renderClientesList(data) {
         document.getElementById('clientes-list').innerHTML = data.map(c => {
             const safeName = c.name.replace(/'/g, "\\'").replace(/"/g, '&quot;'); 
             return `
-            <div class="card">
+            <div class="card cliente-card">
                 <a href="#" class="wpp-btn" onclick="Modals.open('whatsapp', '${c.phone}', '${safeName}', JSON.stringify({cliente:'${safeName}', data_aniversario:'${c.birth_date ? new Date(c.birth_date).toLocaleDateString() : ''}'})); event.stopPropagation()"><i class="ph ph-whatsapp-logo"></i></a>
                 <h4 style="color:var(--primary); font-size:1.2rem; margin-bottom:10px">${c.name}</h4><p><i class="ph ph-phone"></i> ${c.phone}</p>
                 <p style="font-size:0.8rem; color:var(--muted); margin-top:5px"><i class="ph ph-cake"></i> ${c.birth_date ? new Date(c.birth_date).toLocaleDateString('pt-BR') : 'Não cadastrado'}</p>
@@ -524,6 +537,14 @@ const Render = {
                 </div>
             </div>`;
         }).join('');
+    },
+    
+    filterClientes(term) {
+        term = term.toLowerCase();
+        const filtered = (window.allClientes || []).filter(c => 
+            c.name.toLowerCase().includes(term) || (c.phone && c.phone.includes(term))
+        );
+        this.renderClientesList(filtered);
     },
     
     anamnese(id, name) {
@@ -988,7 +1009,6 @@ const Modals = {
         else if(type === 'agendamento') {
             const [c, s, u] = await Promise.all([db.from('clients').select('id,name').order('name'), db.from('services').select('id,name,duration'), db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true)]);
             
-            // NOVO: Adicionado opção de criar cliente direto da tela de agendamento
             html += `<h3 style="text-align:center; margin-bottom:20px; color:var(--primary-dark)">Novo Agendamento</h3><form onsubmit="Actions.createAppointment(event)">
                 <div class="input-group">
                     <label>Cliente</label>
@@ -1211,7 +1231,6 @@ const Actions = {
         try {
             let clientId = document.getElementById('fa-cli').value;
             
-            // NOVO: CADASTRO DO CLIENTE DIRETO NA TELA DA AGENDA
             if(clientId === 'NEW') {
                 const newNome = document.getElementById('fa-new-nome').value.trim();
                 const newFone = document.getElementById('fa-new-fone').value.trim();
@@ -1221,7 +1240,7 @@ const Actions = {
                 if(cliErr || !newCli) throw new Error('Erro ao salvar o cliente novo no banco de dados.');
                 
                 clientId = newCli.id;
-                Render.clientes(); // Atualiza a aba de clientes no background
+                Render.clientes(); 
             }
 
             const servSel = document.getElementById('fa-serv'); const opt = servSel.options[servSel.selectedIndex];
@@ -1354,7 +1373,7 @@ const Actions = {
             const payload = { 
                 name: document.getElementById('fs-nome').value.trim(), 
                 price: parseFloat(document.getElementById('fs-valor').value.replace(',', '.')) || 0, 
-                cost: parseFloat(document.getElementById('fs-custo').value) || 0, // FIXED: cost instead of cost_percentage
+                cost: parseFloat(document.getElementById('fs-custo').value) || 0, 
                 commission: parseFloat(document.getElementById('fs-com').value) || 0, 
                 duration: parseInt(document.getElementById('fs-duracao').value) || 60, 
                 has_assistant: aux, 
@@ -1462,7 +1481,6 @@ const Actions = {
         Modals.close(); window.open(`https://wa.me/55${phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
     },
 
-    // NOVO: TRATAMENTO DE IMAGEM NO PERFIL
     previewAndSaveAvatar(event) {
         const file = event.target.files[0];
         if(!file) return;

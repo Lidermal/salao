@@ -1305,12 +1305,60 @@ const Actions = {
     },
 
     async saveService(e, id) {
-        e.preventDefault(); const aux = document.getElementById('fs-aux').checked;
-        const payload = { name: document.getElementById('fs-nome').value, price: document.getElementById('fs-valor').value, cost_percentage: document.getElementById('fs-custo').value, commission: document.getElementById('fs-com').value, duration: document.getElementById('fs-duracao').value, has_assistant: aux, assistant_commission: aux ? document.getElementById('fs-auxcom').value : 0 };
-        if(id) await db.from('services').update(payload).eq('id', id); else await db.from('services').insert(payload);
-        Modals.close(); UI.toast('Salvo!'); Render.servicos();
+        e.preventDefault(); 
+        const btn = e.target.querySelector('button[type="submit"]');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = 'Salvando...';
+        btn.disabled = true;
+
+        try {
+            const aux = document.getElementById('fs-aux').checked;
+            const payload = { 
+                name: document.getElementById('fs-nome').value.trim(), 
+                price: parseFloat(document.getElementById('fs-valor').value.replace(',', '.')) || 0, 
+                cost_percentage: parseFloat(document.getElementById('fs-custo').value) || 0, 
+                commission: parseFloat(document.getElementById('fs-com').value) || 0, 
+                duration: parseInt(document.getElementById('fs-duracao').value) || 60, 
+                has_assistant: aux, 
+                assistant_commission: aux ? (parseFloat(document.getElementById('fs-auxcom').value) || 0) : 0 
+            };
+            
+            let response;
+            if(id) {
+                response = await db.from('services').update(payload).eq('id', id);
+            } else {
+                response = await db.from('services').insert([payload]); 
+            }
+
+            if (response.error) throw response.error;
+
+            Modals.close(); 
+            UI.toast('Serviço salvo com sucesso!'); 
+            Render.servicos();
+        } catch (error) {
+            console.error("Erro no Supabase:", error);
+            UI.toast('Erro ao salvar: ' + error.message, 'error');
+        } finally {
+            if(btn) {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
     },
-    async deleteService(id) { UI.confirm('Excluir serviço?', async () => { await db.from('services').delete().eq('id', id); Render.servicos(); }); },
+    
+    async deleteService(id) { 
+        UI.confirm('Deseja realmente excluir este serviço?', async () => { 
+            try {
+                const { error } = await db.from('services').delete().eq('id', id);
+                if (error) throw error;
+                UI.toast('Serviço excluído!');
+                Render.servicos(); 
+            } catch (error) {
+                console.error("Erro ao excluir:", error);
+                UI.toast('Erro ao excluir: ' + error.message, 'error');
+            }
+        }); 
+    },
     
     async fetchBarcode(val) {
         if(!val) return; document.getElementById('fp-nome').value = "Buscando...";

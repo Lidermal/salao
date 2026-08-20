@@ -429,32 +429,44 @@ const Render = {
             const cont = document.getElementById('agenda-list');
             if(!usersData || usersData.length === 0) { cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Nenhum profissional encontrado.</p></div>`; return; }
 
-            // NOVO ESPAÇAMENTO DA AGENDA - AINDA MAIS COMPACTO NO COMPUTADOR
+            // NOVO ESPAÇAMENTO DA AGENDA
             const isDesktop = window.innerWidth > 900;
-            const pixelsPerMin = isDesktop ? 1 : 1.3; // 1px por min no PC = slot de 60px (MUITO COMPACTO)
-            const slotHeight = isDesktop ? 60 : 78; // 60 mins * pixelsPerMin
+            const pixelsPerMin = isDesktop ? 1 : 1.3; 
+            const slotHeight = isDesktop ? 60 : 78; 
             const horaInicio = 7; const horaFim = 21;
             
-            let html = `<div class="timeline-wrapper"><div class="timeline-header"><div class="time-col" style="background:transparent; border:none;"></div>`;
+            // CORREÇÃO: ADICIONADO overflow-x e sticky na coluna de tempo para scroll horizontal no Mobile
+            let html = `<div class="timeline-wrapper" style="overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border: 1px solid var(--border); border-radius: 8px;">
+                <div class="timeline-header" style="display: flex; min-width: max-content; border-bottom: 1px solid var(--border);">
+                    <div class="time-col" style="position: sticky; left: 0; z-index: 20; background: var(--surface); border:none; min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);"></div>`;
             
-            // CABEÇALHOS COM A FOTO DOS PROFISSIONAIS (AGORA TODO MUNDO VÊ)
+            // CABEÇALHOS COM A FOTO DOS PROFISSIONAIS
             usersData.forEach(u => { 
                 let bgImage = (App.avatars && App.avatars[u.id]) ? `background-image: url(${App.avatars[u.id]}); background-size: cover; background-position: center; color: transparent;` : '';
                 let init = bgImage ? '' : u.name.substring(0,2).toUpperCase();
-                html += `<div class="prof-col-header" style="display:flex; flex-direction:column; align-items:center; gap:5px; padding-top:10px;">
-                    <div style="width: 40px; height: 40px; border-radius: 50%; background-color: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight:bold; border: 2px solid var(--primary-light); ${bgImage}">${init}</div>
-                    <span style="font-size:0.95rem; margin-bottom:5px;">${u.name.split(' ')[0]}</span>
+                
+                // CORREÇÃO: min-width: 140px garante que não esprema no celular
+                html += `<div class="prof-col-header" style="display:flex; flex-direction:column; align-items:center; gap:5px; padding: 15px 10px; min-width: 140px; flex: 1; border-right: 1px solid var(--border);">
+                    <div style="width: 45px; height: 45px; border-radius: 50%; background-color: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight:bold; border: 2px solid var(--primary-light); ${bgImage}">${init}</div>
+                    <span style="font-size:0.95rem; font-weight: bold; margin-bottom:5px;">${u.name.split(' ')[0]}</span>
                 </div>`; 
             });
-            html += `</div><div class="timeline-body"><div class="time-col">`;
+            html += `</div><div class="timeline-body" style="display: flex; min-width: max-content; position: relative;">
+                <div class="time-col" style="position: sticky; left: 0; z-index: 10; background: var(--surface); min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);">`;
             
             // LINHAS DE HORÁRIOS
-            for(let i=horaInicio; i<=horaFim; i++) { html += `<div class="time-slot" style="height:${slotHeight}px; min-height:${slotHeight}px;"><span>${String(i).padStart(2,'0')}:00</span></div>`; }
-            html += `</div><div class="tracks-container">`;
+            for(let i=horaInicio; i<=horaFim; i++) { 
+                html += `<div class="time-slot" style="height:${slotHeight}px; min-height:${slotHeight}px; display:flex; justify-content:center; padding-top:8px; color:var(--muted); font-size:0.8rem; border-bottom: 1px solid var(--border);"><span>${String(i).padStart(2,'0')}:00</span></div>`; 
+            }
+            html += `</div><div class="tracks-container" style="display: flex; flex: 1;">`;
             
             usersData.forEach(u => {
-                html += `<div class="prof-track">`;
-                for(let i=horaInicio; i<=horaFim; i++) { html += `<div class="track-line" style="height:${slotHeight}px; min-height:${slotHeight}px;"></div>`; }
+                // CORREÇÃO: min-width: 140px no bloco do profissional também
+                html += `<div class="prof-track" style="position: relative; min-width: 140px; flex: 1; border-right: 1px solid var(--border);">`;
+                
+                for(let i=horaInicio; i<=horaFim; i++) { 
+                    html += `<div class="track-line" style="height:${slotHeight}px; min-height:${slotHeight}px; border-bottom: 1px dashed var(--border);"></div>`; 
+                }
                 
                 const userApps = (agData || []).filter(a => a.user_id === u.id);
                 userApps.forEach(a => {
@@ -484,14 +496,14 @@ const Render = {
 
                     const wppBtn = (!isBlocked && a.status === 'agendado') ? `<button onclick="event.stopPropagation(); Actions.sendConfirmacao('${a.id}')"><i class="ph ph-whatsapp-logo"></i></button>` : '';
                     const chkBtn = (!isBlocked && a.status === 'agendado') ? `<button onclick="event.stopPropagation(); Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i></button>` : '';
-                    let extraStyle = isEncaixe ? 'width: 80%; left: 15%; z-index: 10; box-shadow: -4px 4px 15px rgba(0,0,0,0.15); border-left-width: 6px;' : '';
+                    let extraStyle = isEncaixe ? 'width: 80%; left: 10%; z-index: 10; box-shadow: -4px 4px 15px rgba(0,0,0,0.15); border-left-width: 6px;' : 'width: 96%; left: 2%;';
 
                     html += `
-                    <div class="agenda-card ${isCompact ? 'compact' : ''}" style="top:${top}px; height:${height}px; background:${bg}; border-left:4px solid ${border}; color:${color}; ${extraStyle}" onclick="Modals.open('detalhes_agendamento', '${a.id}')">
-                        <div class="ac-time">${a.time.slice(0,5)} - ${endStr.slice(0,5)}</div>
-                        <div class="ac-title"><i class="ph ${isBlocked ? 'ph-prohibit' : 'ph-user'}"></i> ${isBlocked ? 'Bloqueado' : (a.clients?.name || 'Cliente')}</div>
-                        <div class="ac-sub">${!isBlocked ? (a.services?.name || '') : (a.notes || '')}</div>
-                        <div class="ac-actions">${chkBtn} ${wppBtn}</div>
+                    <div class="agenda-card ${isCompact ? 'compact' : ''}" style="position: absolute; top:${top}px; height:${height}px; background:${bg}; border-left:4px solid ${border}; color:${color}; border-radius: 6px; padding: 6px; overflow: hidden; font-size: 0.85rem; cursor: pointer; transition: 0.2s; ${extraStyle}" onclick="Modals.open('detalhes_agendamento', '${a.id}')">
+                        <div class="ac-time" style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 2px;">${a.time.slice(0,5)} - ${endStr.slice(0,5)}</div>
+                        <div class="ac-title" style="font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><i class="ph ${isBlocked ? 'ph-prohibit' : 'ph-user'}"></i> ${isBlocked ? 'Bloqueado' : (a.clients?.name || 'Cliente')}</div>
+                        <div class="ac-sub" style="font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${!isBlocked ? (a.services?.name || '') : (a.notes || '')}</div>
+                        <div class="ac-actions" style="position: absolute; right: 5px; top: 5px; display: flex; gap: 5px;">${chkBtn} ${wppBtn}</div>
                     </div>`;
                 });
                 html += `</div>`;

@@ -17,6 +17,7 @@ const App = {
     calendarMonth: new Date(),
     charts: {}, 
     settings: {},
+    avatars: {}, // NOVO: Armazenar as fotos cacheadas
     inflowCategories: ['Pix', 'Dinheiro', 'Cartão Crédito', 'Cartão Débito']
 };
 
@@ -24,11 +25,10 @@ const U = {
     money: v => new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'}).format(v||0),
     iso: d => { const tzOffset = d.getTimezoneOffset() * 60000; return (new Date(d.getTime() - tzOffset)).toISOString().split('T')[0]; },
     
-    /* BLINDAGEM DA DATA: Força a leitura do horário exato salvo para o extrato */
     date: d => {
         if(!d) return '';
         let dateObj = new Date(d);
-        if(d.length === 10) dateObj = new Date(d + 'T12:00:00'); // Evita bugs caso o BD ainda esteja mandando só o dia
+        if(d.length === 10) dateObj = new Date(d + 'T12:00:00'); 
         return dateObj.toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
     },
 
@@ -77,31 +77,21 @@ const U = {
 
         (desp || []).forEach(d => {
             const isIncome = App.inflowCategories.includes(d.category);
-            const item = {
-                type: isIncome ? 'in' : 'out',
-                desc: d.description,
-                val: d.amount,
-                date: new Date(d.date),
-                category: d.category
-            };
-            if(isIncome) totalIn += d.amount;
-            else totalOut += d.amount;
+            const item = { type: isIncome ? 'in' : 'out', desc: d.description, val: d.amount, date: new Date(d.date), category: d.category };
+            if(isIncome) totalIn += d.amount; else totalOut += d.amount;
             extrato.push(item);
         });
 
         extrato.sort((a, b) => a.date - b.date);
-        
         let saldoAtual = 0;
         extrato = extrato.map(item => {
             saldoAtual += item.type === 'in' ? item.val : -item.val;
             return { ...item, saldo: saldoAtual };
         });
-        
         extrato.reverse();
         return { extrato, totalIn, totalOut };
     },
 
-    /* FUNÇÃO AUXILIAR PARA QUEBRAR A LINHA DO CLIENTE NO EXTRATO */
     formatDesc: (text) => {
         if(text.includes('| Cliente:')) {
             const parts = text.split('| Cliente:');
@@ -114,10 +104,7 @@ const U = {
         const opts = this.generateQuinzenasOptions();
         ['filter-comanda-quinzena', 'filter-comissao-quinzena', 'filter-relatorios'].forEach(id => {
             const el = document.getElementById(id);
-            if(el) {
-                el.innerHTML = opts;
-                el.value = this.getCurrentQuinzenaValue();
-            }
+            if(el) { el.innerHTML = opts; el.value = this.getCurrentQuinzenaValue(); }
         });
     }
 };
@@ -150,7 +137,7 @@ const UI = {
     }
 };
 
-/* TOUR COMPLETO E DINÂMICO (WEB, MOBILE E BASEADO EM PERFIL) - CORRIGIDO */
+/* TOUR COMPLETO E DINÂMICO */
 const Tour = {
     allSteps: [
         { role: 'all', view: 'agenda', target: '#btn-novo-agendamento-tour', mobileTarget: '.fab-button', title: '1. Agenda Inteligente', text: 'Aqui você visualiza e gerencia horários. Clique aqui para agendar um cliente, gerar um encaixe ou bloquear a agenda.' },
@@ -171,106 +158,59 @@ const Tour = {
     steps: [],
     current: 0,
     start() {
-        if (App.role === 'owner') {
-            this.steps = [...this.allSteps];
-        } else {
-            this.steps = this.allSteps.filter(s => s.role === 'all');
-        }
-
-        this.steps.forEach((s, index) => {
-            s.title = s.title.replace(/^\d+\./, `${index + 1}.`);
-        });
-
+        if (App.role === 'owner') { this.steps = [...this.allSteps]; } else { this.steps = this.allSteps.filter(s => s.role === 'all'); }
+        this.steps.forEach((s, index) => { s.title = s.title.replace(/^\d+\./, `${index + 1}.`); });
         this.current = 0;
         document.getElementById('tour-overlay').classList.remove('hidden');
-
-        if(window.innerWidth > 900) {
-            document.getElementById('main-sidebar').classList.add('open');
-        } else {
-            Nav.closeMenu();
-        }
+        if(window.innerWidth > 900) { document.getElementById('main-sidebar').classList.add('open'); } else { Nav.closeMenu(); }
         this.showStep();
     },
     showStep() {
         if(this.current >= this.steps.length) return this.skip();
         const s = this.steps[this.current];
-
         Nav.showView(s.view);
         if(window.innerWidth <= 900) Nav.closeMenu();
-
         document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
 
         setTimeout(() => {
             const isMobile = window.innerWidth <= 900;
-
-            // Insere o texto primeiro para o cálculo de altura da caixa funcionar depois
             document.getElementById('tour-title').textContent = s.title;
             document.getElementById('tour-desc').textContent = s.text;
             document.getElementById('tour-dots').innerHTML = this.steps.map((_, i) => `<span style="height:8px; width:8px; border-radius:50%; background:${i===this.current?'var(--primary)':'#ccc'}"></span>`).join('');
             document.getElementById('tour-next-btn').innerHTML = this.current === this.steps.length - 1 ? 'Concluir <i class="ph ph-check"></i>' : 'Próximo <i class="ph ph-arrow-right"></i>';
 
-            // Se o passo foi marcado para centralizar (páginas cheias)
-            if (s.center) {
-                return this.centerDialog();
-            }
-
+            if (s.center) return this.centerDialog();
             let targetSelector = isMobile && s.mobileTarget ? s.mobileTarget : s.target;
             let targetEl = document.querySelector(targetSelector);
-
-            if(targetEl && targetEl.offsetParent === null && s.target) {
-                targetEl = document.querySelector(s.target);
-            }
-
+            if(targetEl && targetEl.offsetParent === null && s.target) targetEl = document.querySelector(s.target);
             if(targetEl && targetEl.offsetParent !== null) {
                 const rect = targetEl.getBoundingClientRect();
-                // Blindagem: Se o elemento alvo continuar sendo gigantesco, centraliza automaticamente para não quebrar a tela
-                if (rect.height > window.innerHeight * 0.6 || rect.width > window.innerWidth * 0.9) {
-                    this.centerDialog();
-                } else {
-                    targetEl.classList.add('tour-highlight');
-                    this.positionDialog(targetEl, isMobile);
-                }
-            } else {
-                this.centerDialog();
-            }
+                if (rect.height > window.innerHeight * 0.6 || rect.width > window.innerWidth * 0.9) { this.centerDialog(); } 
+                else { targetEl.classList.add('tour-highlight'); this.positionDialog(targetEl, isMobile); }
+            } else { this.centerDialog(); }
         }, 400);
     },
     positionDialog(targetEl, isMobile) {
         const dialog = document.getElementById('tour-dialog');
-        dialog.style.transform = 'none';
-        dialog.style.bottom = 'auto'; // Reseta CSS
-
+        dialog.style.transform = 'none'; dialog.style.bottom = 'auto'; 
         const rect = targetEl.getBoundingClientRect();
-        let top = rect.bottom + 15;
-        let left = rect.left;
+        let top = rect.bottom + 15; let left = rect.left;
 
         if (isMobile) {
-            dialog.style.width = 'calc(100% - 40px)';
-            left = 20;
-            // Cálculo inteligente: se bater no fundo da tela (ex: Botão FAB Flutuante) joga o balão pra cima dele
-            if (rect.bottom > window.innerHeight - 100 || top + dialog.offsetHeight > window.innerHeight) {
-                top = rect.top - dialog.offsetHeight - 15;
-            }
+            dialog.style.width = 'calc(100% - 40px)'; left = 20;
+            if (rect.bottom > window.innerHeight - 100 || top + dialog.offsetHeight > window.innerHeight) { top = rect.top - dialog.offsetHeight - 15; }
         } else {
             dialog.style.width = '350px';
             if (left + 350 > window.innerWidth) { left = window.innerWidth - 370; }
-            // Se o balão no PC tentar vazar pra baixo da tela, joga pra cima
-            if (top + dialog.offsetHeight > window.innerHeight) {
-                top = rect.top - dialog.offsetHeight - 15;
-            }
+            if (top + dialog.offsetHeight > window.innerHeight) { top = rect.top - dialog.offsetHeight - 15; }
         }
-
-        if (top < 20) top = 20; // Impede que o balão vaze pelo topo da tela
-
-        dialog.style.top = `${top}px`;
-        dialog.style.left = `${left}px`;
+        if (top < 20) top = 20; 
+        dialog.style.top = `${top}px`; dialog.style.left = `${left}px`;
     },
     centerDialog() {
         const dialog = document.getElementById('tour-dialog');
-        dialog.style.top = '50%';
-        dialog.style.left = '50%';
-        dialog.style.bottom = 'auto';
-        dialog.style.transform = 'translate(-50%, -50%)'; // Mantém no exato meio da tela
+        dialog.style.top = '50%'; dialog.style.left = '50%'; dialog.style.bottom = 'auto';
+        dialog.style.transform = 'translate(-50%, -50%)'; 
         dialog.style.width = window.innerWidth <= 900 ? 'calc(100% - 40px)' : '350px';
     },
     next() { this.current++; this.showStep(); },
@@ -314,12 +254,20 @@ const Auth = {
     async success() {
         document.getElementById('auth-layer').classList.add('hidden'); 
         document.getElementById('system-layout').classList.remove('hidden');
-        document.getElementById('header-user').textContent = App.user.name.split(' ')[0]; 
-        document.getElementById('header-avatar').textContent = App.user.name.substring(0,2).toUpperCase();
         document.body.classList.toggle('is-owner', App.role === 'owner');
         
+        // CARREGA AS CONFIGURAÇÕES
         const { data: set } = await db.from('settings').select('*').single();
         if(set) { App.settings = set; document.getElementById('brand-name').textContent = set.studio_name; }
+        
+        // CARREGA AVATARES DE TODOS OS USUÁRIOS
+        App.avatars = {};
+        try {
+            const { data: avData } = await db.from('user_avatars').select('*');
+            if(avData) { avData.forEach(av => { App.avatars[av.user_id] = av.avatar_base64; }); }
+        } catch (e) { console.log('Tabela user_avatars ainda não existe. Será ignorada no carregamento inicial.'); }
+        
+        this.updateHeaderAvatar();
         
         U.initFilters(); Nav.init(); Render.showMonthView(); 
         
@@ -331,6 +279,22 @@ const Auth = {
                 Render[App.view]();
             }
         }).subscribe();
+    },
+    updateHeaderAvatar() {
+        document.getElementById('header-user').textContent = App.user.name.split(' ')[0]; 
+        const av = document.getElementById('header-avatar');
+        
+        if(App.avatars[App.user.id]) {
+            av.innerHTML = '';
+            av.style.backgroundImage = `url(${App.avatars[App.user.id]})`;
+            av.style.backgroundSize = 'cover';
+            av.style.backgroundPosition = 'center';
+            av.style.color = 'transparent';
+        } else {
+            av.innerHTML = App.user.name.substring(0,2).toUpperCase();
+            av.style.backgroundImage = 'none';
+            av.style.color = 'white';
+        }
     },
     logout() { 
         UI.confirm('Deseja realmente sair da sua conta?', () => { window.location.reload(true); }); 
@@ -353,10 +317,24 @@ const Nav = {
         document.querySelectorAll('.nav-link, .b-item').forEach(el => el.classList.remove('active'));
         document.querySelectorAll(`[data-view="${id}"]`).forEach(el => el.classList.add('active'));
         
-        const titles = { agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', anamnese:'Ficha de Avaliação', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', relatorios:'Relatórios & Arquivos' };
+        const titles = { perfil: 'Meu Perfil', agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', anamnese:'Ficha de Avaliação', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', relatorios:'Relatórios & Arquivos' };
         document.getElementById('page-title').textContent = titles[id] || 'Amor que Cuida';
         
         if (id === 'agenda') { Render.showMonthView(); } 
+        else if (id === 'perfil') {
+            document.getElementById('perfil-nome').textContent = App.user.name;
+            document.getElementById('perfil-role').textContent = App.role === 'owner' ? 'Gestor / Proprietário' : 'Colaborador';
+            const preview = document.getElementById('perfil-foto-preview');
+            if(App.avatars[App.user.id]) {
+                preview.innerHTML = '';
+                preview.style.backgroundImage = `url(${App.avatars[App.user.id]})`;
+                preview.style.backgroundSize = 'cover';
+                preview.style.backgroundPosition = 'center';
+            } else {
+                preview.innerHTML = App.user.name.substring(0,2).toUpperCase();
+                preview.style.backgroundImage = 'none';
+            }
+        }
         else {
             const detailViews = ['anamnese', 'perfil-cliente'];
             if(Render[id] && !detailViews.includes(id)) {
@@ -444,16 +422,32 @@ const Render = {
             const cont = document.getElementById('agenda-list');
             if(!usersData || usersData.length === 0) { cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Nenhum profissional encontrado.</p></div>`; return; }
 
-            const pixelsPerMin = 2; const horaInicio = 7; const horaFim = 21;
+            // NOVO ESPAÇAMENTO DA AGENDA - DINÂMICO PC VS MOBILE
+            const isDesktop = window.innerWidth > 900;
+            const pixelsPerMin = isDesktop ? 1.5 : 2; // Menor espaço entre horários no PC
+            const slotHeight = isDesktop ? 90 : 120; // 60 mins * pixelsPerMin
+            const horaInicio = 7; const horaFim = 21;
+            
             let html = `<div class="timeline-wrapper"><div class="timeline-header"><div class="time-col" style="background:transparent; border:none;"></div>`;
-            usersData.forEach(u => { html += `<div class="prof-col-header">${u.name.split(' ')[0]}</div>`; });
+            
+            // CABEÇALHOS COM A FOTO DOS PROFISSIONAIS
+            usersData.forEach(u => { 
+                let bgImage = (App.avatars && App.avatars[u.id]) ? `background-image: url(${App.avatars[u.id]}); background-size: cover; background-position: center; color: transparent;` : '';
+                let init = bgImage ? '' : u.name.substring(0,2).toUpperCase();
+                html += `<div class="prof-col-header" style="display:flex; flex-direction:column; align-items:center; gap:5px; padding-top:10px;">
+                    <div style="width: 40px; height: 40px; border-radius: 50%; background-color: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight:bold; border: 2px solid var(--primary-light); ${bgImage}">${init}</div>
+                    <span style="font-size:0.95rem; margin-bottom:5px;">${u.name.split(' ')[0]}</span>
+                </div>`; 
+            });
             html += `</div><div class="timeline-body"><div class="time-col">`;
-            for(let i=horaInicio; i<=horaFim; i++) { html += `<div class="time-slot"><span>${String(i).padStart(2,'0')}:00</span></div>`; }
+            
+            // LINHAS DE HORÁRIOS
+            for(let i=horaInicio; i<=horaFim; i++) { html += `<div class="time-slot" style="height:${slotHeight}px; min-height:${slotHeight}px;"><span>${String(i).padStart(2,'0')}:00</span></div>`; }
             html += `</div><div class="tracks-container">`;
             
             usersData.forEach(u => {
                 html += `<div class="prof-track">`;
-                for(let i=horaInicio; i<=horaFim; i++) { html += `<div class="track-line"></div>`; }
+                for(let i=horaInicio; i<=horaFim; i++) { html += `<div class="track-line" style="height:${slotHeight}px; min-height:${slotHeight}px;"></div>`; }
                 
                 const userApps = (agData || []).filter(a => a.user_id === u.id);
                 userApps.forEach(a => {
@@ -659,7 +653,7 @@ const Render = {
                 <div style="margin:10px 0; color:var(--muted)">
                     <p>Comissão Pro: <b style="color:var(--text)">${s.commission}%</b></p>
                     ${s.has_assistant?`<p>Auxiliar: <b style="color:var(--text)">${s.assistant_commission}%</b></p>`:''}
-                    <p>Custo Fixo Retido: <b style="color:#d32f2f">${s.cost_percentage || 0}%</b></p>
+                    <p>Custo Fixo Retido: <b style="color:#d32f2f">${s.cost || 0}%</b></p>
                 </div>
                 <div class="val" style="font-size:1.5rem">${U.money(s.price)}</div>
             </div>`).join('');
@@ -983,7 +977,7 @@ const Modals = {
             </div>`;
             
             if(!isFechada) {
-                const sOpts = servicos.map(s => `<option value='{"id":"${s.id}","name":"${s.name}","price":${s.price},"cost_percentage":${s.cost_percentage || 0},"commission":${s.commission},"type":"service"}'>${s.name} - ${U.money(s.price)}</option>`).join('');
+                const sOpts = servicos.map(s => `<option value='{"id":"${s.id}","name":"${s.name}","price":${s.price},"cost":${s.cost || 0},"commission":${s.commission},"type":"service"}'>${s.name} - ${U.money(s.price)}</option>`).join('');
                 const pOpts = produtos.map(p => `<option value='{"id":"${p.id}","name":"${p.name}","price":${p.price},"commission":${p.commission},"type":"product"}'>${p.name} (Est. ${p.stock}) - ${U.money(p.price)}</option>`).join('');
                 html += `<div style="display:flex; gap:10px; margin-bottom:20px; align-items: flex-end;"><div class="input-group" style="margin:0; flex:1"><label>Adicionar Item</label><select id="add-item-sel" style="padding:1.2rem;"><option value="">-- Buscar --</option><optgroup label="Serviços">${sOpts}</optgroup><optgroup label="Produtos">${pOpts}</optgroup></select></div><button type="button" class="btn-secondary" style="width:auto; padding:1.2rem;" onclick="Actions.addComandaItem('${comanda.id}')"><i class="ph ph-plus"></i></button></div>
                 <button type="button" id="btn-fechar-com" class="btn-primary" style="background:#2e7d32; padding:1.2rem;" onclick="Actions.closeComanda('${comanda.id}', '${comanda.client_id}', ${comanda.total}, '${comanda.ticket}', '${comanda.professional_id}')"><i class="ph ph-check-circle"></i> Faturar e Separar Comissões</button>`;
@@ -993,8 +987,24 @@ const Modals = {
         }
         else if(type === 'agendamento') {
             const [c, s, u] = await Promise.all([db.from('clients').select('id,name').order('name'), db.from('services').select('id,name,duration'), db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true)]);
+            
+            // NOVO: Adicionado opção de criar cliente direto da tela de agendamento
             html += `<h3 style="text-align:center; margin-bottom:20px; color:var(--primary-dark)">Novo Agendamento</h3><form onsubmit="Actions.createAppointment(event)">
-                <div class="input-group"><label>Cliente</label><select id="fa-cli" required><option value="">-- Selecione --</option>${c.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select></div>
+                <div class="input-group">
+                    <label>Cliente</label>
+                    <select id="fa-cli" required style="padding:1.2rem;" onchange="if(this.value==='NEW'){document.getElementById('fa-new-cli-div').style.display='block';}else{document.getElementById('fa-new-cli-div').style.display='none';}">
+                        <option value="">-- Selecione --</option>
+                        <option value="NEW" style="font-weight:bold; color:#2e7d32;">+ CADASTRAR NOVO CLIENTE AQUI</option>
+                        ${c.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}
+                    </select>
+                </div>
+                
+                <div id="fa-new-cli-div" style="display:none; background:#f1f8e9; padding:15px; border-radius:12px; margin-bottom:15px; border:1px solid #c5e1a5;">
+                    <p style="font-size:0.8rem; color:#2e7d32; font-weight:bold; margin-bottom:10px;"><i class="ph ph-user-plus"></i> Cadastro Rápido</p>
+                    <div class="input-group" style="margin-bottom:10px;"><label>Nome Completo (Novo Cliente)</label><input type="text" id="fa-new-nome" placeholder="Ex: Maria Silva"></div>
+                    <div class="input-group" style="margin:0;"><label>WhatsApp com DDD</label><input type="text" id="fa-new-fone" placeholder="Ex: 86999999999"></div>
+                </div>
+
                 <div class="input-group"><label>Serviço</label><select id="fa-serv" required><option value="">-- Selecione --</option>${s.data.map(x=>`<option value="${x.id}" data-dur="${x.duration || 60}">${x.name} (${x.duration||60}min)</option>`).join('')}</select></div>
                 <div class="input-group"><label>Profissional</label><select id="fa-user" required><option value="">-- Atendente --</option>${u.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select></div>
                 <div class="input-group" style="background:#fff3e0; padding:10px; border-radius:8px; border:1px solid #ffb74d;"><label style="margin:0; color:#e65100; cursor:pointer;"><input type="checkbox" id="fa-encaixe"> Forçar Encaixe (Ignora conflitos)</label></div>
@@ -1016,11 +1026,11 @@ const Modals = {
                 <button type="submit" id="btn-gera-comanda" class="btn-primary" style="padding:1.2rem">Abrir Comanda</button></form>`;
         }
         else if(type === 'servico' || type === 'edit_servico') {
-            let s = { name: '', price: '', cost_percentage: '', duration: 60, commission: '', has_assistant: false, assistant_commission: 0 };
+            let s = { name: '', price: '', cost: '', duration: 60, commission: '', has_assistant: false, assistant_commission: 0 };
             if(param1) { const { data } = await db.from('services').select('*').eq('id', param1).single(); s = data; }
             html += `<h3>${param1 ? 'Editar Serviço' : 'Cadastrar Serviço'}</h3><form onsubmit="Actions.saveService(event, '${param1||''}')">
                 <div class="input-group"><label>Nome</label><input type="text" id="fs-nome" value="${s.name}" required></div>
-                <div style="display:flex; gap:10px;"><div class="input-group"><label>Valor Final (R$)</label><input type="number" id="fs-valor" step="0.01" value="${s.price}" required></div><div class="input-group"><label>Custo Fixo Retido (%)</label><input type="number" id="fs-custo" max="100" value="${s.cost_percentage || ''}" required placeholder="Ex: 10%"></div></div>
+                <div style="display:flex; gap:10px;"><div class="input-group"><label>Valor Final (R$)</label><input type="number" id="fs-valor" step="0.01" value="${s.price}" required></div><div class="input-group"><label>Custo Fixo Retido (%)</label><input type="number" id="fs-custo" max="100" value="${s.cost || ''}" required placeholder="Ex: 10%"></div></div>
                 <div style="display:flex; gap:10px;"><div class="input-group"><label>Duração Média (min)</label><input type="number" id="fs-duracao" value="${s.duration}" required></div><div class="input-group"><label>Comissão do Pro. (%)</label><input type="number" id="fs-com" max="100" value="${s.commission}" required></div></div>
                 <div class="input-group" style="background:#f9f9f9; padding:15px; border-radius:12px"><label style="margin:0"><input type="checkbox" id="fs-aux" ${s.has_assistant?'checked':''} onchange="document.getElementById('aux-com-div').style.display=this.checked?'block':'none'"> Tem Auxiliar?</label></div>
                 <div class="input-group" id="aux-com-div" style="display:${s.has_assistant?'block':'none'}; margin-top:15px"><label>Comissão Auxiliar (%)</label><input type="number" id="fs-auxcom" max="100" value="${s.assistant_commission}"></div>
@@ -1194,25 +1204,54 @@ const Actions = {
 
     async createAppointment(e) {
         e.preventDefault(); 
-        const servSel = document.getElementById('fa-serv'); const opt = servSel.options[servSel.selectedIndex];
-        const dur = parseInt(opt.dataset.dur || 60); const encaixe = document.getElementById('fa-encaixe').checked;
-        const time = document.getElementById('fa-time').value; const date = document.getElementById('fa-date').value; const user_id = document.getElementById('fa-user').value;
-
-        if(!encaixe) {
-            const { data: over } = await db.from('appointments').select('time, status, notes, services(duration)').eq('date', date).eq('user_id', user_id).neq('status', 'cancelado');
-            let conflito = false;
-            if(over) {
-                const sM = (time.split(':')[0]*60)+Number(time.split(':')[1]); const eM = sM + dur;
-                over.forEach(a => {
-                    const [ash, asm] = (a.time||'00:00').split(':').map(Number);
-                    let aEM; if(a.status === 'bloqueado' && a.notes?.includes('BLOQUEIO_ATE:')) { aEM = (a.notes.split('|')[0].replace('BLOQUEIO_ATE:','').trim().split(':')[0]*60)+Number(a.notes.split('|')[0].replace('BLOQUEIO_ATE:','').trim().split(':')[1]); } else { aEM = (ash*60+asm) + (a.services?.duration||60); }
-                    const aSM = ash*60+asm; if(sM < aEM && eM > aSM) conflito = true;
-                });
+        const btn = e.target.querySelector('button[type="submit"]');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = 'Salvando...'; btn.disabled = true;
+        
+        try {
+            let clientId = document.getElementById('fa-cli').value;
+            
+            // NOVO: CADASTRO DO CLIENTE DIRETO NA TELA DA AGENDA
+            if(clientId === 'NEW') {
+                const newNome = document.getElementById('fa-new-nome').value.trim();
+                const newFone = document.getElementById('fa-new-fone').value.trim();
+                if(!newNome) throw new Error('Preencha o nome do novo cliente.');
+                
+                const { data: newCli, error: cliErr } = await db.from('clients').insert({ name: newNome, phone: newFone }).select().single();
+                if(cliErr || !newCli) throw new Error('Erro ao salvar o cliente novo no banco de dados.');
+                
+                clientId = newCli.id;
+                Render.clientes(); // Atualiza a aba de clientes no background
             }
-            if(conflito) return UI.toast('Horário ocupado! Marque Encaixe se necessário.', 'error');
+
+            const servSel = document.getElementById('fa-serv'); const opt = servSel.options[servSel.selectedIndex];
+            const dur = parseInt(opt.dataset.dur || 60); const encaixe = document.getElementById('fa-encaixe').checked;
+            const time = document.getElementById('fa-time').value; const date = document.getElementById('fa-date').value; const user_id = document.getElementById('fa-user').value;
+
+            if(!encaixe) {
+                const { data: over } = await db.from('appointments').select('time, status, notes, services(duration)').eq('date', date).eq('user_id', user_id).neq('status', 'cancelado');
+                let conflito = false;
+                if(over) {
+                    const sM = (time.split(':')[0]*60)+Number(time.split(':')[1]); const eM = sM + dur;
+                    over.forEach(a => {
+                        const [ash, asm] = (a.time||'00:00').split(':').map(Number);
+                        let aEM; if(a.status === 'bloqueado' && a.notes?.includes('BLOQUEIO_ATE:')) { aEM = (a.notes.split('|')[0].replace('BLOQUEIO_ATE:','').trim().split(':')[0]*60)+Number(a.notes.split('|')[0].replace('BLOQUEIO_ATE:','').trim().split(':')[1]); } else { aEM = (ash*60+asm) + (a.services?.duration||60); }
+                        const aSM = ash*60+asm; if(sM < aEM && eM > aSM) conflito = true;
+                    });
+                }
+                if(conflito) throw new Error('Horário ocupado! Marque Encaixe se necessário.');
+            }
+            await db.from('appointments').insert({ client_id: clientId, service_id: servSel.value, user_id: user_id, date: date, time: time, is_encaixe: encaixe, status: 'agendado' });
+            
+            Modals.close(); 
+            UI.toast('Horário salvo com sucesso!'); 
+            Render.agendaDay(); 
+            
+        } catch(err) {
+            UI.toast(err.message, 'error');
+        } finally {
+            if (btn) { btn.innerHTML = originalText; btn.disabled = false; }
         }
-        await db.from('appointments').insert({ client_id: document.getElementById('fa-cli').value, service_id: servSel.value, user_id: user_id, date: date, time: time, is_encaixe: encaixe, status: 'agendado' });
-        Modals.close(); UI.toast('Horário salvo!'); Render.agendaDay(); 
     },
     
     async blockAppointment(e) {
@@ -1264,7 +1303,7 @@ const Actions = {
             if(comanda.items) {
                 comanda.items.forEach(item => {
                     if (item.type === 'service') {
-                        if (item.cost_percentage) totalCustoFixo += (item.price * item.cost_percentage) / 100;
+                        if (item.cost) totalCustoFixo += (item.price * item.cost) / 100;
                         if (item.commission) totalComissao += (item.price * item.commission) / 100;
                     } else if (item.type === 'product' && item.commission) {
                         totalComissao += (item.price * item.commission) / 100;
@@ -1281,7 +1320,6 @@ const Actions = {
             }
             const proName = comanda.users?.name || 'Profissional';
             
-            /* Adicionando a Referência da Comanda e o Nome do Cliente no Banco */
             if(totalCustoFixo > 0) await db.from('despesas').insert({ description: `Custo Retido: Comanda ${ticketNum} | Cliente: ${clientName}`, amount: totalCustoFixo, category: 'Custos Fixos', date: dtISO });
             if(totalComissao > 0) await db.from('despesas').insert({ description: `Comissão ${proName}: Comanda ${ticketNum} | Cliente: ${clientName}`, amount: totalComissao, category: 'Comissões', date: dtISO });
             Modals.close(); UI.toast('Fechado com sucesso!'); Render.comandas();
@@ -1316,7 +1354,7 @@ const Actions = {
             const payload = { 
                 name: document.getElementById('fs-nome').value.trim(), 
                 price: parseFloat(document.getElementById('fs-valor').value.replace(',', '.')) || 0, 
-                cost_percentage: parseFloat(document.getElementById('fs-custo').value) || 0, 
+                cost: parseFloat(document.getElementById('fs-custo').value) || 0, // FIXED: cost instead of cost_percentage
                 commission: parseFloat(document.getElementById('fs-com').value) || 0, 
                 duration: parseInt(document.getElementById('fs-duracao').value) || 60, 
                 has_assistant: aux, 
@@ -1391,7 +1429,6 @@ const Actions = {
 
         const dtISO = new Date().toISOString();
         
-        /* Adicionando a Referência da Comanda e o Nome do Cliente no Pagamento */
         const { data: currDebt } = await db.from('debts').select('payment_details, comanda_ticket, clients(name)').eq('id', id).single();
         const clientName = currDebt.clients?.name || 'Não informado';
         const tkts = currDebt.comanda_ticket || refTicket;
@@ -1423,6 +1460,58 @@ const Actions = {
     sendWhatsApp(phone) {
         const msg = document.getElementById('wpp-msg').value; if(!msg) return UI.toast('Escreva algo.', 'error');
         Modals.close(); window.open(`https://wa.me/55${phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+    },
+
+    // NOVO: TRATAMENTO DE IMAGEM NO PERFIL
+    previewAndSaveAvatar(event) {
+        const file = event.target.files[0];
+        if(!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            const base64 = e.target.result;
+            
+            document.getElementById('perfil-foto-preview').innerHTML = '';
+            document.getElementById('perfil-foto-preview').style.backgroundImage = `url(${base64})`;
+            document.getElementById('perfil-foto-preview').style.backgroundSize = 'cover';
+            document.getElementById('perfil-foto-preview').style.backgroundPosition = 'center';
+            document.getElementById('perfil-foto-preview').style.color = 'transparent';
+            
+            try {
+                const {data: existing} = await db.from('user_avatars').select('id').eq('user_id', App.user.id).maybeSingle();
+                if(existing) {
+                    await db.from('user_avatars').update({avatar_base64: base64}).eq('id', existing.id);
+                } else {
+                    await db.from('user_avatars').insert({user_id: App.user.id, avatar_base64: base64});
+                }
+                
+                App.avatars[App.user.id] = base64;
+                Auth.updateHeaderAvatar();
+                Render.agendaDay(); 
+                UI.toast('Sua foto de perfil foi atualizada com sucesso!');
+            } catch(err) {
+                UI.toast('Erro ao salvar no banco. A tabela user_avatars já foi criada?', 'error');
+            }
+        };
+        reader.readAsDataURL(file);
+    },
+    
+    async deleteAvatar() {
+        if(!App.avatars[App.user.id]) return UI.toast('Você já não possui foto.', 'warning');
+        UI.confirm('Remover sua foto de perfil?', async () => {
+            try {
+                await db.from('user_avatars').delete().eq('user_id', App.user.id);
+                delete App.avatars[App.user.id];
+                
+                Auth.updateHeaderAvatar();
+                Nav.showView('perfil'); 
+                Render.agendaDay(); 
+                
+                UI.toast('Foto removida!');
+            } catch(e) {
+                UI.toast('Erro ao remover.', 'error');
+            }
+        });
     }
 };
 

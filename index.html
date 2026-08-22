@@ -225,6 +225,11 @@
 
                 <section id="view-servicos" class="view">
                     <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('servico')">+ Cadastrar Serviço</button>
+                    <div class="card" style="margin-bottom:20px; padding: 10px;">
+                        <div class="input-group" style="margin:0;">
+                            <input type="text" id="search-servico" placeholder="🔍 Buscar serviço por nome..." onkeyup="Render.filterServicos(this.value)" style="padding:1rem; border-radius:8px; border:1px solid var(--border); font-size: 1rem;">
+                        </div>
+                    </div>
                     <div id="servicos-list" class="data-grid"></div>
                 </section>
                 
@@ -334,6 +339,6 @@
 
     <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
     
-    <script src="script.js?v=10"></script>
+    <script src="script.js?v=11"></script>
 </body>
 </html>

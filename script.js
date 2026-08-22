@@ -667,7 +667,14 @@ const Render = {
 
     async servicos() {
         const { data } = await db.from('services').select('*').order('name');
-        document.getElementById('servicos-list').innerHTML = data.map(s => `
+        window.allServicos = data || [];
+        this.renderServicosList(window.allServicos);
+    },
+
+    renderServicosList(data) {
+        const cont = document.getElementById('servicos-list');
+        if(!data || data.length === 0) { cont.innerHTML = '<p style="color:var(--muted); padding: 1rem;">Nenhum serviço encontrado.</p>'; return; }
+        cont.innerHTML = data.map(s => `
             <div class="card">
                 <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding-bottom:10px">
                     <h4 style="font-size:1.2rem;">${s.name} <span style="font-size:0.8rem; font-weight:normal; color:#888;">(${s.duration || 60}min)</span></h4>
@@ -683,6 +690,12 @@ const Render = {
                 </div>
                 <div class="val" style="font-size:1.5rem">${U.money(s.price)}</div>
             </div>`).join('');
+    },
+
+    filterServicos(term) {
+        term = term.toLowerCase();
+        const filtered = (window.allServicos || []).filter(s => s.name.toLowerCase().includes(term));
+        this.renderServicosList(filtered);
     },
     
     async produtos() {
@@ -1099,7 +1112,20 @@ const Modals = {
         else if(type === 'comanda') {
             const [c, u] = await Promise.all([db.from('clients').select('id,name').order('name'), db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true)]);
             html += `<h3>Gerar Novo Ticket</h3><form onsubmit="Actions.createComanda(event)">
-                <div class="input-group"><label>Cliente</label><select id="fcom-cli" required><option value="">-- Buscar Cliente --</option>${c.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select></div>
+                <div class="input-group">
+                    <label>Cliente</label>
+                    <select id="fcom-cli" required style="padding:1.2rem;" onchange="if(this.value==='NEW'){document.getElementById('fcom-new-cli-div').style.display='block';}else{document.getElementById('fcom-new-cli-div').style.display='none';}">
+                        <option value="">-- Buscar Cliente --</option>
+                        <option value="NEW" style="font-weight:bold; color:#2e7d32;">+ CADASTRAR NOVO CLIENTE AQUI</option>
+                        ${c.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}
+                    </select>
+                </div>
+                <div id="fcom-new-cli-div" style="display:none; background:#f1f8e9; padding:15px; border-radius:12px; margin-bottom:15px; border:1px solid #c5e1a5;">
+                    <p style="font-size:0.8rem; color:#2e7d32; font-weight:bold; margin-bottom:10px;"><i class="ph ph-user-plus"></i> Cadastro Rápido</p>
+                    <div class="input-group" style="margin-bottom:10px;"><label>Nome Completo (Obrigatório)</label><input type="text" id="fcom-new-nome" placeholder="Ex: Maria Silva"></div>
+                    <div class="input-group" style="margin-bottom:10px;"><label>WhatsApp com DDD (Opcional)</label><input type="text" id="fcom-new-fone" placeholder="Ex: 86999999999"></div>
+                    <div class="input-group" style="margin:0;"><label>Data de Nascimento (Opcional)</label><input type="date" id="fcom-new-nasc"></div>
+                </div>
                 <div class="input-group"><label>Profissional Responsável (Receberá a Comissão)</label><select id="fcom-prof" required><option value="">-- Selecione --</option>${u.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select></div>
                 <button type="submit" id="btn-gera-comanda" class="btn-primary" style="padding:1.2rem">Abrir Comanda</button></form>`;
         }
@@ -1387,12 +1413,38 @@ const Actions = {
 
     async createComanda(e) {
         e.preventDefault(); 
-        const btn = document.getElementById('btn-gera-comanda'); btn.disabled = true; btn.innerHTML = "Gerando...";
-        const { data } = await db.from('comandas').select('ticket');
-        let maxNum = 0; (data || []).forEach(c => { if (c.ticket) { const n = parseInt(c.ticket.split('-')[1], 10); if (n > maxNum) maxNum = n; } });
-        const tk = 'TKT-' + String(maxNum + 1).padStart(4, '0');
-        await db.from('comandas').insert({ client_id: document.getElementById('fcom-cli').value, professional_id: document.getElementById('fcom-prof').value, user_id: App.user.id, ticket: tk, status: 'aberta' });
-        Modals.close(); UI.toast(`Comanda ${tk} gerada!`); Render.comandas();
+        const btn = document.getElementById('btn-gera-comanda'); 
+        const originalText = btn.innerHTML;
+        btn.disabled = true; btn.innerHTML = "Gerando...";
+
+        try {
+            let clientId = document.getElementById('fcom-cli').value;
+
+            if(clientId === 'NEW') {
+                const newNome = document.getElementById('fcom-new-nome').value.trim();
+                const newFone = document.getElementById('fcom-new-fone').value.trim();
+                const newNasc = document.getElementById('fcom-new-nasc').value;
+                if(!newNome) throw new Error('Preencha o nome do novo cliente.');
+
+                const { data: newCli, error: cliErr } = await db.from('clients').insert({ name: newNome, phone: newFone || null, birth_date: newNasc || null }).select().single();
+                if(cliErr || !newCli) throw new Error('Erro ao salvar o cliente novo no banco de dados.');
+
+                clientId = newCli.id;
+                Render.clientes();
+            }
+
+            if(!clientId) throw new Error('Selecione ou cadastre um cliente.');
+
+            const { data } = await db.from('comandas').select('ticket');
+            let maxNum = 0; (data || []).forEach(c => { if (c.ticket) { const n = parseInt(c.ticket.split('-')[1], 10); if (n > maxNum) maxNum = n; } });
+            const tk = 'TKT-' + String(maxNum + 1).padStart(4, '0');
+            await db.from('comandas').insert({ client_id: clientId, professional_id: document.getElementById('fcom-prof').value, user_id: App.user.id, ticket: tk, status: 'aberta' });
+            Modals.close(); UI.toast(`Comanda ${tk} gerada!`); Render.comandas();
+        } catch(err) {
+            UI.toast(err.message, 'error');
+        } finally {
+            if(btn) { btn.disabled = false; btn.innerHTML = originalText; }
+        }
     },
     async addComandaItem(id) {
         const val = document.getElementById('add-item-sel').value; if(!val) return;

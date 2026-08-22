@@ -125,7 +125,7 @@ const UI = {
     },
     handleFabClick() {
         const v = App.view;
-        if(v === 'agenda') Modals.open('menu_agenda_mobile');
+        if(v === 'agenda') Modals.open('agendamento');
         else if(v === 'comandas') Modals.open('comanda');
         else if(v === 'clientes') Modals.open('cliente');
         else if(v === 'funcionarios' && App.role === 'owner') Modals.open('funcionario');
@@ -458,7 +458,9 @@ const Render = {
                 html += `<div class="prof-track" style="position: relative; min-width: 140px; flex: 1; border-right: 1px solid var(--border);">`;
                 
                 for(let i=horaInicio; i<=horaFim; i++) { 
-                    html += `<div class="track-line" style="height:${slotHeight}px; min-height:${slotHeight}px; border-bottom: 1px dashed var(--border);"></div>`; 
+                    const tm = String(i).padStart(2,'0') + ':00';
+                    // ADICIONADO ONCLICK NO ESPAÇO VAZIO DA AGENDA
+                    html += `<div class="track-line" style="height:${slotHeight}px; min-height:${slotHeight}px; border-bottom: 1px dashed var(--border); cursor:pointer;" onclick="Modals.open('menu_agenda_mobile', '${u.id}', '${tm}', '${dateStr}')"></div>`; 
                 }
                 
                 const userApps = (agData || []).filter(a => a.user_id === u.id);
@@ -469,7 +471,6 @@ const Render = {
                     if (a.status === 'bloqueado' && originalNotes.includes('BLOQUEIO_ATE:')) {
                         const parts = originalNotes.split('|');
                         endStr = parts[0].replace('BLOQUEIO_ATE:', '').trim();
-                        // Remove o selo de ADMIN_BLOCK visualmente no card da agenda
                         a.notes = parts.slice(1).filter(p => !p.includes('ADMIN_BLOCK')).join(' | ').trim(); 
                     } else {
                         let durationMins = (a.services && a.services.duration) ? a.services.duration : 60;
@@ -584,7 +585,7 @@ const Render = {
             return `<div class="card" style="margin-bottom:10px;">
                 <h4 style="color:var(--primary-dark); font-size:1.1rem; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;"><i class="ph ph-calendar"></i> ${U.date(c.created_at)}</h4>
                 <p style="margin-bottom:5px;"><b>Ticket Associado:</b> ${c.ticket || 'S/N'}</p>
-                <p style="margin-bottom:5px;"><b>Profissional Responsável:</b> ${c.users?.name || 'Não informado'}</p>
+                <p style="margin-bottom:5px;"><b>Profissional que Abriu:</b> ${c.users?.name || 'Não informado'}</p>
                 <p style="margin-bottom:5px;"><b>Serviços/Produtos:</b> ${itens || 'Nenhum detalhe salvo'}</p>
                 <p><b>Total Investido:</b> ${U.money(c.total)}</p>
             </div>`;
@@ -610,16 +611,18 @@ const Render = {
         for (let d of debts) {
             const fTkt = `FAT-${d.id.substring(0,5).toUpperCase()}`; 
             const ticketsArr = d.comanda_ticket ? d.comanda_ticket.split(', ').map(t => t.trim()) : [];
-            const { data: relatedComandas } = await db.from('comandas').select('items, created_at, ticket, users!comandas_professional_id_fkey(name)').in('ticket', ticketsArr);
+            const { data: relatedComandas } = await db.from('comandas').select('items, created_at, ticket').in('ticket', ticketsArr);
             
             let htmlList = ''; let profsEnvolvidos = [];
             if(relatedComandas) {
                 relatedComandas.forEach(rc => {
                     const dt = U.date(rc.created_at);
-                    if(rc.users?.name && !profsEnvolvidos.includes(rc.users.name)) profsEnvolvidos.push(rc.users.name);
                     if(rc.items) {
                         htmlList += `<div style="font-size:0.75rem; color:#666; margin-top:10px; border-bottom:1px dashed #ccc; padding-bottom:3px;">Comanda Origem: ${rc.ticket} (${dt})</div>`;
-                        rc.items.forEach(i => { htmlList += `<div style="display:flex; justify-content:space-between; padding:5px 0; font-size:0.95rem;"><span>${i.name}</span><b>${U.money(i.price)}</b></div>`; });
+                        rc.items.forEach(i => { 
+                            if(i.prof_name && !profsEnvolvidos.includes(i.prof_name)) profsEnvolvidos.push(i.prof_name);
+                            htmlList += `<div style="display:flex; justify-content:space-between; padding:5px 0; font-size:0.95rem;"><span>${i.name}</span><b>${U.money(i.price)}</b></div>`; 
+                        });
                     }
                 });
             }
@@ -742,7 +745,7 @@ const Render = {
     },
     
     async comandas() {
-        let query = db.from('comandas').select('*, clients(name), users!comandas_professional_id_fkey(name)').order('created_at', {ascending: false});
+        let query = db.from('comandas').select('*, clients(name)').order('created_at', {ascending: false});
         
         const qFilter = document.getElementById('filter-comanda-quinzena')?.value;
         if (qFilter) {
@@ -757,7 +760,7 @@ const Render = {
                     <div>
                         <span style="font-size:0.8rem; color:var(--primary); font-weight:bold; letter-spacing:1px">${c.ticket || 'TKT-####'}</span>
                         <h4 style="font-size:1.2rem; margin-top:5px">${c.clients?.name || 'Desconhecido'}</h4>
-                        <p style="font-size:0.8rem; color:var(--muted)"><i class="ph ph-identification-badge"></i> Pro: ${c.users?.name || 'N/A'}</p>
+                        <p style="font-size:0.8rem; color:var(--muted)"><i class="ph ph-list-bullets"></i> Itens Lançados: ${(c.items||[]).length}</p>
                     </div>
                     <span style="font-size:0.7rem; font-weight:bold; padding: 4px 10px; border-radius:20px; background:${c.status === 'aberta' ? 'var(--primary-light)' : '#eee'}; color:${c.status === 'aberta' ? 'var(--primary-dark)' : 'var(--muted)'}">${c.status.toUpperCase()}</span>
                 </div>
@@ -832,23 +835,26 @@ const Render = {
 
     async comissao() {
         const isOwner = App.role === 'owner';
-        let query = db.from('comandas').select('*, users!comandas_professional_id_fkey(name)');
+        let query = db.from('comandas').select('*');
         
         const qFilter = document.getElementById('filter-comissao-quinzena')?.value || U.getCurrentQuinzenaValue();
         const range = U.getQuinzenaDates(qFilter);
         query = query.gte('created_at', range.start).lte('created_at', range.end).eq('status', 'fechada');
 
-        if(!isOwner) query = query.eq('professional_id', App.user.id);
         const { data } = await query;
         
         let html = ''; let totalComissao = 0; let rank = {};
         data.forEach(c => {
             if(!c.items) return; 
             c.items.forEach(i => {
+                // Filtra apenas as comissões do profissional logado (se não for gestor)
+                if(!isOwner && i.prof_id !== App.user.id) return;
+
                 if(i.commission) {
                     const v = (i.price * i.commission) / 100;
                     totalComissao += v;
-                    if(c.users) rank[c.users.name] = (rank[c.users.name]||0) + v;
+                    if(i.prof_name) rank[i.prof_name] = (rank[i.prof_name]||0) + v;
+                    
                     if(!isOwner) html += `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:3px solid #2e7d32"><div><h4>${i.name}</h4><p style="font-size:0.8rem; color:var(--muted)">Ref: ${c.ticket||'-'} • Taxa: ${i.commission}%</p></div><div class="val" style="color:#2e7d32; font-size:1.3rem">+${U.money(v)}</div></div>`;
                 }
             });
@@ -930,12 +936,20 @@ const Render = {
     },
 
     async performance() {
-        const [ {data}, {data:agendas} ] = await Promise.all([ db.from('comandas').select('*, users!comandas_professional_id_fkey(name), items').eq('status', 'fechada'), db.from('appointments').select('*') ]);
+        const [ {data}, {data:agendas} ] = await Promise.all([ db.from('comandas').select('*, items').eq('status', 'fechada'), db.from('appointments').select('*') ]);
         let rankFunc = {}; let rankServ = {}; let totalFaturamento = 0;
         data.forEach(c => { 
             totalFaturamento += c.total; 
-            if(c.users) rankFunc[c.users.name] = (rankFunc[c.users.name]||0) + c.total; 
-            if(c.items) { c.items.forEach(i => { if(i.type === 'service') { rankServ[i.name] = rankServ[i.name] || { qtd: 0, receita: 0 }; rankServ[i.name].qtd += 1; rankServ[i.name].receita += i.price; } }); }
+            if(c.items) { 
+                c.items.forEach(i => { 
+                    if(i.prof_name) rankFunc[i.prof_name] = (rankFunc[i.prof_name]||0) + i.price;
+                    if(i.type === 'service') { 
+                        rankServ[i.name] = rankServ[i.name] || { qtd: 0, receita: 0 }; 
+                        rankServ[i.name].qtd += 1; 
+                        rankServ[i.name].receita += i.price; 
+                    } 
+                }); 
+            }
         });
         const tkMedio = data.length ? totalFaturamento / data.length : 0;
         const totalAgendas = agendas.length || 1;
@@ -978,7 +992,6 @@ const Modals = {
                 if (motivo.includes('BLOQUEIO_ATE:')) {
                     const parts = motivo.split('|');
                     endStr = parts[0].replace('BLOQUEIO_ATE:', '').trim(); 
-                    // Limpa a tag ADMIN_BLOCK para não aparecer para o usuário
                     motivo = parts.slice(1).filter(p => !p.includes('ADMIN_BLOCK')).join(' | ').trim();
                 }
 
@@ -1015,8 +1028,8 @@ const Modals = {
         }
         else if(type === 'menu_agenda_mobile') {
             html += `<div style="text-align: center; margin-bottom: 20px;"><h3 style="margin: 0; color: var(--primary-dark);">O que deseja fazer?</h3></div><div style="display:flex; flex-direction:column; gap:10px;">
-                <button class="btn-primary" style="padding:1.2rem; font-size:1.1rem; justify-content:flex-start" onclick="Modals.open('agendamento')"><i class="ph ph-calendar-plus" style="font-size:1.5rem; margin-right:10px;"></i> Agendar Cliente</button>
-                <button class="btn-secondary" style="padding:1.2rem; font-size:1.1rem; border: 1px solid #d32f2f; color: #d32f2f; background: #ffebee; justify-content:flex-start" onclick="Modals.open('bloquear_agenda')"><i class="ph ph-prohibit" style="font-size:1.5rem; margin-right:10px;"></i> Bloquear Horário</button>
+                <button class="btn-primary" style="padding:1.2rem; font-size:1.1rem; justify-content:flex-start" onclick="Modals.open('agendamento', '${param1}', '${param2}', '${param3}')"><i class="ph ph-calendar-plus" style="font-size:1.5rem; margin-right:10px;"></i> Agendar Cliente</button>
+                <button class="btn-secondary" style="padding:1.2rem; font-size:1.1rem; border: 1px solid #d32f2f; color: #d32f2f; background: #ffebee; justify-content:flex-start" onclick="Modals.open('bloquear_agenda', '${param1}', '${param2}', '${param3}')"><i class="ph ph-prohibit" style="font-size:1.5rem; margin-right:10px;"></i> Bloquear Horário</button>
             </div>`;
         }
         else if(type === 'first_login') {
@@ -1035,19 +1048,26 @@ const Modals = {
             <button class="btn-primary" style="background:#25D366; padding:1.2rem;" onclick="Actions.sendWhatsApp('${param1}')"><i class="ph ph-whatsapp-logo" style="font-size:1.5rem"></i> Abrir Chat</button>`;
         }
         else if (type === 'edit_comanda') {
-            const { data: comanda } = await db.from('comandas').select('*, clients(name), users!comandas_professional_id_fkey(name)').eq('id', param1).single();
+            const { data: comanda } = await db.from('comandas').select('*, clients(name)').eq('id', param1).single();
             const { data: servicos } = await db.from('services').select('*');
             const { data: produtos } = await db.from('products').select('*').gt('stock', 0);
+            const { data: profs } = await db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true);
             const isFechada = comanda.status === 'fechada';
             
             let htmlList = (comanda.items||[]).map((i, idx) => `<div style="display:flex; justify-content:space-between; align-items:center; padding:12px 0; border-bottom:1px solid #eee">
-                <div><span style="font-size:0.7rem; background:var(--bg); padding:3px 8px; border-radius:10px; margin-right:8px; border:1px solid var(--border); font-weight:bold">${i.type==='product'?'PROD':'SERV'}</span><span style="font-size:1.1rem">${i.name}</span></div>
+                <div>
+                    <span style="font-size:0.7rem; background:var(--bg); padding:3px 8px; border-radius:10px; margin-right:8px; border:1px solid var(--border); font-weight:bold">${i.type==='product'?'PROD':'SERV'}</span>
+                    <span style="font-size:1.1rem">${i.name}</span>
+                    <span style="font-size:0.85rem; color:var(--muted); display:block; margin-top:4px;"><i class="ph ph-identification-badge"></i> Profissional: ${i.prof_name || 'Não informado'}</span>
+                </div>
                 <div style="display:flex; align-items:center; gap:20px"><b style="font-size:1.2rem; color:var(--primary-dark)">${U.money(i.price)}</b> ${!isFechada ? `<button type="button" onclick="Actions.removeComandaItem('${comanda.id}', ${idx})" style="background:none; border:none; color:#d32f2f; cursor:pointer; font-size:1.2rem"><i class="ph ph-trash"></i></button>`:''}</div>
             </div>`).join('');
             
-            html += `<div style="text-align: center; margin-bottom: 20px;"><h3 style="margin: 0; color: var(--primary-dark);">Ticket: <span style="color:var(--primary)">${comanda.ticket || '-'}</span></h3>
+            let delBtnHtml = (App.role === 'owner' && !isFechada) ? `<button class="btn-secondary" style="width:auto; padding:0.6rem 1rem; color:#d32f2f; border:1px solid #d32f2f;" onclick="Actions.deleteComanda('${comanda.id}')"><i class="ph ph-trash"></i> Deletar</button>` : '';
+
+            html += `<div style="text-align: center; margin-bottom: 20px;"><div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin: 0; color: var(--primary-dark);">Ticket: <span style="color:var(--primary)">${comanda.ticket || '-'}</span></h3> ${delBtnHtml}</div>
                 <p style="color: var(--muted); margin-top: 5px; font-size:1.1rem;">Cliente: <b style="color:var(--text)">${comanda.clients?.name}</b></p>
-                <p style="color: var(--primary); font-size:0.9rem; font-weight:bold; margin-top:5px;"><i class="ph ph-identification-badge"></i> Profissional Vinculado: ${comanda.users?.name}</p></div>
+            </div>
             <div style="background: #fafafa; border: 1px solid var(--border); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
                 <h4 style="border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px; color:var(--muted)">Itens Lançados</h4>
                 ${htmlList || '<p style="color:var(--muted); text-align:center; padding:1rem 0">Nenhum serviço/produto.</p>'} 
@@ -1057,8 +1077,20 @@ const Modals = {
             if(!isFechada) {
                 const sOpts = servicos.map(s => `<option value='{"id":"${s.id}","name":"${s.name}","price":${s.price},"cost":${s.cost || 0},"commission":${s.commission},"type":"service"}'>${s.name} - ${U.money(s.price)}</option>`).join('');
                 const pOpts = produtos.map(p => `<option value='{"id":"${p.id}","name":"${p.name}","price":${p.price},"commission":${p.commission},"type":"product"}'>${p.name} (Est. ${p.stock}) - ${U.money(p.price)}</option>`).join('');
-                html += `<div style="display:flex; gap:10px; margin-bottom:20px; align-items: flex-end;"><div class="input-group" style="margin:0; flex:1"><label>Adicionar Item</label><select id="add-item-sel" style="padding:1.2rem;"><option value="">-- Buscar --</option><optgroup label="Serviços">${sOpts}</optgroup><optgroup label="Produtos">${pOpts}</optgroup></select></div><button type="button" class="btn-secondary" style="width:auto; padding:1.2rem;" onclick="Actions.addComandaItem('${comanda.id}')"><i class="ph ph-plus"></i></button></div>
-                <button type="button" id="btn-fechar-com" class="btn-primary" style="background:#2e7d32; padding:1.2rem;" onclick="Actions.closeComanda('${comanda.id}', '${comanda.client_id}', ${comanda.total}, '${comanda.ticket}', '${comanda.professional_id}')"><i class="ph ph-check-circle"></i> Faturar e Separar Comissões</button>`;
+                const profOpts = profs.map(x=>`<option value="${x.id}|${x.name}">${x.name}</option>`).join('');
+                
+                html += `<div style="display:flex; gap:10px; margin-bottom:20px; align-items: flex-end; flex-wrap:wrap;">
+                    <div class="input-group" style="margin:0; flex:1; min-width:200px;">
+                        <label>Adicionar Item</label>
+                        <select id="add-item-sel" style="padding:1.2rem;"><option value="">-- Buscar Serviço/Prod --</option><optgroup label="Serviços">${sOpts}</optgroup><optgroup label="Produtos">${pOpts}</optgroup></select>
+                    </div>
+                    <div class="input-group" style="margin:0; flex:1; min-width:150px;">
+                        <label>Feito por:</label>
+                        <select id="add-item-prof" style="padding:1.2rem;"><option value="">-- Profissional --</option>${profOpts}</select>
+                    </div>
+                    <button type="button" class="btn-secondary" style="width:auto; padding:1.2rem;" onclick="Actions.addComandaItem('${comanda.id}')"><i class="ph ph-plus"></i></button>
+                </div>
+                <button type="button" id="btn-fechar-com" class="btn-primary" style="background:#2e7d32; padding:1.2rem;" onclick="Actions.closeComanda('${comanda.id}', '${comanda.client_id}', ${comanda.total}, '${comanda.ticket}')"><i class="ph ph-check-circle"></i> Faturar e Separar Comissões</button>`;
             } else if (App.role === 'owner') {
                 html += `<button type="button" class="btn-secondary" style="color:#d32f2f; padding:1.2rem;" onclick="Actions.reopenComanda('${comanda.id}')"><i class="ph ph-warning-circle"></i> Reabrir Comanda</button>`;
             }
@@ -1083,9 +1115,9 @@ const Modals = {
                 </div>
 
                 <div class="input-group"><label>Serviço</label><select id="fa-serv" required><option value="">-- Selecione --</option>${s.data.map(x=>`<option value="${x.id}" data-dur="${x.duration || 60}">${x.name} (${x.duration||60}min)</option>`).join('')}</select></div>
-                <div class="input-group"><label>Profissional</label><select id="fa-user" required><option value="">-- Atendente --</option>${u.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select></div>
+                <div class="input-group"><label>Profissional</label><select id="fa-user" required><option value="">-- Atendente --</option>${u.data.map(x=>`<option value="${x.id}" ${x.id===param1?'selected':''}>${x.name}</option>`).join('')}</select></div>
                 <div class="input-group" style="background:#fff3e0; padding:10px; border-radius:8px; border:1px solid #ffb74d;"><label style="margin:0; color:#e65100; cursor:pointer;"><input type="checkbox" id="fa-encaixe"> Forçar Encaixe (Ignora conflitos)</label></div>
-                <div style="display:flex; gap:10px;"><div class="input-group"><label>Data</label><input type="date" id="fa-date" required></div><div class="input-group"><label>Hora</label><input type="time" id="fa-time" required></div></div>
+                <div style="display:flex; gap:10px;"><div class="input-group"><label>Data</label><input type="date" id="fa-date" value="${param3||''}" required></div><div class="input-group"><label>Hora</label><input type="time" id="fa-time" value="${param2||''}" required></div></div>
                 <button type="submit" class="btn-primary" style="padding:1.2rem;">Confirmar Horário</button></form>`;
         }
         else if(type === 'bloquear_agenda') {
@@ -1096,28 +1128,28 @@ const Modals = {
                     <div class="input-group" style="background:#fff3e0; border: 1px solid #ffb74d; padding:15px; border-radius:12px;">
                         <label style="color:#e65100; font-weight:bold"><i class="ph ph-identification-badge"></i> Qual profissional bloquear?</label>
                         <select id="fb-user" required style="border-color:#ffb74d">
-                            <option value="${App.user.id}">Bloquear a Mim Mesmo(a)</option>
-                            ${users.filter(u => u.id !== App.user.id).map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}
+                            <option value="${App.user.id}" ${App.user.id===param1?'selected':''}>Bloquear a Mim Mesmo(a)</option>
+                            ${users.filter(u => u.id !== App.user.id).map(x=>`<option value="${x.id}" ${x.id===param1?'selected':''}>${x.name}</option>`).join('')}
                         </select>
                     </div>`;
             }
             
             html += `<h3 style="text-align:center; margin-bottom:20px; color:#d32f2f">Bloquear Horário</h3><form onsubmit="Actions.blockAppointment(event)">
                 ${profSelectHtml}
-                <div class="input-group"><label>Data</label><input type="date" id="fb-date" required></div>
-                <div style="display:flex; gap:10px;"><div class="input-group"><label>Início</label><input type="time" id="fb-time" required></div><div class="input-group"><label>Término</label><input type="time" id="fb-end" required></div></div>
+                <div class="input-group"><label>Data</label><input type="date" id="fb-date" value="${param3||''}" required></div>
+                <div style="display:flex; gap:10px;"><div class="input-group"><label>Início</label><input type="time" id="fb-time" value="${param2||''}" required></div><div class="input-group"><label>Término</label><input type="time" id="fb-end" required></div></div>
                 <div class="input-group"><label>Motivo / Justificativa</label><textarea id="fb-motivo" required rows="2"></textarea></div>
                 <button type="submit" class="btn-primary" style="padding:1.2rem; background: #d32f2f;">Confirmar Bloqueio</button></form>`;
         }
         else if(type === 'comanda') {
-            const [c, u] = await Promise.all([db.from('clients').select('id,name').order('name'), db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true)]);
+            const { data: c } = await db.from('clients').select('id,name').order('name');
             html += `<h3>Gerar Novo Ticket</h3><form onsubmit="Actions.createComanda(event)">
                 <div class="input-group">
                     <label>Cliente</label>
                     <select id="fcom-cli" required style="padding:1.2rem;" onchange="if(this.value==='NEW'){document.getElementById('fcom-new-cli-div').style.display='block';}else{document.getElementById('fcom-new-cli-div').style.display='none';}">
                         <option value="">-- Buscar Cliente --</option>
                         <option value="NEW" style="font-weight:bold; color:#2e7d32;">+ CADASTRAR NOVO CLIENTE AQUI</option>
-                        ${c.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}
+                        ${c.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}
                     </select>
                 </div>
                 <div id="fcom-new-cli-div" style="display:none; background:#f1f8e9; padding:15px; border-radius:12px; margin-bottom:15px; border:1px solid #c5e1a5;">
@@ -1126,7 +1158,7 @@ const Modals = {
                     <div class="input-group" style="margin-bottom:10px;"><label>WhatsApp com DDD (Opcional)</label><input type="text" id="fcom-new-fone" placeholder="Ex: 86999999999"></div>
                     <div class="input-group" style="margin:0;"><label>Data de Nascimento (Opcional)</label><input type="date" id="fcom-new-nasc"></div>
                 </div>
-                <div class="input-group"><label>Profissional Responsável (Receberá a Comissão)</label><select id="fcom-prof" required><option value="">-- Selecione --</option>${u.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}</select></div>
+                <!-- O profissional não é mais selecionado aqui. Será selecionado item a item. -->
                 <button type="submit" id="btn-gera-comanda" class="btn-primary" style="padding:1.2rem">Abrir Comanda</button></form>`;
         }
         else if(type === 'servico' || type === 'edit_servico') {
@@ -1330,7 +1362,6 @@ const Actions = {
             const dur = parseInt(opt.dataset.dur || 60); const encaixe = document.getElementById('fa-encaixe').checked;
             const time = document.getElementById('fa-time').value; const date = document.getElementById('fa-date').value; const user_id = document.getElementById('fa-user').value;
 
-            // Busca os agendamentos já existentes naquele dia para o profissional
             const { data: over } = await db.from('appointments').select('time, status, notes, services(duration)').eq('date', date).eq('user_id', user_id).neq('status', 'cancelado');
             let conflitoNormal = false;
             let conflitoAdmin = false;
@@ -1347,7 +1378,6 @@ const Actions = {
                     }
                     const aSM = ash*60+asm; 
                     
-                    // Se houver conflito de horário
                     if(sM < aEM && eM > aSM) {
                         if (a.status === 'bloqueado' && a.notes?.includes('ADMIN_BLOCK')) {
                             conflitoAdmin = true;
@@ -1358,7 +1388,6 @@ const Actions = {
                 });
             }
 
-            // Regras de bloqueio rígidas:
             if (conflitoAdmin && App.role !== 'owner') {
                 throw new Error('Horário bloqueado pelo Gestor. O Encaixe não é permitido neste caso.');
             }
@@ -1389,7 +1418,6 @@ const Actions = {
         const userTargetObj = document.getElementById('fb-user');
         const targetUserId = userTargetObj ? userTargetObj.value : App.user.id;
         
-        // Se quem está bloqueando é o dono, adicionamos o selo invisível ADMIN_BLOCK no motivo
         const isAdminBlock = App.role === 'owner' ? ' | ADMIN_BLOCK' : '';
 
         if (start >= end) return UI.toast('Término deve ser maior que início.', 'error');
@@ -1438,7 +1466,8 @@ const Actions = {
             const { data } = await db.from('comandas').select('ticket');
             let maxNum = 0; (data || []).forEach(c => { if (c.ticket) { const n = parseInt(c.ticket.split('-')[1], 10); if (n > maxNum) maxNum = n; } });
             const tk = 'TKT-' + String(maxNum + 1).padStart(4, '0');
-            await db.from('comandas').insert({ client_id: clientId, professional_id: document.getElementById('fcom-prof').value, user_id: App.user.id, ticket: tk, status: 'aberta' });
+            // Como não tem mais o profissional obrigatório na comanda geral, podemos passar o ID do usuário que abriu para não gerar erro na restrição de chave, mas os cálculos serão apenas baseados nos itens.
+            await db.from('comandas').insert({ client_id: clientId, professional_id: App.user.id, user_id: App.user.id, ticket: tk, status: 'aberta' });
             Modals.close(); UI.toast(`Comanda ${tk} gerada!`); Render.comandas();
         } catch(err) {
             UI.toast(err.message, 'error');
@@ -1446,39 +1475,70 @@ const Actions = {
             if(btn) { btn.disabled = false; btn.innerHTML = originalText; }
         }
     },
+    
     async addComandaItem(id) {
-        const val = document.getElementById('add-item-sel').value; if(!val) return;
+        const val = document.getElementById('add-item-sel').value; 
+        const profVal = document.getElementById('add-item-prof').value;
+
+        if(!val) return UI.toast('Selecione um serviço ou produto.', 'error');
+        if(!profVal) return UI.toast('Selecione o profissional que realizou o serviço!', 'error');
+
         const item = JSON.parse(val); 
-        if(item.type === 'product') { const { data: p } = await db.from('products').select('stock').eq('id', item.id).single(); if(p.stock <= 0) return UI.toast('Sem estoque.', 'error'); await db.from('products').update({stock: p.stock - 1}).eq('id', item.id); }
+        const [prof_id, prof_name] = profVal.split('|');
+        item.prof_id = prof_id;
+        item.prof_name = prof_name;
+
+        if(item.type === 'product') { 
+            const { data: p } = await db.from('products').select('stock').eq('id', item.id).single(); 
+            if(p.stock <= 0) return UI.toast('Sem estoque.', 'error'); 
+            await db.from('products').update({stock: p.stock - 1}).eq('id', item.id); 
+        }
+
         const { data: c } = await db.from('comandas').select('items, total').eq('id', id).single();
         const items = c.items || []; items.push(item);
         await db.from('comandas').update({ items, total: c.total + item.price }).eq('id', id);
+        
         Modals.close(); setTimeout(() => Modals.open('edit_comanda', id), 100);
     },
+
     async removeComandaItem(id, idx) {
         const { data: c } = await db.from('comandas').select('items, total').eq('id', id).single();
         const items = c.items || []; const item = items[idx];
-        if(item.type === 'product') { const { data: p } = await db.from('products').select('stock').eq('id', item.id).single(); if(p) await db.from('products').update({stock: p.stock + 1}).eq('id', item.id); }
-        items.splice(idx, 1); await db.from('comandas').update({ items, total: Math.max(0, c.total - item.price) }).eq('id', id);
+        
+        if(item.type === 'product') { 
+            const { data: p } = await db.from('products').select('stock').eq('id', item.id).single(); 
+            if(p) await db.from('products').update({stock: p.stock + 1}).eq('id', item.id); 
+        }
+        
+        items.splice(idx, 1); 
+        await db.from('comandas').update({ items, total: Math.max(0, c.total - item.price) }).eq('id', id);
         Modals.close(); setTimeout(() => Modals.open('edit_comanda', id), 100);
     },
     
-    async closeComanda(comandaId, clientId, total, ticketNum, profId) {
-        UI.confirm('Deseja fechar esta comanda? Ela gerará os custos automaticamente e será enviada para cobrança.', async () => {
+    async closeComanda(comandaId, clientId, total, ticketNum) {
+        UI.confirm('Deseja fechar esta comanda? Ela gerará os custos e separará as comissões por profissional automaticamente, enviando para cobrança.', async () => {
             const btn = document.getElementById('btn-fechar-com');
             if(btn) { btn.disabled = true; btn.innerHTML = "Processando..."; }
             
-            const { data: comanda } = await db.from('comandas').select('items, clients(name), users!comandas_professional_id_fkey(name)').eq('id', comandaId).single();
+            const { data: comanda } = await db.from('comandas').select('items, clients(name)').eq('id', comandaId).single();
             const clientName = comanda.clients?.name || 'Cliente';
-            let totalCustoFixo = 0; let totalComissao = 0;
+            
+            let totalCustoFixo = 0; 
+            let commissionsByProf = {};
             
             if(comanda.items) {
                 comanda.items.forEach(item => {
-                    if (item.type === 'service') {
-                        if (item.cost) totalCustoFixo += (item.price * item.cost) / 100;
-                        if (item.commission) totalComissao += (item.price * item.commission) / 100;
-                    } else if (item.type === 'product' && item.commission) {
-                        totalComissao += (item.price * item.commission) / 100;
+                    let com = 0;
+                    if (item.type === 'service' && item.commission) com = (item.price * item.commission) / 100;
+                    if (item.type === 'product' && item.commission) com = (item.price * item.commission) / 100;
+                    
+                    if (item.type === 'service' && item.cost) {
+                        totalCustoFixo += (item.price * item.cost) / 100;
+                    }
+
+                    if (com > 0) {
+                        let pName = item.prof_name || 'Profissional Desconhecido';
+                        commissionsByProf[pName] = (commissionsByProf[pName] || 0) + com;
                     }
                 });
             }
@@ -1490,10 +1550,15 @@ const Actions = {
                 if (ext) await db.from('debts').update({ total_amount: ext.total_amount + total, remaining_amount: ext.remaining_amount + total, comanda_ticket: ext.comanda_ticket + ', ' + ticketNum, created_at: dtISO }).eq('id', ext.id);
                 else await db.from('debts').insert({ client_id: clientId, total_amount: total, remaining_amount: total, comanda_ticket: ticketNum, created_at: dtISO }); 
             }
-            const proName = comanda.users?.name || 'Profissional';
             
-            if(totalCustoFixo > 0) await db.from('despesas').insert({ description: `Custo Retido: Comanda ${ticketNum} | Cliente: ${clientName}`, amount: totalCustoFixo, category: 'Custos Fixos', date: dtISO });
-            if(totalComissao > 0) await db.from('despesas').insert({ description: `Comissão ${proName}: Comanda ${ticketNum} | Cliente: ${clientName}`, amount: totalComissao, category: 'Comissões', date: dtISO });
+            if(totalCustoFixo > 0) {
+                await db.from('despesas').insert({ description: `Custo Retido: Comanda ${ticketNum} | Cliente: ${clientName}`, amount: totalCustoFixo, category: 'Custos Fixos', date: dtISO });
+            }
+            
+            for (const [pName, val] of Object.entries(commissionsByProf)) {
+                await db.from('despesas').insert({ description: `Comissão ${pName}: Comanda ${ticketNum} | Cliente: ${clientName}`, amount: val, category: 'Comissões', date: dtISO });
+            }
+
             Modals.close(); UI.toast('Fechado com sucesso!'); Render.comandas();
         });
     },
@@ -1511,6 +1576,17 @@ const Actions = {
                 }
             }
             await db.from('comandas').update({ status: 'aberta' }).eq('id', id); Modals.close(); UI.toast('Reaberta!'); Render.comandas();
+        });
+    },
+
+    async deleteComanda(id) {
+        UI.confirm('Tem certeza que deseja deletar permanentemente esta comanda aberta?', async () => {
+            try {
+                await db.from('comandas').delete().eq('id', id);
+                Modals.close(); UI.toast('Comanda deletada com sucesso!'); Render.comandas();
+            } catch (err) {
+                UI.toast('Erro ao deletar comanda.', 'error');
+            }
         });
     },
 

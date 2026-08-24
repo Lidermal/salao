@@ -404,23 +404,23 @@ const Render = {
             if (App.role !== 'owner') query = query.eq('user_id', App.user.id);
             const { data: agData, error: errAg } = await query; if(errAg) throw errAg;
 
-            let uQuery = db.from('users').select('id, name, schedule').neq('username', 'admin.teste').eq('active', true).neq('is_deleted', true).order('name');
+            let uQuery = db.from('users').select('id, name, schedule, phone').neq('username', 'admin.teste').eq('active', true).neq('is_deleted', true).order('name');
             if(App.role !== 'owner') uQuery = uQuery.eq('id', App.user.id);
             let { data: usersData } = await uQuery;
 
-            // Filtro Mágico da Escala: Remove quem não trabalha no dia da semana selecionado
+            // Novo Comportamento da Escala (Sol. 07): Mantém na lista, mas marca como 'isOffDay' para pintar de rosa e liberar
             if(usersData) {
-                const currentDayOfWeek = App.currentDate.getDay(); // 0 = Dom, 1 = Seg ... 6 = Sab
-                usersData = usersData.filter(u => {
-                    if(!u.schedule) return true; 
+                const currentDayOfWeek = App.currentDate.getDay();
+                usersData.forEach(u => {
+                    if(!u.schedule) { u.isOffDay = false; return; }
                     const dayConf = u.schedule[String(currentDayOfWeek)];
-                    return dayConf ? dayConf.active !== false : true;
+                    u.isOffDay = dayConf ? dayConf.active === false : false;
                 });
             }
 
             const cont = document.getElementById('agenda-list');
             if(!usersData || usersData.length === 0) { 
-                cont.innerHTML = `<div class="card" style="text-align:center; padding:4rem 1rem"><i class="ph ph-calendar-x" style="font-size:3rem; color:var(--muted); margin-bottom:10px;"></i><p style="color:var(--muted); font-size:1.1rem">Nenhum profissional escalado para trabalhar neste dia da semana.</p></div>`; 
+                cont.innerHTML = `<div class="card" style="text-align:center; padding:4rem 1rem"><i class="ph ph-calendar-x" style="font-size:3rem; color:var(--muted); margin-bottom:10px;"></i><p style="color:var(--muted); font-size:1.1rem">Nenhum profissional cadastrado.</p></div>`; 
                 return; 
             }
 
@@ -428,14 +428,19 @@ const Render = {
             let html = `<div class="timeline-wrapper" style="overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border: 1px solid var(--border); border-radius: 8px;"><div class="timeline-header" style="display: flex; min-width: max-content; border-bottom: 1px solid var(--border);"><div class="time-col" style="position: sticky; left: 0; z-index: 20; background: var(--surface); border:none; min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);"></div>`;
             usersData.forEach(u => { 
                 let bgImage = (App.avatars && App.avatars[u.id]) ? `background-image: url(${App.avatars[u.id]}); background-size: cover; background-position: center; color: transparent;` : ''; let init = bgImage ? '' : u.name.substring(0,2).toUpperCase();
-                html += `<div class="prof-col-header" style="display:flex; flex-direction:column; align-items:center; gap:5px; padding: 15px 10px; min-width: 140px; flex: 1; border-right: 1px solid var(--border);"><div style="width: 45px; height: 45px; border-radius: 50%; background-color: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight:bold; border: 2px solid var(--primary-light); ${bgImage}">${init}</div><span style="font-size:0.95rem; font-weight: bold; margin-bottom:5px;">${u.name.split(' ')[0]}</span></div>`; 
+                html += `<div class="prof-col-header" style="display:flex; flex-direction:column; align-items:center; gap:5px; padding: 15px 10px; min-width: 140px; flex: 1; border-right: 1px solid var(--border); opacity: ${u.isOffDay ? '0.6' : '1'};"><div style="width: 45px; height: 45px; border-radius: 50%; background-color: ${u.isOffDay ? '#ccc' : 'var(--primary)'}; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight:bold; border: 2px solid ${u.isOffDay ? '#aaa' : 'var(--primary-light)'}; ${bgImage}">${init}</div><span style="font-size:0.95rem; font-weight: bold; margin-bottom:5px; color: ${u.isOffDay ? 'var(--muted)' : 'var(--text)'}; text-align:center">${u.name.split(' ')[0]} ${u.isOffDay ? '<br><span style="font-size:0.7rem; color:var(--primary)">(Folga)</span>' : ''}</span></div>`; 
             });
             html += `</div><div class="timeline-body" style="display: flex; min-width: max-content; position: relative;"><div class="time-col" style="position: sticky; left: 0; z-index: 10; background: var(--surface); min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);">`;
             for(let i=horaInicio; i<=horaFim; i++) { html += `<div class="time-slot" style="height:${slotHeight}px; min-height:${slotHeight}px; display:flex; justify-content:center; padding-top:8px; color:var(--muted); font-size:0.8rem; border-bottom: 1px solid var(--border);"><span>${String(i).padStart(2,'0')}:00</span></div>`; }
             html += `</div><div class="tracks-container" style="display: flex; flex: 1;">`;
             usersData.forEach(u => {
-                html += `<div class="prof-track" style="position: relative; min-width: 140px; flex: 1; border-right: 1px solid var(--border);">`;
-                for(let i=horaInicio; i<=horaFim; i++) { const tm = String(i).padStart(2,'0') + ':00'; html += `<div class="track-line" style="height:${slotHeight}px; min-height:${slotHeight}px; border-bottom: 1px dashed var(--border); cursor:pointer;" onclick="Modals.open('menu_agenda_mobile', '${u.id}', '${tm}', '${dateStr}')"></div>`; }
+                let trackBg = u.isOffDay ? 'background-color: rgba(216, 27, 96, 0.08);' : '';
+                html += `<div class="prof-track" style="position: relative; min-width: 140px; flex: 1; border-right: 1px solid var(--border); ${trackBg}">`;
+                for(let i=horaInicio; i<=horaFim; i++) { 
+                    const tm = String(i).padStart(2,'0') + ':00'; 
+                    const onclickAction = u.isOffDay ? `Modals.open('menu_indisponivel', '${u.id}', '${u.name.replace(/'/g, "\\'")}', '${u.phone || ''}')` : `Modals.open('menu_agenda_mobile', '${u.id}', '${tm}', '${dateStr}')`;
+                    html += `<div class="track-line" style="height:${slotHeight}px; min-height:${slotHeight}px; border-bottom: 1px dashed var(--border); cursor:pointer;" onclick="${onclickAction}"></div>`; 
+                }
                 const userApps = (agData || []).filter(a => a.user_id === u.id);
                 userApps.forEach(a => {
                     const [sh, sm] = (a.time||'00:00').split(':').map(Number); let endStr, originalNotes = a.notes || '';
@@ -844,6 +849,25 @@ const Modals = {
                 <button class="btn-secondary" style="padding:1.2rem; font-size:1.1rem; border: 1px solid #d32f2f; color: #d32f2f; background: #ffebee; justify-content:flex-start" onclick="Modals.open('bloquear_agenda', '${param1}', '${param2}', '${param3}')"><i class="ph ph-prohibit" style="font-size:1.5rem; margin-right:10px;"></i> Bloquear Horário</button>
             </div>`;
         }
+        else if(type === 'menu_indisponivel') {
+            const isMeOrOwner = App.user.id === param1 || App.role === 'owner';
+            const firstName = param2.split(' ')[0];
+            
+            html += `<div style="text-align: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: #d32f2f;"><i class="ph ph-calendar-x"></i> Profissional de Folga</h3>
+                <p style="color:var(--muted); margin-top:5px;">${firstName} não está escalado(a) para trabalhar neste dia da semana.</p>
+            </div>
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <button class="btn-primary" style="padding:1.2rem; font-size:1.1rem; justify-content:center; background:#25D366; color:white; border:none" onclick="Actions.consultarDisponibilidade('${param3}', '${firstName}')">
+                    <i class="ph ph-whatsapp-logo" style="font-size:1.5rem; margin-right:10px;"></i> Consultar Disponibilidade
+                </button>
+                ${isMeOrOwner ? `
+                <button class="btn-secondary" style="padding:1.2rem; font-size:1.1rem; border: 1px solid var(--primary); color: var(--primary); justify-content:center; margin-top:10px;" onclick="Actions.liberarDia('${param1}')">
+                    <i class="ph ph-lock-key-open" style="font-size:1.5rem; margin-right:10px;"></i> Liberar Minha Agenda Hoje
+                </button>
+                ` : ''}
+            </div>`;
+        }
         else if(type === 'first_login') {
             html += `<div style="text-align: center; margin-bottom: 20px;"><h3 style="margin: 0; color: var(--primary-dark);">Definir Nova Senha</h3></div><form onsubmit="Actions.updatePassword(event)">
                 <div class="input-group"><label>Digite a nova senha</label><input type="password" id="new-pass" required></div><button type="submit" class="btn-primary" style="padding:1.2rem">Salvar e Acessar</button></form>`;
@@ -1205,6 +1229,31 @@ const Modals = {
 };
 
 const Actions = {
+    
+    consultarDisponibilidade(phone, name) {
+        if(!phone || phone === 'undefined') return UI.toast('Profissional não possui telefone cadastrado.', 'error');
+        const msg = `Oii ${name}, gostaria da sua disponibilidade para atendimento hoje?`;
+        window.open(`https://wa.me/55${phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
+        Modals.close();
+    },
+
+    async liberarDia(userId) {
+        UI.confirm('Deseja liberar a agenda deste profissional para o dia de hoje?', async () => {
+            const { data: user } = await db.from('users').select('schedule').eq('id', userId).single();
+            if(user) {
+                const currentDayOfWeek = App.currentDate.getDay();
+                let sched = user.schedule || { "0":{active:true}, "1":{active:true}, "2":{active:true}, "3":{active:true}, "4":{active:true}, "5":{active:true}, "6":{active:true} };
+                if(sched[String(currentDayOfWeek)]) {
+                    sched[String(currentDayOfWeek)].active = true;
+                }
+                await db.from('users').update({ schedule: sched }).eq('id', userId);
+                Modals.close();
+                UI.toast('Agenda liberada com sucesso!');
+                Render.agendaDay();
+            }
+        });
+    },
+
     exportPDF(viewType, quinzenaStr) {
         if(!window.jspdf) return UI.toast('Carregando PDF. Tente novamente em instantes.', 'warning');
         const { jsPDF } = window.jspdf; const doc = new jsPDF();

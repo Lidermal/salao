@@ -18,7 +18,7 @@ const App = {
     settings: {},
     avatars: {}, 
     inflowCategories: ['Pix', 'Dinheiro', 'Cartão Crédito', 'Cartão Débito'],
-    filters: { relatorios: null, comissoes: null } // NOVO: Controle de filtros 03 e 04
+    filters: { relatorios: null, comissoes: null }
 };
 
 const U = {
@@ -109,7 +109,6 @@ const U = {
     }
 };
 
-/* --- COMPONENTE CUSTOM SELECT COM BUSCA MELHORADO --- */
 const CustomSelect = {
     render(id, placeholder, optionsHtml, onChangeGlobalName = '', initialValue = '') {
         return `
@@ -550,7 +549,6 @@ const Render = {
         if(App.charts.despesas) App.charts.despesas.destroy(); App.charts.despesas = new Chart(document.getElementById('chart-despesas'), { type: 'pie', data: { labels: Object.keys(totais), datasets: [{ data: Object.values(totais), backgroundColor: ['#d32f2f', '#cd7f32', '#8e24aa', '#e65100'] }] }});
     },
 
-    /* PASSO 3: SOLICITAÇÃO 04 (Filtro Personalizado para Comissões) */
     async comissao() {
         const isOwner = App.role === 'owner';
         
@@ -639,7 +637,6 @@ const Render = {
         if(dashContainer) dashContainer.innerHTML = finalHtml;
     },
     
-    /* PASSO 3: SOLICITAÇÃO 05 (Botão de Injetar Receita Manual no Fluxo) */
     async 'resumo-financeiro'() {
         const rc = document.getElementById('resumo-cards');
         if(rc && !document.getElementById('btn-add-receita-wrapper')) {
@@ -665,7 +662,7 @@ const Render = {
             extrato.map(i => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;"><div style="flex:1"><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Saída'} - ${i.category}</b><p style="margin-top:5px; font-weight:600; font-size:1.1rem">${U.formatDesc(i.desc)}</p><span style="font-size:0.8rem; color:var(--muted); display:inline-block; margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(i.date)}</span></div><div style="text-align:right"><span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.3rem; display:block">${i.type==='in'?'+':'-'} ${U.money(i.val)}</span><span style="font-size:0.85rem; color:var(--muted); font-weight:bold">Caixa: ${U.money(i.saldo)}</span></div></div>`).join('');
     },
 
-    /* PASSO 3: SOLICITAÇÃO 03 (Filtro Personalizado para Relatórios) */
+    /* PASSO 3: SOLICITAÇÃO 03 E 05 - MELHORIA NO FILTRO DE RELATÓRIOS PARA PERMITIR "APENAS RECEITAS" */
     async relatorios() {
         const relContainer = document.getElementById('relatorio-despesas-conteudo');
         if(relContainer) {
@@ -693,8 +690,11 @@ const Render = {
         if (App.filters.relatorios) {
             let f = App.filters.relatorios;
             let query = db.from('despesas').select('*').gte('date', f.start + 'T00:00:00Z').lte('date', f.end + 'T23:59:59Z');
+            
+            // Adicionado suporte para filtrar apenas Entradas/Receitas para PDF e visualização
             if (f.tipo === 'Custos Fixos') query = query.eq('category', 'Custos Fixos');
             else if (f.tipo === 'Comissões') query = query.eq('category', 'Comissões');
+            else if (f.tipo === 'Receitas') query = query.in('category', App.inflowCategories);
             
             const { data } = await query.order('date', {ascending: false});
             desp = data || [];
@@ -713,8 +713,12 @@ const Render = {
         const despesasOnly = desp.filter(d => !App.inflowCategories.includes(d.category));
 
         let htmlDesp = '';
-        if(despesasOnly.length === 0) { htmlDesp = '<p style="color:var(--muted); text-align:center;">Sem gastos registrados para este filtro.</p>'; }
-        else { htmlDesp = despesasOnly.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${U.formatDesc(d.description)}</b><br><span style="font-size:0.8rem; color:#888"><i class="ph ph-clock"></i> ${U.date(d.date)}</span></div><div style="color:#d32f2f; font-weight:bold">-${U.money(d.amount)}</div></div>`).join(''); }
+        if(despesasOnly.length === 0) { 
+            let msgText = App.filters.relatorios?.tipo === 'Receitas' ? 'Filtro focado apenas em receitas. Para ver as saídas remova o filtro.' : 'Sem gastos registrados para este filtro.';
+            htmlDesp = `<p style="color:var(--muted); text-align:center;">${msgText}</p>`; 
+        } else { 
+            htmlDesp = despesasOnly.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${U.formatDesc(d.description)}</b><br><span style="font-size:0.8rem; color:#888"><i class="ph ph-clock"></i> ${U.date(d.date)}</span></div><div style="color:#d32f2f; font-weight:bold">-${U.money(d.amount)}</div></div>`).join(''); 
+        }
         if(relContainer) relContainer.innerHTML = htmlDesp;
         window.currentDespesasData = despesasOnly;
 
@@ -1082,7 +1086,7 @@ const Modals = {
                 <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar</button></form>`;
         }
         
-        /* PASSO 3: MODAIS DE FILTROS PERSONALIZADOS E RECEITA MANUAL */
+        /* PASSO 3: MELHORIA ADICIONADA (FILTRO APENAS RECEITAS) */
         else if (type === 'filtro_relatorios') {
             const { data: users } = await db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true).order('name');
             const uOpts = users.map(u => `<option value="${u.name}">${u.name}</option>`).join('');
@@ -1096,7 +1100,8 @@ const Modals = {
                 <div class="input-group">
                     <label>Filtrar Qual Movimentação?</label>
                     <select id="frel-tipo" required onchange="document.getElementById('frel-prof-div').style.display = this.value === 'Comissões' ? 'block' : 'none'">
-                        <option value="Todos">Todas (Custos, Comissões e Receitas)</option>
+                        <option value="Todos">Todas (Custos, Comissões e Entradas)</option>
+                        <option value="Receitas">Apenas Entradas (Receitas)</option>
                         <option value="Custos Fixos">Apenas Custos Fixos</option>
                         <option value="Comissões">Apenas Comissões</option>
                     </select>
@@ -1181,7 +1186,6 @@ const Actions = {
         }
     },
     
-    /* PASSO 3: AÇÕES DE FILTROS E RECEITA */
     applyFilterRelatorios(e) {
         e.preventDefault();
         App.filters.relatorios = { start: document.getElementById('frel-start').value, end: document.getElementById('frel-end').value, tipo: document.getElementById('frel-tipo').value, prof_name: document.getElementById('frel-prof').value };

@@ -1,4 +1,5 @@
-/** * SISTEMA ESTÚDIO AMOR QUE CUIDA
+/** 
+ * SISTEMA ESTÚDIO AMOR QUE CUIDA
  */
 
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
@@ -108,6 +109,68 @@ const U = {
     }
 };
 
+/* --- COMPONENTE CUSTOM SELECT COM BUSCA --- */
+const CustomSelect = {
+    render(id, placeholder, optionsHtml, onChangeGlobalName = '', initialValue = '') {
+        return `
+        <div class="aqc-custom-select" id="wrapper-${id}" onclick="event.stopPropagation()">
+            <div class="aqc-select-trigger" onclick="CustomSelect.toggle('${id}')">
+                <span id="label-${id}">${placeholder}</span>
+                <i class="ph ph-caret-down"></i>
+            </div>
+            <div class="aqc-select-menu" id="menu-${id}" style="display:none;">
+                <div class="aqc-select-search-box">
+                    <input type="text" placeholder="Buscar..." onkeyup="CustomSelect.filter('${id}', this.value)">
+                </div>
+                <ul class="aqc-select-options" id="options-${id}">
+                    ${optionsHtml}
+                </ul>
+            </div>
+            <input type="hidden" id="${id}" value="${initialValue}" required onchange="${onChangeGlobalName ? onChangeGlobalName + '(this.value)' : ''}">
+        </div>`;
+    },
+    toggle(id) {
+        document.querySelectorAll('.aqc-select-menu').forEach(el => {
+            if(el.id !== `menu-${id}`) el.style.display = 'none';
+        });
+        const menu = document.getElementById(`menu-${id}`);
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        if (menu.style.display === 'block') {
+            const input = menu.querySelector('input');
+            if(input) input.focus();
+        }
+    },
+    filter(id, term) {
+        term = term.toLowerCase();
+        const opts = document.getElementById(`options-${id}`).querySelectorAll('li');
+        opts.forEach(opt => {
+            if (opt.classList.contains('optgroup-label')) return;
+            const text = opt.innerText.toLowerCase();
+            opt.style.display = text.includes(term) ? 'block' : 'none';
+        });
+    },
+    select(id, val, text) {
+        document.getElementById(`label-${id}`).innerText = text;
+        const input = document.getElementById(id);
+        if(val.includes('%7B')) val = decodeURIComponent(val); // Decodifica JSON se necessário
+        input.value = val;
+        input.dispatchEvent(new Event('change'));
+        document.getElementById(`menu-${id}`).style.display = 'none';
+    },
+    closeAll() {
+        document.querySelectorAll('.aqc-select-menu').forEach(el => el.style.display = 'none');
+    }
+};
+document.addEventListener('click', CustomSelect.closeAll);
+window.handleNewClient = function(val) {
+    const div = document.getElementById('fa-new-cli-div');
+    if(div) div.style.display = val === 'NEW' ? 'block' : 'none';
+};
+window.handleNewClientComanda = function(val) {
+    const div = document.getElementById('fcom-new-cli-div');
+    if(div) div.style.display = val === 'NEW' ? 'block' : 'none';
+};
+
 const UI = {
     toast(msg, type='success') {
         const cont = document.getElementById('toast-container');
@@ -133,41 +196,6 @@ const UI = {
         else if(v === 'mensagens' && App.role === 'owner') Modals.open('mensagem');
         else if(v === 'despesas' && App.role === 'owner') Modals.open('despesa');
         else this.toast('Utilize os botões na tela para cadastros rápidos.', 'error');
-    },
-    filterSelect(term, selectId) {
-        term = term.toLowerCase();
-        const sel = document.getElementById(selectId);
-        
-        if (!sel._originalOptions) {
-            sel._originalOptions = Array.from(sel.children).map(child => {
-                if (child.tagName === 'OPTGROUP') {
-                    return { type: 'optgroup', label: child.label, options: Array.from(child.children).map(o => ({ val: o.value, text: o.text, style: o.style.cssText })) };
-                } else {
-                    return { type: 'option', val: child.value, text: child.text, style: child.style.cssText };
-                }
-            });
-        }
-        
-        sel.innerHTML = '';
-        sel._originalOptions.forEach(group => {
-            if (group.type === 'optgroup') {
-                const optGroup = document.createElement('optgroup');
-                optGroup.label = group.label;
-                let hasVisible = false;
-                group.options.forEach(o => {
-                    if (o.text.toLowerCase().includes(term)) {
-                        const opt = document.createElement('option'); opt.value = o.val; opt.text = o.text; opt.style.cssText = o.style;
-                        optGroup.appendChild(opt); hasVisible = true;
-                    }
-                });
-                if (hasVisible) sel.appendChild(optGroup);
-            } else {
-                if (group.val === "" || group.val === "NEW" || group.text.toLowerCase().includes(term)) {
-                    const opt = document.createElement('option'); opt.value = group.val; opt.text = group.text; opt.style.cssText = group.style;
-                    sel.appendChild(opt);
-                }
-            }
-        });
     }
 };
 
@@ -1099,9 +1127,14 @@ const Modals = {
                 `:''}</div>
             </div>`).join('');
             
-            let delBtnHtml = (App.role === 'owner' && !isFechada) ? `<button class="btn-secondary" style="width:auto; padding:0.6rem 1rem; color:#d32f2f; border:1px solid #d32f2f;" onclick="Actions.deleteComanda('${comanda.id}')"><i class="ph ph-trash"></i> Deletar</button>` : '';
+            /* PASSO 3: O botão de deletar recebeu margin-right: 40px para afastar do X */
+            let delBtnHtml = (App.role === 'owner' && !isFechada) ? `<button class="btn-secondary" style="width:auto; padding:0.5rem 0.8rem; color:#d32f2f; border:1px solid #d32f2f; margin-right: 40px;" onclick="Actions.deleteComanda('${comanda.id}')"><i class="ph ph-trash"></i> Deletar</button>` : '';
 
-            html += `<div style="text-align: center; margin-bottom: 20px;"><div style="display:flex; justify-content:space-between; align-items:center;"><h3 style="margin: 0; color: var(--primary-dark);">Ticket: <span style="color:var(--primary)">${comanda.ticket || '-'}</span></h3> ${delBtnHtml}</div>
+            html += `<div style="text-align: left; margin-bottom: 20px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3 style="margin: 0; color: var(--primary-dark);">Ticket: <span style="color:var(--primary)">${comanda.ticket || '-'}</span></h3> 
+                    ${delBtnHtml}
+                </div>
                 <p style="color: var(--muted); margin-top: 5px; font-size:1.1rem;">Cliente: <b style="color:var(--text)">${comanda.clients?.name}</b></p>
             </div>
             <div style="background: #fafafa; border: 1px solid var(--border); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
@@ -1111,19 +1144,29 @@ const Modals = {
             </div>`;
             
             if(!isFechada) {
-                const sOpts = servicos.map(s => `<option value='{"id":"${s.id}","name":"${s.name}","price":${s.price},"cost":${s.cost || 0},"commission":${s.commission},"type":"service"}'>${s.name} - ${U.money(s.price)}</option>`).join('');
-                const pOpts = produtos.map(p => `<option value='{"id":"${p.id}","name":"${p.name}","price":${p.price},"commission":${p.commission},"type":"product"}'>${p.name} (Est. ${p.stock}) - ${U.money(p.price)}</option>`).join('');
-                const profOpts = profs.map(x=>`<option value="${x.id}|${x.name}">${x.name}</option>`).join('');
+                /* PASSO 1: Integração do Custom Select no modal de Editar Comanda */
+                const sOpts = servicos.map(s => {
+                    const val = encodeURIComponent(JSON.stringify({id: s.id, name: s.name, price: s.price, cost: s.cost || 0, commission: s.commission, type: 'service'}));
+                    return `<li onclick="CustomSelect.select('add-item-sel', '${val}', '${s.name.replace(/'/g, "\\'")} - ${U.money(s.price)}')">${s.name} - ${U.money(s.price)}</li>`;
+                }).join('');
+                
+                const pOpts = produtos.map(p => {
+                    const val = encodeURIComponent(JSON.stringify({id: p.id, name: p.name, price: p.price, commission: p.commission, type: 'product'}));
+                    return `<li onclick="CustomSelect.select('add-item-sel', '${val}', '${p.name.replace(/'/g, "\\'")} (Est. ${p.stock}) - ${U.money(p.price)}')">${p.name} (Est. ${p.stock}) - ${U.money(p.price)}</li>`;
+                }).join('');
+                
+                const optionsItemHtml = `<li class="optgroup-label">Serviços</li>${sOpts}<li class="optgroup-label">Produtos</li>${pOpts}`;
+                
+                const profOpts = profs.map(x=>`<li onclick="CustomSelect.select('add-item-prof', '${x.id}|${x.name}', '${x.name.replace(/'/g, "\\'")}')">${x.name}</li>`).join('');
                 
                 html += `<div style="display:flex; gap:10px; margin-bottom:20px; align-items: flex-end; flex-wrap:wrap;">
                     <div class="input-group" style="margin:0; flex:1; min-width:200px;">
                         <label>Adicionar Item</label>
-                        <input type="text" placeholder="🔍 Buscar serviço/produto..." onkeyup="UI.filterSelect(this.value, 'add-item-sel')" style="padding: 0.8rem; border-radius: 8px; margin-bottom: 5px; width: 100%; border: 1px solid var(--border);">
-                        <select id="add-item-sel" style="padding:1.2rem;"><option value="">-- Buscar Serviço/Prod --</option><optgroup label="Serviços">${sOpts}</optgroup><optgroup label="Produtos">${pOpts}</optgroup></select>
+                        ${CustomSelect.render('add-item-sel', '-- Buscar Serviço/Prod --', optionsItemHtml)}
                     </div>
                     <div class="input-group" style="margin:0; flex:1; min-width:150px;">
                         <label>Feito por:</label>
-                        <select id="add-item-prof" style="padding:1.2rem;"><option value="">-- Profissional --</option>${profOpts}</select>
+                        ${CustomSelect.render('add-item-prof', '-- Profissional --', profOpts)}
                     </div>
                     <button type="button" class="btn-secondary" style="width:auto; padding:1.2rem;" onclick="Actions.addComandaItem('${comanda.id}')"><i class="ph ph-plus"></i></button>
                 </div>
@@ -1132,6 +1175,24 @@ const Modals = {
                 html += `<button type="button" class="btn-secondary" style="color:#d32f2f; padding:1.2rem;" onclick="Actions.reopenComanda('${comanda.id}')"><i class="ph ph-warning-circle"></i> Reabrir Comanda</button>`;
             }
         }
+        else if (type === 'edit_price') {
+            /* PASSO 2: Modal Customizado no lugar do prompt nativo */
+            const item = JSON.parse(param3);
+            html += `<div style="text-align: center; margin-bottom: 20px;">
+                <h3 style="margin: 0; color: var(--primary-dark);">Alterar valor de: ${item.name}</h3>
+                <p style="color:var(--muted); margin-top:5px;">Valor atual: <b>${U.money(item.price)}</b></p>
+            </div>
+            <form onsubmit="Actions.saveComandaItemPrice(event, '${param1}', ${param2})">
+                <div class="input-group">
+                    <label>Digite o novo valor (R$)</label>
+                    <input type="number" id="edit-price-val" step="0.01" min="0" value="${item.price}" required style="padding:1.2rem; font-size: 1.2rem;">
+                </div>
+                <div style="display:flex; gap:10px; margin-top: 20px;">
+                    <button type="button" class="btn-secondary" style="flex:1; padding: 1.2rem;" onclick="Modals.open('edit_comanda', '${param1}')">Cancelar</button>
+                    <button type="submit" class="btn-primary" style="flex:1; padding: 1.2rem;">Salvar OK</button>
+                </div>
+            </form>`;
+        }
         else if(type === 'agendamento') {
             const [c, s, u] = await Promise.all([
                 db.from('clients').select('id,name').order('name'), 
@@ -1139,15 +1200,22 @@ const Modals = {
                 db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true).order('name')
             ]);
             
+            /* PASSO 1: Custom Select no Agendamento */
+            const cliOpts = `<li onclick="CustomSelect.select('fa-cli', 'NEW', '+ CADASTRAR NOVO CLIENTE AQUI')" style="font-weight:bold; color:#2e7d32;">+ CADASTRAR NOVO CLIENTE AQUI</li>` + 
+                c.data.map(x=>`<li onclick="CustomSelect.select('fa-cli', '${x.id}', '${x.name.replace(/'/g, "\\'")}')">${x.name}</li>`).join('');
+            
+            const servOpts = s.data.map(x=>`<li onclick="CustomSelect.select('fa-serv', '${x.id}|${x.duration||60}', '${x.name.replace(/'/g, "\\'")} (${x.duration||60}min)')">${x.name} (${x.duration||60}min)</li>`).join('');
+            
+            let defaultUserName = '-- Atendente --'; let defaultUserId = '';
+            const userOpts = u.data.map(x => {
+                if(x.id === param1) { defaultUserName = x.name; defaultUserId = x.id; }
+                return `<li onclick="CustomSelect.select('fa-user', '${x.id}', '${x.name.replace(/'/g, "\\'")}')">${x.name}</li>`;
+            }).join('');
+            
             html += `<h3 style="text-align:center; margin-bottom:20px; color:var(--primary-dark)">Novo Agendamento</h3><form onsubmit="Actions.createAppointment(event)">
                 <div class="input-group">
                     <label>Cliente</label>
-                    <input type="text" placeholder="🔍 Buscar cliente..." onkeyup="UI.filterSelect(this.value, 'fa-cli')" style="padding: 0.8rem; border-radius: 8px; margin-bottom: 5px; width: 100%; border: 1px solid var(--border);">
-                    <select id="fa-cli" required style="padding:1.2rem;" onchange="if(this.value==='NEW'){document.getElementById('fa-new-cli-div').style.display='block';}else{document.getElementById('fa-new-cli-div').style.display='none';}">
-                        <option value="">-- Selecione --</option>
-                        <option value="NEW" style="font-weight:bold; color:#2e7d32;">+ CADASTRAR NOVO CLIENTE AQUI</option>
-                        ${c.data.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}
-                    </select>
+                    ${CustomSelect.render('fa-cli', '-- Buscar Cliente --', cliOpts, 'handleNewClient')}
                 </div>
                 
                 <div id="fa-new-cli-div" style="display:none; background:#f1f8e9; padding:15px; border-radius:12px; margin-bottom:15px; border:1px solid #c5e1a5;">
@@ -1158,10 +1226,14 @@ const Modals = {
 
                 <div class="input-group">
                     <label>Serviço</label>
-                    <input type="text" placeholder="🔍 Buscar serviço..." onkeyup="UI.filterSelect(this.value, 'fa-serv')" style="padding: 0.8rem; border-radius: 8px; margin-bottom: 5px; width: 100%; border: 1px solid var(--border);">
-                    <select id="fa-serv" required><option value="">-- Selecione --</option>${s.data.map(x=>`<option value="${x.id}" data-dur="${x.duration || 60}">${x.name} (${x.duration||60}min)</option>`).join('')}</select>
+                    ${CustomSelect.render('fa-serv', '-- Buscar Serviço --', servOpts)}
                 </div>
-                <div class="input-group"><label>Profissional</label><select id="fa-user" required><option value="">-- Atendente --</option>${u.data.map(x=>`<option value="${x.id}" ${x.id===param1?'selected':''}>${x.name}</option>`).join('')}</select></div>
+                
+                <div class="input-group">
+                    <label>Profissional</label>
+                    ${CustomSelect.render('fa-user', defaultUserName, userOpts, '', defaultUserId)}
+                </div>
+                
                 <div class="input-group" style="background:#fff3e0; padding:10px; border-radius:8px; border:1px solid #ffb74d;"><label style="margin:0; color:#e65100; cursor:pointer;"><input type="checkbox" id="fa-encaixe"> Forçar Encaixe (Ignora conflitos)</label></div>
                 <div style="display:flex; gap:10px;"><div class="input-group"><label>Data</label><input type="date" id="fa-date" value="${param3||''}" required></div><div class="input-group"><label>Hora</label><input type="time" id="fa-time" value="${param2||''}" required></div></div>
                 <button type="submit" class="btn-primary" style="padding:1.2rem;">Confirmar Horário</button></form>`;
@@ -1189,15 +1261,15 @@ const Modals = {
         }
         else if(type === 'comanda') {
             const { data: c } = await db.from('clients').select('id,name').order('name');
+            
+            /* PASSO 1: Custom Select na Geração da Comanda */
+            const cliOptsCom = `<li onclick="CustomSelect.select('fcom-cli', 'NEW', '+ CADASTRAR NOVO CLIENTE AQUI')" style="font-weight:bold; color:#2e7d32;">+ CADASTRAR NOVO CLIENTE AQUI</li>` + 
+                c.map(x=>`<li onclick="CustomSelect.select('fcom-cli', '${x.id}', '${x.name.replace(/'/g, "\\'")}')">${x.name}</li>`).join('');
+                
             html += `<h3>Gerar Novo Ticket</h3><form onsubmit="Actions.createComanda(event)">
                 <div class="input-group">
                     <label>Cliente</label>
-                    <input type="text" placeholder="🔍 Buscar cliente..." onkeyup="UI.filterSelect(this.value, 'fcom-cli')" style="padding: 0.8rem; border-radius: 8px; margin-bottom: 5px; width: 100%; border: 1px solid var(--border);">
-                    <select id="fcom-cli" required style="padding:1.2rem;" onchange="if(this.value==='NEW'){document.getElementById('fcom-new-cli-div').style.display='block';}else{document.getElementById('fcom-new-cli-div').style.display='none';}">
-                        <option value="">-- Buscar Cliente --</option>
-                        <option value="NEW" style="font-weight:bold; color:#2e7d32;">+ CADASTRAR NOVO CLIENTE AQUI</option>
-                        ${c.map(x=>`<option value="${x.id}">${x.name}</option>`).join('')}
-                    </select>
+                    ${CustomSelect.render('fcom-cli', '-- Buscar Cliente --', cliOptsCom, 'handleNewClientComanda')}
                 </div>
                 <div id="fcom-new-cli-div" style="display:none; background:#f1f8e9; padding:15px; border-radius:12px; margin-bottom:15px; border:1px solid #c5e1a5;">
                     <p style="font-size:0.8rem; color:#2e7d32; font-weight:bold; margin-bottom:10px;"><i class="ph ph-user-plus"></i> Cadastro Rápido</p>
@@ -1404,9 +1476,17 @@ const Actions = {
                 Render.clientes(); 
             }
 
-            const servSel = document.getElementById('fa-serv'); const opt = servSel.options[servSel.selectedIndex];
-            const dur = parseInt(opt.dataset.dur || 60); const encaixe = document.getElementById('fa-encaixe').checked;
-            const time = document.getElementById('fa-time').value; const date = document.getElementById('fa-date').value; const user_id = document.getElementById('fa-user').value;
+            const servVal = document.getElementById('fa-serv').value;
+            if(!servVal) throw new Error('Selecione o serviço!');
+            const [service_id, durStr] = servVal.split('|');
+            const dur = parseInt(durStr || 60); 
+
+            const encaixe = document.getElementById('fa-encaixe').checked;
+            const time = document.getElementById('fa-time').value; 
+            const date = document.getElementById('fa-date').value; 
+            const user_id = document.getElementById('fa-user').value;
+
+            if(!user_id) throw new Error('Selecione o Profissional!');
 
             const { data: over } = await db.from('appointments').select('time, status, notes, services(duration)').eq('date', date).eq('user_id', user_id).neq('status', 'cancelado');
             let conflitoNormal = false;
@@ -1441,7 +1521,7 @@ const Actions = {
                 throw new Error('Horário ocupado! Marque a opção "Forçar Encaixe" se for estritamente necessário.');
             }
 
-            await db.from('appointments').insert({ client_id: clientId, service_id: servSel.value, user_id: user_id, date: date, time: time, is_encaixe: encaixe, status: 'agendado' });
+            await db.from('appointments').insert({ client_id: clientId, service_id: service_id, user_id: user_id, date: date, time: time, is_encaixe: encaixe, status: 'agendado' });
             
             Modals.close(); 
             UI.toast('Horário salvo com sucesso!'); 
@@ -1561,24 +1641,32 @@ const Actions = {
         Modals.close(); setTimeout(() => Modals.open('edit_comanda', id), 100);
     },
     
+    /* PASSO 2: Chamada do Novo Modal de Editar Preço (Substituindo o Prompt NATIVO) */
     async editComandaItemPrice(id, idx) {
+        const { data: c } = await db.from('comandas').select('items').eq('id', id).single();
+        const item = c.items[idx];
+        Modals.open('edit_price', id, idx, JSON.stringify(item));
+    },
+
+    /* PASSO 2: Função que salva o preço editado no novo modal */
+    async saveComandaItemPrice(e, id, idx) {
+        e.preventDefault();
+        const novoValorStr = document.getElementById('edit-price-val').value;
+        const novoValor = parseFloat(novoValorStr);
+        
+        if (isNaN(novoValor) || novoValor < 0) return UI.toast('Valor inválido.', 'error');
+
         const { data: c } = await db.from('comandas').select('items, total').eq('id', id).single();
         const items = c.items || [];
         const item = items[idx];
-        
-        let novoValor = prompt(`Alterar valor de: ${item.name}\nValor atual: R$ ${item.price.toFixed(2)}\n\nDigite o novo valor (use ponto em vez de vírgula):`, item.price);
-        
-        if (novoValor === null || novoValor.trim() === '') return;
-        novoValor = parseFloat(novoValor.replace(',', '.'));
-        
-        if (isNaN(novoValor) || novoValor < 0) return UI.toast('Valor inválido.', 'error');
         
         const diferenca = novoValor - item.price;
         item.price = novoValor;
         
         await db.from('comandas').update({ items, total: Math.max(0, c.total + diferenca) }).eq('id', id);
-        Modals.close(); setTimeout(() => Modals.open('edit_comanda', id), 100);
         UI.toast('Valor modificado com sucesso!');
+        Modals.close(); 
+        setTimeout(() => Modals.open('edit_comanda', id), 100);
     },
 
     async closeComanda(comandaId, clientId, total, ticketNum) {
@@ -1832,4 +1920,28 @@ const Actions = {
     }
 };
 
-document.addEventListener('DOMContentLoaded', () => { setTimeout(() => { const splash = document.getElementById('splash-screen'); if(splash) { splash.style.opacity = '0'; setTimeout(() => splash.remove(), 500); } }, 4000); Auth.init(); });
+/* PASSO 1: INJETOR DE CSS PARA O DROPDOWN CUSTOMIZADO */
+const initCSS = () => {
+    if(document.getElementById('aqc-custom-styles')) return;
+    const style = document.createElement('style');
+    style.id = 'aqc-custom-styles';
+    style.innerHTML = `
+        .aqc-custom-select { position: relative; width: 100%; font-family: inherit; }
+        .aqc-select-trigger { background: #fff; border: 1px solid var(--border); padding: 1.2rem; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; color: var(--text); }
+        .aqc-select-menu { position: absolute; top: 100%; left: 0; width: 100%; background: #fff; border: 1px solid var(--border); border-radius: 8px; margin-top: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); z-index: 9999; display: flex; flex-direction: column; max-height: 300px; }
+        .aqc-select-search-box { padding: 10px; border-bottom: 1px solid #eee; position: sticky; top: 0; background: #fff; border-radius: 8px 8px 0 0; }
+        .aqc-select-search-box input { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; outline: none; font-size: 1rem; font-family: inherit; }
+        .aqc-select-options { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
+        .aqc-select-options li { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #f9f9f9; color: var(--text); font-size: 0.95rem; }
+        .aqc-select-options li:hover { background: #f1f8e9; }
+        .aqc-select-options li.optgroup-label { font-weight: bold; background: #f5f5f5; cursor: default; color: var(--muted); font-size: 0.9rem; text-transform: uppercase; }
+        .aqc-select-options li.optgroup-label:hover { background: #f5f5f5; }
+    `;
+    document.head.appendChild(style);
+};
+
+document.addEventListener('DOMContentLoaded', () => { 
+    initCSS();
+    setTimeout(() => { const splash = document.getElementById('splash-screen'); if(splash) { splash.style.opacity = '0'; setTimeout(() => splash.remove(), 500); } }, 4000); 
+    Auth.init(); 
+});

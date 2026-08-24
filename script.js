@@ -1,4 +1,5 @@
-/** * SISTEMA ESTÚDIO AMOR QUE CUIDA
+/** 
+ * SISTEMA ESTÚDIO AMOR QUE CUIDA
  */
 
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
@@ -77,8 +78,9 @@ const U = {
 
         (desp || []).forEach(d => {
             const isIncome = App.inflowCategories.includes(d.category);
-            const item = { type: isIncome ? 'in' : 'out', desc: d.description, val: d.amount, date: new Date(d.date), category: d.category };
-            if(isIncome) totalIn += d.amount; else totalOut += d.amount;
+            const valNum = Number(d.amount) || 0; // Correção: Garante que é número e não texto
+            const item = { type: isIncome ? 'in' : 'out', desc: d.description, val: valNum, date: new Date(d.date), category: d.category };
+            if(isIncome) totalIn += valNum; else totalOut += valNum;
             extrato.push(item);
         });
 
@@ -655,14 +657,13 @@ const Render = {
         rc.innerHTML = `<div class="card" style="border-bottom:4px solid #2e7d32"><h4>Faturamento (Pago)</h4><div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(totalIn)}</div></div><div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custos & Comissões (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(totalOut)}</div></div><div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
         
         let subDash = { 'Pix':0, 'Dinheiro':0, 'Cartão Crédito':0, 'Cartão Débito':0 };
-        desp.forEach(d => { if(subDash[d.category] !== undefined) subDash[d.category] += d.amount; });
+        desp.forEach(d => { if(subDash[d.category] !== undefined) subDash[d.category] += Number(d.amount)||0; }); // Correção de segurança numérica
         
         document.getElementById('resumo-pagamentos-cards').innerHTML = `<div class="card" style="text-align:center"><i class="ph ph-qr-code" style="font-size:2rem; color:#00695c"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Pix</p><div class="val" style="font-size:1.2rem; color:#00695c">${U.money(subDash['Pix'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-money" style="font-size:2rem; color:#2e7d32"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Dinheiro</p><div class="val" style="font-size:1.2rem; color:#2e7d32">${U.money(subDash['Dinheiro'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#e65100"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Crédito</p><div class="val" style="font-size:1.2rem; color:#e65100">${U.money(subDash['Cartão Crédito'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#1565c0"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Débito</p><div class="val" style="font-size:1.2rem; color:#1565c0">${U.money(subDash['Cartão Débito'])}</div></div>`;
         document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações na quinzena.</p>' :
             extrato.map(i => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;"><div style="flex:1"><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Saída'} - ${i.category}</b><p style="margin-top:5px; font-weight:600; font-size:1.1rem">${U.formatDesc(i.desc)}</p><span style="font-size:0.8rem; color:var(--muted); display:inline-block; margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(i.date)}</span></div><div style="text-align:right"><span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.3rem; display:block">${i.type==='in'?'+':'-'} ${U.money(i.val)}</span><span style="font-size:0.85rem; color:var(--muted); font-weight:bold">Caixa: ${U.money(i.saldo)}</span></div></div>`).join('');
     },
 
-    /* PASSO 3: SOLICITAÇÃO 03 E 05 - MELHORIA NO FILTRO DE RELATÓRIOS PARA PERMITIR "APENAS RECEITAS" */
     async relatorios() {
         const relContainer = document.getElementById('relatorio-despesas-conteudo');
         if(relContainer) {
@@ -691,7 +692,6 @@ const Render = {
             let f = App.filters.relatorios;
             let query = db.from('despesas').select('*').gte('date', f.start + 'T00:00:00Z').lte('date', f.end + 'T23:59:59Z');
             
-            // Adicionado suporte para filtrar apenas Entradas/Receitas para PDF e visualização
             if (f.tipo === 'Custos Fixos') query = query.eq('category', 'Custos Fixos');
             else if (f.tipo === 'Comissões') query = query.eq('category', 'Comissões');
             else if (f.tipo === 'Receitas') query = query.in('category', App.inflowCategories);
@@ -710,17 +710,26 @@ const Render = {
         }
 
         const { extrato, totalIn, totalOut } = U.buildExtrato(desp);
-        const despesasOnly = desp.filter(d => !App.inflowCategories.includes(d.category));
+        
+        // Correção na Abordagem da Lista Principal (Despesas ou Receitas dinamicamente)
+        let isReceitaFilter = App.filters.relatorios?.tipo === 'Receitas';
+        let targetList = isReceitaFilter 
+            ? desp.filter(d => App.inflowCategories.includes(d.category)) 
+            : desp.filter(d => !App.inflowCategories.includes(d.category));
 
         let htmlDesp = '';
-        if(despesasOnly.length === 0) { 
-            let msgText = App.filters.relatorios?.tipo === 'Receitas' ? 'Filtro focado apenas em receitas. Para ver as saídas remova o filtro.' : 'Sem gastos registrados para este filtro.';
+        if(targetList.length === 0) { 
+            let msgText = isReceitaFilter ? 'Nenhuma entrada/receita encontrada nesse período.' : 'Sem gastos registrados para este filtro.';
             htmlDesp = `<p style="color:var(--muted); text-align:center;">${msgText}</p>`; 
         } else { 
-            htmlDesp = despesasOnly.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${U.formatDesc(d.description)}</b><br><span style="font-size:0.8rem; color:#888"><i class="ph ph-clock"></i> ${U.date(d.date)}</span></div><div style="color:#d32f2f; font-weight:bold">-${U.money(d.amount)}</div></div>`).join(''); 
+            htmlDesp = targetList.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${U.formatDesc(d.description)}</b><br><span style="font-size:0.8rem; color:#888"><i class="ph ph-clock"></i> ${U.date(d.date)}</span></div><div style="color:${isReceitaFilter ? '#2e7d32' : '#d32f2f'}; font-weight:bold">${isReceitaFilter ? '+' : '-'}${U.money(d.amount)}</div></div>`).join(''); 
         }
+        
         if(relContainer) relContainer.innerHTML = htmlDesp;
-        window.currentDespesasData = despesasOnly;
+        
+        // Salva os dados atualizados para usar no Export de PDF
+        window.currentDespesasData = targetList;
+        window.currentRelatorioTipo = isReceitaFilter ? 'Receitas' : 'Despesas';
 
         let htmlFluxo = '';
         if(extrato.length === 0) { htmlFluxo = '<p style="color:var(--muted); text-align:center;">Nenhuma movimentação para este filtro.</p>'; }
@@ -1086,7 +1095,6 @@ const Modals = {
                 <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar</button></form>`;
         }
         
-        /* PASSO 3: MELHORIA ADICIONADA (FILTRO APENAS RECEITAS) */
         else if (type === 'filtro_relatorios') {
             const { data: users } = await db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true).order('name');
             const uOpts = users.map(u => `<option value="${u.name}">${u.name}</option>`).join('');
@@ -1170,11 +1178,21 @@ const Actions = {
         doc.setFontSize(12); doc.setTextColor(50, 50, 50);
         
         if (viewType === 'despesas') {
-            doc.text(`Relatório de Despesas`, 105, 30, null, null, "center");
+            // Verifica dinamicamente se o usuário pediu receitas ou despesas
+            let isReceitas = window.currentRelatorioTipo === 'Receitas';
+            let title = isReceitas ? 'Relatório de Entradas (Receitas)' : 'Relatório de Despesas';
+            
+            doc.text(title, 105, 30, null, null, "center");
+            
             if(!window.currentDespesasData || window.currentDespesasData.length === 0) return UI.toast('Sem dados.', 'warning');
+            
             const rows = window.currentDespesasData.map(d => [ U.date(d.date), d.category, d.description, U.money(d.amount) ]);
-            doc.autoTable({ startY: 45, head: [['Data/Hora', 'Categoria', 'Descrição', 'Valor (R$)']], body: rows, theme: 'striped', headStyles: { fillColor: [183, 110, 121] } });
-            doc.save(`AQC_Despesas_${quinzenaStr}.pdf`);
+            
+            // Muda a cor do topo da tabela no PDF para verde (Receitas) ou Vermelho (Saídas)
+            const corTema = isReceitas ? [46, 125, 50] : [183, 110, 121];
+            
+            doc.autoTable({ startY: 45, head: [['Data/Hora', 'Categoria', 'Descrição', 'Valor (R$)']], body: rows, theme: 'striped', headStyles: { fillColor: corTema } });
+            doc.save(`AQC_${title.replace(/ /g, '_')}_${quinzenaStr}.pdf`);
         } else if (viewType === 'fluxo') {
             doc.text(`Relatório de Fluxo de Caixa`, 105, 30, null, null, "center");
             if(!window.currentFluxoData || window.currentFluxoData.length === 0) return UI.toast('Sem dados.', 'warning');
@@ -1202,8 +1220,23 @@ const Actions = {
 
     async createReceita(e) {
         e.preventDefault();
-        await db.from('despesas').insert({ description: "ENTRADA MANUAL: " + document.getElementById('fr-desc').value, amount: document.getElementById('fr-val').value, category: document.getElementById('fr-cat').value, date: new Date().toISOString() }); 
-        Modals.close(); UI.toast('Valor positivo injetado com sucesso no Fluxo de Caixa!'); Render['resumo-financeiro']();
+        
+        // Correção: Extrai o valor preenchido e garante que seja salvo com formato numérico decimal.
+        const valorReceita = parseFloat(document.getElementById('fr-val').value) || 0;
+        
+        await db.from('despesas').insert({ 
+            description: "ENTRADA MANUAL: " + document.getElementById('fr-desc').value, 
+            amount: valorReceita, 
+            category: document.getElementById('fr-cat').value, 
+            date: new Date().toISOString() 
+        }); 
+        
+        Modals.close(); 
+        UI.toast('Valor positivo injetado com sucesso no Fluxo de Caixa!'); 
+        
+        // Atualiza instantaneamente as abas se o usuário estiver lá
+        Render['resumo-financeiro']();
+        if (App.view === 'relatorios') { Render.relatorios(); }
     },
 
     async updatePassword(e) {

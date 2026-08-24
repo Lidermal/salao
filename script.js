@@ -1,5 +1,4 @@
-/** 
- * SISTEMA ESTÚDIO AMOR QUE CUIDA
+/** * SISTEMA ESTÚDIO AMOR QUE CUIDA
  */
 
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
@@ -18,7 +17,8 @@ const App = {
     charts: {}, 
     settings: {},
     avatars: {}, 
-    inflowCategories: ['Pix', 'Dinheiro', 'Cartão Crédito', 'Cartão Débito']
+    inflowCategories: ['Pix', 'Dinheiro', 'Cartão Crédito', 'Cartão Débito'],
+    filters: { relatorios: null, comissoes: null } // NOVO: Controle de filtros 03 e 04
 };
 
 const U = {
@@ -134,7 +134,6 @@ const CustomSelect = {
         const wrapper = document.getElementById(`wrapper-${id}`);
         const isOpening = menu.style.display === 'none' || menu.style.display === '';
 
-        // Fecha todos os outros e reseta z-index
         document.querySelectorAll('.aqc-select-menu').forEach(el => el.style.display = 'none');
         document.querySelectorAll('.aqc-custom-select').forEach(el => {
             el.style.zIndex = '1';
@@ -143,28 +142,17 @@ const CustomSelect = {
 
         if (isOpening) {
             menu.style.display = 'flex';
-            
-            // Força a prioridade máxima
             wrapper.style.zIndex = '999999';
-            if(wrapper.parentElement) {
-                wrapper.parentElement.style.position = 'relative';
-                wrapper.parentElement.style.zIndex = '999999';
-            }
+            if(wrapper.parentElement) { wrapper.parentElement.style.position = 'relative'; wrapper.parentElement.style.zIndex = '999999'; }
 
-            // Algoritmo de Inteligência de Espaço: Abre pra cima ou pra baixo
             const rect = wrapper.getBoundingClientRect();
             const spaceBelow = window.innerHeight - rect.bottom;
             
-            if (spaceBelow < 280) { // Se não tiver ~280px sobrando embaixo
-                menu.style.top = 'auto';
-                menu.style.bottom = 'calc(100% + 5px)'; // Sobe o menu
-                menu.style.boxShadow = '0 -10px 30px rgba(0,0,0,0.25)';
+            if (spaceBelow < 280) { 
+                menu.style.top = 'auto'; menu.style.bottom = 'calc(100% + 5px)'; menu.style.boxShadow = '0 -10px 30px rgba(0,0,0,0.25)';
             } else {
-                menu.style.top = 'calc(100% + 5px)';
-                menu.style.bottom = 'auto'; // Desce o menu normal
-                menu.style.boxShadow = '0 10px 30px rgba(0,0,0,0.25)';
+                menu.style.top = 'calc(100% + 5px)'; menu.style.bottom = 'auto'; menu.style.boxShadow = '0 10px 30px rgba(0,0,0,0.25)';
             }
-
             const input = menu.querySelector('input');
             if(input) { input.value = ''; CustomSelect.filter(id, ''); input.focus(); }
         }
@@ -181,34 +169,25 @@ const CustomSelect = {
     select(id, val, text) {
         document.getElementById(`label-${id}`).innerText = text;
         const input = document.getElementById(id);
-        if(val.includes('%7B')) val = decodeURIComponent(val); // Decodifica JSON se necessário
+        if(val.includes('%7B')) val = decodeURIComponent(val); 
         input.value = val;
         input.dispatchEvent(new Event('change'));
         document.getElementById(`menu-${id}`).style.display = 'none';
         
-        // Reseta as prioridades
         const wrapper = document.getElementById(`wrapper-${id}`);
-        wrapper.style.zIndex = '1';
-        if(wrapper.parentElement) wrapper.parentElement.style.zIndex = '';
+        wrapper.style.zIndex = '1'; if(wrapper.parentElement) wrapper.parentElement.style.zIndex = '';
     },
     closeAll() {
         document.querySelectorAll('.aqc-select-menu').forEach(el => el.style.display = 'none');
         document.querySelectorAll('.aqc-custom-select').forEach(el => {
-            el.style.zIndex = '1';
-            if(el.parentElement) el.parentElement.style.zIndex = '';
+            el.style.zIndex = '1'; if(el.parentElement) el.parentElement.style.zIndex = '';
         });
     }
 };
 
 document.addEventListener('click', CustomSelect.closeAll);
-window.handleNewClient = function(val) {
-    const div = document.getElementById('fa-new-cli-div');
-    if(div) div.style.display = val === 'NEW' ? 'block' : 'none';
-};
-window.handleNewClientComanda = function(val) {
-    const div = document.getElementById('fcom-new-cli-div');
-    if(div) div.style.display = val === 'NEW' ? 'block' : 'none';
-};
+window.handleNewClient = function(val) { const div = document.getElementById('fa-new-cli-div'); if(div) div.style.display = val === 'NEW' ? 'block' : 'none'; };
+window.handleNewClientComanda = function(val) { const div = document.getElementById('fcom-new-cli-div'); if(div) div.style.display = val === 'NEW' ? 'block' : 'none'; };
 
 const UI = {
     toast(msg, type='success') {
@@ -219,26 +198,20 @@ const UI = {
     },
     confirm(msg, onConfirm) {
         document.getElementById('confirm-msg').textContent = msg;
-        const modal = document.getElementById('custom-confirm'); 
-        modal.classList.remove('hidden');
+        const modal = document.getElementById('custom-confirm'); modal.classList.remove('hidden');
         document.getElementById('confirm-cancel').onclick = () => modal.classList.add('hidden');
         document.getElementById('confirm-ok').onclick = () => { modal.classList.add('hidden'); onConfirm(); };
     },
     handleFabClick() {
         const v = App.view;
-        if(v === 'agenda') Modals.open('agendamento');
-        else if(v === 'comandas') Modals.open('comanda');
-        else if(v === 'clientes') Modals.open('cliente');
-        else if(v === 'funcionarios' && App.role === 'owner') Modals.open('funcionario');
-        else if(v === 'servicos' && App.role === 'owner') Modals.open('servico');
-        else if(v === 'produtos' && App.role === 'owner') Modals.open('produto');
-        else if(v === 'mensagens' && App.role === 'owner') Modals.open('mensagem');
-        else if(v === 'despesas' && App.role === 'owner') Modals.open('despesa');
+        if(v === 'agenda') Modals.open('agendamento'); else if(v === 'comandas') Modals.open('comanda');
+        else if(v === 'clientes') Modals.open('cliente'); else if(v === 'funcionarios' && App.role === 'owner') Modals.open('funcionario');
+        else if(v === 'servicos' && App.role === 'owner') Modals.open('servico'); else if(v === 'produtos' && App.role === 'owner') Modals.open('produto');
+        else if(v === 'mensagens' && App.role === 'owner') Modals.open('mensagem'); else if(v === 'despesas' && App.role === 'owner') Modals.open('despesa');
         else this.toast('Utilize os botões na tela para cadastros rápidos.', 'error');
     }
 };
 
-/* TOUR COMPLETO E DINÂMICO */
 const Tour = {
     allSteps: [
         { role: 'all', view: 'agenda', target: '#btn-novo-agendamento-tour', mobileTarget: '.fab-button', title: '1. Agenda Inteligente', text: 'Aqui você visualiza e gerencia horários. Clique aqui para agendar um cliente, gerar um encaixe ou bloquear a agenda.' },
@@ -256,30 +229,24 @@ const Tour = {
         { role: 'owner', view: 'relatorios', target: '#filter-relatorios', mobileTarget: '#filter-relatorios', title: '13. Relatórios e PDF', text: 'Selecione a quinzena desejada e gere relatórios em PDF do Fluxo de Caixa ou Despesas para enviar ao contador.' },
         { role: 'owner', view: 'configuracoes', target: '#cfg-name', mobileTarget: '#cfg-name', title: '14. Ajustes do Sistema', text: 'Configure o Nome Oficial do estúdio. Isso altera a logo do sistema e a assinatura das mensagens enviadas pelo WhatsApp.' }
     ],
-    steps: [],
-    current: 0,
+    steps: [], current: 0,
     start() {
         if (App.role === 'owner') { this.steps = [...this.allSteps]; } else { this.steps = this.allSteps.filter(s => s.role === 'all'); }
         this.steps.forEach((s, index) => { s.title = s.title.replace(/^\d+\./, `${index + 1}.`); });
-        this.current = 0;
-        document.getElementById('tour-overlay').classList.remove('hidden');
+        this.current = 0; document.getElementById('tour-overlay').classList.remove('hidden');
         if(window.innerWidth > 900) { document.getElementById('main-sidebar').classList.add('open'); } else { Nav.closeMenu(); }
         this.showStep();
     },
     showStep() {
         if(this.current >= this.steps.length) return this.skip();
-        const s = this.steps[this.current];
-        Nav.showView(s.view);
+        const s = this.steps[this.current]; Nav.showView(s.view);
         if(window.innerWidth <= 900) Nav.closeMenu();
         document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
-
         setTimeout(() => {
             const isMobile = window.innerWidth <= 900;
-            document.getElementById('tour-title').textContent = s.title;
-            document.getElementById('tour-desc').textContent = s.text;
+            document.getElementById('tour-title').textContent = s.title; document.getElementById('tour-desc').textContent = s.text;
             document.getElementById('tour-dots').innerHTML = this.steps.map((_, i) => `<span style="height:8px; width:8px; border-radius:50%; background:${i===this.current?'var(--primary)':'#ccc'}"></span>`).join('');
             document.getElementById('tour-next-btn').innerHTML = this.current === this.steps.length - 1 ? 'Concluir <i class="ph ph-check"></i>' : 'Próximo <i class="ph ph-arrow-right"></i>';
-
             if (s.center) return this.centerDialog();
             let targetSelector = isMobile && s.mobileTarget ? s.mobileTarget : s.target;
             let targetEl = document.querySelector(targetSelector);
@@ -292,11 +259,8 @@ const Tour = {
         }, 400);
     },
     positionDialog(targetEl, isMobile) {
-        const dialog = document.getElementById('tour-dialog');
-        dialog.style.transform = 'none'; dialog.style.bottom = 'auto'; 
-        const rect = targetEl.getBoundingClientRect();
-        let top = rect.bottom + 15; let left = rect.left;
-
+        const dialog = document.getElementById('tour-dialog'); dialog.style.transform = 'none'; dialog.style.bottom = 'auto'; 
+        const rect = targetEl.getBoundingClientRect(); let top = rect.bottom + 15; let left = rect.left;
         if (isMobile) {
             dialog.style.width = 'calc(100% - 40px)'; left = 20;
             if (rect.bottom > window.innerHeight - 100 || top + dialog.offsetHeight > window.innerHeight) { top = rect.top - dialog.offsetHeight - 15; }
@@ -305,107 +269,57 @@ const Tour = {
             if (left + 350 > window.innerWidth) { left = window.innerWidth - 370; }
             if (top + dialog.offsetHeight > window.innerHeight) { top = rect.top - dialog.offsetHeight - 15; }
         }
-        if (top < 20) top = 20; 
-        dialog.style.top = `${top}px`; dialog.style.left = `${left}px`;
+        if (top < 20) top = 20; dialog.style.top = `${top}px`; dialog.style.left = `${left}px`;
     },
     centerDialog() {
-        const dialog = document.getElementById('tour-dialog');
-        dialog.style.top = '50%'; dialog.style.left = '50%'; dialog.style.bottom = 'auto';
-        dialog.style.transform = 'translate(-50%, -50%)'; 
-        dialog.style.width = window.innerWidth <= 900 ? 'calc(100% - 40px)' : '350px';
+        const dialog = document.getElementById('tour-dialog'); dialog.style.top = '50%'; dialog.style.left = '50%'; dialog.style.bottom = 'auto';
+        dialog.style.transform = 'translate(-50%, -50%)'; dialog.style.width = window.innerWidth <= 900 ? 'calc(100% - 40px)' : '350px';
     },
     next() { this.current++; this.showStep(); },
     skip() {
-        document.getElementById('tour-overlay').classList.add('hidden');
-        document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
-        document.getElementById('tour-dialog').style.transform = 'none';
-        localStorage.setItem('aqc_tour_done', 'true');
+        document.getElementById('tour-overlay').classList.add('hidden'); document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+        document.getElementById('tour-dialog').style.transform = 'none'; localStorage.setItem('aqc_tour_done', 'true');
     }
 };
 
 const Auth = {
     init() { document.getElementById('login-form').onsubmit = e => { e.preventDefault(); this.login(); }; },
     async login() {
-        const u = document.getElementById('username').value.trim(); 
-        const p = document.getElementById('password').value;
+        const u = document.getElementById('username').value.trim(); const p = document.getElementById('password').value;
         const btn = document.getElementById('btn-login'); btn.textContent = 'Aguarde...';
-        
         try {
             const { data, error } = await db.from('users').select('*').ilike('username', u).maybeSingle();
-            
-            if (error) throw new Error(`Falha no sistema: ${error.message}`);
-            if (!data) throw new Error("Usuário não encontrado.");
+            if (error) throw new Error(`Falha no sistema: ${error.message}`); if (!data) throw new Error("Usuário não encontrado.");
             if (data.active === false || data.is_deleted === true) throw new Error("Conta desativada ou excluída. Procure a Administração.");
             if (data.password !== p) throw new Error("Senha incorreta.");
-            
-            App.user = data; 
-            App.role = (data.role === 'freelancer' || data.role === 'colaborador') ? 'colaborador' : 'owner';
-            
-            document.getElementById('login-form').reset();
-            this.success();
-
-            if(data.first_login || p === '123456') { 
-                setTimeout(() => { Modals.open('first_login'); }, 500);
-            } else if (!localStorage.getItem('aqc_tour_done')) {
-                setTimeout(() => { Tour.start(); }, 1000);
-            }
-            
+            App.user = data; App.role = (data.role === 'freelancer' || data.role === 'colaborador') ? 'colaborador' : 'owner';
+            document.getElementById('login-form').reset(); this.success();
+            if(data.first_login || p === '123456') { setTimeout(() => { Modals.open('first_login'); }, 500); } 
+            else if (!localStorage.getItem('aqc_tour_done')) { setTimeout(() => { Tour.start(); }, 1000); }
         } catch(e) { UI.toast(e.message, 'error'); btn.textContent = 'Entrar'; }
     },
     async fetchAllAvatars() {
-        try {
-            const { data: avData } = await db.from('user_avatars').select('*');
-            if(avData) { avData.forEach(av => { App.avatars[av.user_id] = av.avatar_base64; }); }
-        } catch (e) { console.log('Tabela user_avatars ignorada.'); }
+        try { const { data: avData } = await db.from('user_avatars').select('*'); if(avData) { avData.forEach(av => { App.avatars[av.user_id] = av.avatar_base64; }); } } catch (e) { console.log('Tabela user_avatars ignorada.'); }
     },
     async success() {
-        document.getElementById('auth-layer').classList.add('hidden'); 
-        document.getElementById('system-layout').classList.remove('hidden');
-        document.body.classList.toggle('is-owner', App.role === 'owner');
-        
+        document.getElementById('auth-layer').classList.add('hidden'); document.getElementById('system-layout').classList.remove('hidden'); document.body.classList.toggle('is-owner', App.role === 'owner');
         const { data: set } = await db.from('settings').select('*').single();
         if(set) { App.settings = set; document.getElementById('brand-name').textContent = set.studio_name; }
-        
-        App.avatars = {};
-        await this.fetchAllAvatars();
-        this.updateHeaderAvatar();
-        
+        App.avatars = {}; await this.fetchAllAvatars(); this.updateHeaderAvatar();
         U.initFilters(); Nav.init(); Render.showMonthView(); 
         
         db.channel('custom-all-channel').on('postgres_changes', { event: '*', schema: 'public' }, payload => {
-            if(payload.table === 'user_avatars') {
-                this.fetchAllAvatars().then(() => {
-                    this.updateHeaderAvatar();
-                    if(App.view === 'agenda' && !document.getElementById('agenda-day-view').classList.contains('hidden')) Render.agendaDay();
-                });
-            }
-            else if(App.view === 'agenda') {
-                if(!document.getElementById('agenda-day-view').classList.contains('hidden')) Render.agendaDay();
-                else Render.buildMonthCalendar();
-            } else if(Render[App.view]) {
-                Render[App.view]();
-            }
+            if(payload.table === 'user_avatars') { this.fetchAllAvatars().then(() => { this.updateHeaderAvatar(); if(App.view === 'agenda' && !document.getElementById('agenda-day-view').classList.contains('hidden')) Render.agendaDay(); }); }
+            else if(App.view === 'agenda') { if(!document.getElementById('agenda-day-view').classList.contains('hidden')) Render.agendaDay(); else Render.buildMonthCalendar(); } 
+            else if(Render[App.view]) { Render[App.view](); }
         }).subscribe();
     },
     updateHeaderAvatar() {
-        document.getElementById('header-user').textContent = App.user.name.split(' ')[0]; 
-        const av = document.getElementById('header-avatar');
-        
-        if(App.avatars[App.user.id]) {
-            av.innerHTML = '';
-            av.style.backgroundImage = `url(${App.avatars[App.user.id]})`;
-            av.style.backgroundSize = 'cover';
-            av.style.backgroundPosition = 'center';
-            av.style.color = 'transparent';
-        } else {
-            av.innerHTML = App.user.name.substring(0,2).toUpperCase();
-            av.style.backgroundImage = 'none';
-            av.style.color = 'white';
-        }
+        document.getElementById('header-user').textContent = App.user.name.split(' ')[0]; const av = document.getElementById('header-avatar');
+        if(App.avatars[App.user.id]) { av.innerHTML = ''; av.style.backgroundImage = `url(${App.avatars[App.user.id]})`; av.style.backgroundSize = 'cover'; av.style.backgroundPosition = 'center'; av.style.color = 'transparent'; } 
+        else { av.innerHTML = App.user.name.substring(0,2).toUpperCase(); av.style.backgroundImage = 'none'; av.style.color = 'white'; }
     },
-    logout() { 
-        UI.confirm('Deseja realmente sair da sua conta?', () => { window.location.reload(true); }); 
-    }
+    logout() { UI.confirm('Deseja realmente sair da sua conta?', () => { window.location.reload(true); }); }
 };
 
 const Nav = {
@@ -419,35 +333,19 @@ const Nav = {
     },
     showView(id) {
         App.view = id;
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-        document.getElementById(`view-${id}`).classList.add('active');
-        document.querySelectorAll('.nav-link, .b-item').forEach(el => el.classList.remove('active'));
-        document.querySelectorAll(`[data-view="${id}"]`).forEach(el => el.classList.add('active'));
-        
+        document.querySelectorAll('.view').forEach(v => v.classList.remove('active')); document.getElementById(`view-${id}`).classList.add('active');
+        document.querySelectorAll('.nav-link, .b-item').forEach(el => el.classList.remove('active')); document.querySelectorAll(`[data-view="${id}"]`).forEach(el => el.classList.add('active'));
         const titles = { perfil: 'Meu Perfil', agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', anamnese:'Ficha de Avaliação', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', relatorios:'Relatórios & Arquivos' };
         document.getElementById('page-title').textContent = titles[id] || 'Amor que Cuida';
-        
         if (id === 'agenda') { Render.showMonthView(); } 
         else if (id === 'perfil') {
-            document.getElementById('perfil-nome').textContent = App.user.name;
-            document.getElementById('perfil-role').textContent = App.role === 'owner' ? 'Gestor / Proprietário' : 'Colaborador';
+            document.getElementById('perfil-nome').textContent = App.user.name; document.getElementById('perfil-role').textContent = App.role === 'owner' ? 'Gestor / Proprietário' : 'Colaborador';
             const preview = document.getElementById('perfil-foto-preview');
-            if(App.avatars[App.user.id]) {
-                preview.innerHTML = '';
-                preview.style.backgroundImage = `url(${App.avatars[App.user.id]})`;
-                preview.style.backgroundSize = 'cover';
-                preview.style.backgroundPosition = 'center';
-            } else {
-                preview.innerHTML = App.user.name.substring(0,2).toUpperCase();
-                preview.style.backgroundImage = 'none';
-            }
-        }
-        else {
+            if(App.avatars[App.user.id]) { preview.innerHTML = ''; preview.style.backgroundImage = `url(${App.avatars[App.user.id]})`; preview.style.backgroundSize = 'cover'; preview.style.backgroundPosition = 'center'; } 
+            else { preview.innerHTML = App.user.name.substring(0,2).toUpperCase(); preview.style.backgroundImage = 'none'; }
+        } else {
             const detailViews = ['anamnese', 'perfil-cliente'];
-            if(Render[id] && !detailViews.includes(id)) {
-                if(id === 'cobrancas') Render.cobrancas('pendentes');
-                else Render[id]();
-            }
+            if(Render[id] && !detailViews.includes(id)) { if(id === 'cobrancas') Render.cobrancas('pendentes'); else Render[id](); }
         }
     },
     toggleMenu() { document.getElementById('main-sidebar').classList.toggle('open'); document.getElementById('mobile-overlay').classList.toggle('hidden'); },
@@ -456,22 +354,15 @@ const Nav = {
 
 const Render = {
     showMonthView() {
-        document.getElementById('agenda-day-view').classList.add('hidden');
-        document.getElementById('agenda-month-view').classList.remove('hidden');
-        document.getElementById('btn-voltar-mes').classList.add('hidden');
-        document.getElementById('day-view-title').classList.add('hidden');
+        document.getElementById('agenda-day-view').classList.add('hidden'); document.getElementById('agenda-month-view').classList.remove('hidden');
+        document.getElementById('btn-voltar-mes').classList.add('hidden'); document.getElementById('day-view-title').classList.add('hidden');
         this.buildMonthCalendar();
     },
-    changeMonth(dir) {
-        App.calendarMonth.setMonth(App.calendarMonth.getMonth() + dir);
-        this.buildMonthCalendar();
-    },
+    changeMonth(dir) { App.calendarMonth.setMonth(App.calendarMonth.getMonth() + dir); this.buildMonthCalendar(); },
 
     async buildMonthCalendar() {
-        const year = App.calendarMonth.getFullYear();
-        const month = App.calendarMonth.getMonth();
+        const year = App.calendarMonth.getFullYear(); const month = App.calendarMonth.getMonth();
         document.getElementById('cal-month-year').textContent = App.calendarMonth.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
-        
         const firstDay = new Date(year, month, 1); const lastDay = new Date(year, month + 1, 0);
         const startDate = U.iso(firstDay); const endDate = U.iso(lastDay);
         
@@ -482,35 +373,25 @@ const Render = {
             const { data } = await query; if(data) monthApps = data;
         } catch(e) {}
 
-        const grid = document.getElementById('cal-grid'); let html = '';
-        const weekDays = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
+        const grid = document.getElementById('cal-grid'); let html = ''; const weekDays = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
         weekDays.forEach(d => { html += `<div class="cal-grid-header">${d}</div>`; });
         for (let i = 0; i < firstDay.getDay(); i++) { html += `<div class="cal-day empty"></div>`; }
-        
         for (let i = 1; i <= lastDay.getDate(); i++) {
-            const currentIso = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`;
-            const isToday = currentIso === U.iso(new Date());
-            const dayApps = monthApps.filter(a => a.date === currentIso);
-            let indicators = '';
-            
+            const currentIso = `${year}-${String(month+1).padStart(2,'0')}-${String(i).padStart(2,'0')}`; const isToday = currentIso === U.iso(new Date());
+            const dayApps = monthApps.filter(a => a.date === currentIso); let indicators = '';
             if(dayApps.length > 0) {
                 if(dayApps.some(a => ['agendado','chegou'].includes(a.status))) indicators += '<span class="dot agendado"></span>';
                 if(dayApps.some(a => a.status === 'bloqueado')) indicators += '<span class="dot bloqueado"></span>';
             } else { indicators = '<span class="dot livre"></span>'; }
-
-            html += `<div class="cal-day num ${isToday ? 'today' : ''}" onclick="Render.selectDate('${currentIso}')">
-                        <span class="day-num">${i}</span><div class="cal-dots">${indicators}</div>
-                     </div>`;
+            html += `<div class="cal-day num ${isToday ? 'today' : ''}" onclick="Render.selectDate('${currentIso}')"><span class="day-num">${i}</span><div class="cal-dots">${indicators}</div></div>`;
         }
         grid.innerHTML = html;
     },
 
     selectDate(iso) { 
         App.currentDate = new Date(iso+'T12:00:00'); 
-        document.getElementById('agenda-month-view').classList.add('hidden');
-        document.getElementById('agenda-day-view').classList.remove('hidden');
-        document.getElementById('btn-voltar-mes').classList.remove('hidden');
-        document.getElementById('day-view-title').classList.remove('hidden');
+        document.getElementById('agenda-month-view').classList.add('hidden'); document.getElementById('agenda-day-view').classList.remove('hidden');
+        document.getElementById('btn-voltar-mes').classList.remove('hidden'); document.getElementById('day-view-title').classList.remove('hidden');
         this.agendaDay(); 
     },
 
@@ -529,431 +410,197 @@ const Render = {
             const cont = document.getElementById('agenda-list');
             if(!usersData || usersData.length === 0) { cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Nenhum profissional encontrado.</p></div>`; return; }
 
-            const isDesktop = window.innerWidth > 900;
-            const pixelsPerMin = isDesktop ? 1 : 1.3; 
-            const slotHeight = isDesktop ? 60 : 78; 
-            const horaInicio = 7; const horaFim = 21;
-            
-            let html = `<div class="timeline-wrapper" style="overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border: 1px solid var(--border); border-radius: 8px;">
-                <div class="timeline-header" style="display: flex; min-width: max-content; border-bottom: 1px solid var(--border);">
-                    <div class="time-col" style="position: sticky; left: 0; z-index: 20; background: var(--surface); border:none; min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);"></div>`;
-            
+            const isDesktop = window.innerWidth > 900; const pixelsPerMin = isDesktop ? 1 : 1.3; const slotHeight = isDesktop ? 60 : 78; const horaInicio = 7; const horaFim = 21;
+            let html = `<div class="timeline-wrapper" style="overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border: 1px solid var(--border); border-radius: 8px;"><div class="timeline-header" style="display: flex; min-width: max-content; border-bottom: 1px solid var(--border);"><div class="time-col" style="position: sticky; left: 0; z-index: 20; background: var(--surface); border:none; min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);"></div>`;
             usersData.forEach(u => { 
-                let bgImage = (App.avatars && App.avatars[u.id]) ? `background-image: url(${App.avatars[u.id]}); background-size: cover; background-position: center; color: transparent;` : '';
-                let init = bgImage ? '' : u.name.substring(0,2).toUpperCase();
-                
-                html += `<div class="prof-col-header" style="display:flex; flex-direction:column; align-items:center; gap:5px; padding: 15px 10px; min-width: 140px; flex: 1; border-right: 1px solid var(--border);">
-                    <div style="width: 45px; height: 45px; border-radius: 50%; background-color: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight:bold; border: 2px solid var(--primary-light); ${bgImage}">${init}</div>
-                    <span style="font-size:0.95rem; font-weight: bold; margin-bottom:5px;">${u.name.split(' ')[0]}</span>
-                </div>`; 
+                let bgImage = (App.avatars && App.avatars[u.id]) ? `background-image: url(${App.avatars[u.id]}); background-size: cover; background-position: center; color: transparent;` : ''; let init = bgImage ? '' : u.name.substring(0,2).toUpperCase();
+                html += `<div class="prof-col-header" style="display:flex; flex-direction:column; align-items:center; gap:5px; padding: 15px 10px; min-width: 140px; flex: 1; border-right: 1px solid var(--border);"><div style="width: 45px; height: 45px; border-radius: 50%; background-color: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight:bold; border: 2px solid var(--primary-light); ${bgImage}">${init}</div><span style="font-size:0.95rem; font-weight: bold; margin-bottom:5px;">${u.name.split(' ')[0]}</span></div>`; 
             });
-            html += `</div><div class="timeline-body" style="display: flex; min-width: max-content; position: relative;">
-                <div class="time-col" style="position: sticky; left: 0; z-index: 10; background: var(--surface); min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);">`;
-            
-            for(let i=horaInicio; i<=horaFim; i++) { 
-                html += `<div class="time-slot" style="height:${slotHeight}px; min-height:${slotHeight}px; display:flex; justify-content:center; padding-top:8px; color:var(--muted); font-size:0.8rem; border-bottom: 1px solid var(--border);"><span>${String(i).padStart(2,'0')}:00</span></div>`; 
-            }
+            html += `</div><div class="timeline-body" style="display: flex; min-width: max-content; position: relative;"><div class="time-col" style="position: sticky; left: 0; z-index: 10; background: var(--surface); min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);">`;
+            for(let i=horaInicio; i<=horaFim; i++) { html += `<div class="time-slot" style="height:${slotHeight}px; min-height:${slotHeight}px; display:flex; justify-content:center; padding-top:8px; color:var(--muted); font-size:0.8rem; border-bottom: 1px solid var(--border);"><span>${String(i).padStart(2,'0')}:00</span></div>`; }
             html += `</div><div class="tracks-container" style="display: flex; flex: 1;">`;
-            
             usersData.forEach(u => {
                 html += `<div class="prof-track" style="position: relative; min-width: 140px; flex: 1; border-right: 1px solid var(--border);">`;
-                
-                for(let i=horaInicio; i<=horaFim; i++) { 
-                    const tm = String(i).padStart(2,'0') + ':00';
-                    html += `<div class="track-line" style="height:${slotHeight}px; min-height:${slotHeight}px; border-bottom: 1px dashed var(--border); cursor:pointer;" onclick="Modals.open('menu_agenda_mobile', '${u.id}', '${tm}', '${dateStr}')"></div>`; 
-                }
-                
+                for(let i=horaInicio; i<=horaFim; i++) { const tm = String(i).padStart(2,'0') + ':00'; html += `<div class="track-line" style="height:${slotHeight}px; min-height:${slotHeight}px; border-bottom: 1px dashed var(--border); cursor:pointer;" onclick="Modals.open('menu_agenda_mobile', '${u.id}', '${tm}', '${dateStr}')"></div>`; }
                 const userApps = (agData || []).filter(a => a.user_id === u.id);
                 userApps.forEach(a => {
-                    const [sh, sm] = (a.time||'00:00').split(':').map(Number);
-                    let endStr, originalNotes = a.notes || '';
-                    
-                    if (a.status === 'bloqueado' && originalNotes.includes('BLOQUEIO_ATE:')) {
-                        const parts = originalNotes.split('|');
-                        endStr = parts[0].replace('BLOQUEIO_ATE:', '').trim();
-                        a.notes = parts.slice(1).filter(p => !p.includes('ADMIN_BLOCK')).join(' | ').trim(); 
-                    } else {
-                        let durationMins = (a.services && a.services.duration) ? a.services.duration : 60;
-                        let mF = sm + durationMins; let hF = sh + Math.floor(mF/60);
-                        endStr = `${String(hF).padStart(2,'0')}:${String(mF%60).padStart(2,'0')}`;
-                    }
-
-                    const [eh, em] = endStr.split(':').map(Number);
-                    const startMins = (sh * 60 + sm) - (horaInicio * 60);
-                    let blockDuration = (eh * 60 + em) - (sh * 60 + sm);
-                    if (blockDuration <= 0) blockDuration = 60;
-
-                    const top = startMins * pixelsPerMin; const height = blockDuration * pixelsPerMin;
-                    const isBlocked = a.status === 'bloqueado'; const isEncaixe = a.is_encaixe; const isCompact = blockDuration <= 45; 
-                    
-                    let bg = isBlocked ? '#f0f0f0' : '#ffe3e8'; let color = isBlocked ? '#616161' : '#880e4f'; let border = isBlocked ? '#9e9e9e' : '#d81b60';
-                    if(a.status === 'chegou') { bg = '#dcedc8'; border = '#689f38'; color = '#33691e'; }
-
+                    const [sh, sm] = (a.time||'00:00').split(':').map(Number); let endStr, originalNotes = a.notes || '';
+                    if (a.status === 'bloqueado' && originalNotes.includes('BLOQUEIO_ATE:')) { const parts = originalNotes.split('|'); endStr = parts[0].replace('BLOQUEIO_ATE:', '').trim(); a.notes = parts.slice(1).filter(p => !p.includes('ADMIN_BLOCK')).join(' | ').trim(); } 
+                    else { let durationMins = (a.services && a.services.duration) ? a.services.duration : 60; let mF = sm + durationMins; let hF = sh + Math.floor(mF/60); endStr = `${String(hF).padStart(2,'0')}:${String(mF%60).padStart(2,'0')}`; }
+                    const [eh, em] = endStr.split(':').map(Number); const startMins = (sh * 60 + sm) - (horaInicio * 60); let blockDuration = (eh * 60 + em) - (sh * 60 + sm); if (blockDuration <= 0) blockDuration = 60;
+                    const top = startMins * pixelsPerMin; const height = blockDuration * pixelsPerMin; const isBlocked = a.status === 'bloqueado'; const isEncaixe = a.is_encaixe; const isCompact = blockDuration <= 45; 
+                    let bg = isBlocked ? '#f0f0f0' : '#ffe3e8'; let color = isBlocked ? '#616161' : '#880e4f'; let border = isBlocked ? '#9e9e9e' : '#d81b60'; if(a.status === 'chegou') { bg = '#dcedc8'; border = '#689f38'; color = '#33691e'; }
                     const wppBtn = (!isBlocked && a.status === 'agendado') ? `<button onclick="event.stopPropagation(); Actions.sendConfirmacao('${a.id}')"><i class="ph ph-whatsapp-logo"></i></button>` : '';
                     const chkBtn = (!isBlocked && a.status === 'agendado') ? `<button onclick="event.stopPropagation(); Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i></button>` : '';
                     let extraStyle = isEncaixe ? 'width: 80%; left: 10%; z-index: 10; box-shadow: -4px 4px 15px rgba(0,0,0,0.15); border-left-width: 6px;' : 'width: 96%; left: 2%;';
-
-                    html += `
-                    <div class="agenda-card ${isCompact ? 'compact' : ''}" style="position: absolute; top:${top}px; height:${height}px; background:${bg}; border-left:4px solid ${border}; color:${color}; border-radius: 6px; padding: 6px; overflow: hidden; font-size: 0.85rem; cursor: pointer; transition: 0.2s; ${extraStyle}" onclick="Modals.open('detalhes_agendamento', '${a.id}')">
-                        <div class="ac-time" style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 2px;">${a.time.slice(0,5)} - ${endStr.slice(0,5)}</div>
-                        <div class="ac-title" style="font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><i class="ph ${isBlocked ? 'ph-prohibit' : 'ph-user'}"></i> ${isBlocked ? 'Bloqueado' : (a.clients?.name || 'Cliente')}</div>
-                        <div class="ac-sub" style="font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${!isBlocked ? (a.services?.name || '') : (a.notes || '')}</div>
-                        <div class="ac-actions" style="position: absolute; right: 5px; top: 5px; display: flex; gap: 5px;">${chkBtn} ${wppBtn}</div>
-                    </div>`;
-                });
-                html += `</div>`;
-            });
-            html += `</div></div></div>`; cont.innerHTML = html;
+                    html += `<div class="agenda-card ${isCompact ? 'compact' : ''}" style="position: absolute; top:${top}px; height:${height}px; background:${bg}; border-left:4px solid ${border}; color:${color}; border-radius: 6px; padding: 6px; overflow: hidden; font-size: 0.85rem; cursor: pointer; transition: 0.2s; ${extraStyle}" onclick="Modals.open('detalhes_agendamento', '${a.id}')">
+                        <div class="ac-time" style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 2px;">${a.time.slice(0,5)} - ${endStr.slice(0,5)}</div><div class="ac-title" style="font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><i class="ph ${isBlocked ? 'ph-prohibit' : 'ph-user'}"></i> ${isBlocked ? 'Bloqueado' : (a.clients?.name || 'Cliente')}</div><div class="ac-sub" style="font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${!isBlocked ? (a.services?.name || '') : (a.notes || '')}</div><div class="ac-actions" style="position: absolute; right: 5px; top: 5px; display: flex; gap: 5px;">${chkBtn} ${wppBtn}</div></div>`;
+                }); html += `</div>`;
+            }); html += `</div></div></div>`; cont.innerHTML = html;
         } catch (e) { UI.toast(`Erro na agenda: ${e.message}`, 'error'); }
     },
 
     buildWeekStrip() {
-        const d = App.currentDate;
-        let strTitle = d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+        const d = App.currentDate; let strTitle = d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
         document.getElementById('day-view-title').textContent = strTitle.charAt(0).toUpperCase() + strTitle.slice(1);
-
-        const start = new Date(d); start.setDate(d.getDate() - 3);
-        let html = ''; const days = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
-        for(let i=0; i<7; i++) {
-            const cur = new Date(start); cur.setDate(start.getDate() + i);
-            const isoCur = U.iso(cur); const isSel = isoCur === U.iso(App.currentDate) ? 'active' : '';
-            html += `<div class="cal-day ${isSel}" onclick="Render.selectDate('${isoCur}')"><span>${days[cur.getDay()]}</span><span>${cur.getDate()}</span></div>`;
-        }
+        const start = new Date(d); start.setDate(d.getDate() - 3); let html = ''; const days = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
+        for(let i=0; i<7; i++) { const cur = new Date(start); cur.setDate(start.getDate() + i); const isoCur = U.iso(cur); const isSel = isoCur === U.iso(App.currentDate) ? 'active' : ''; html += `<div class="cal-day ${isSel}" onclick="Render.selectDate('${isoCur}')"><span>${days[cur.getDay()]}</span><span>${cur.getDate()}</span></div>`; }
         document.getElementById('cal-days-row').innerHTML = html;
     },
 
-    async clientes() {
-        const { data } = await db.from('clients').select('*').order('name');
-        window.allClientes = data || [];
-        this.renderClientesList(window.allClientes);
-    },
-    
+    async clientes() { const { data } = await db.from('clients').select('*').order('name'); window.allClientes = data || []; this.renderClientesList(window.allClientes); },
     renderClientesList(data) {
         document.getElementById('clientes-list').innerHTML = data.map(c => {
             const safeName = c.name.replace(/'/g, "\\'").replace(/"/g, '&quot;'); 
-            return `
-            <div class="card cliente-card">
-                <a href="#" class="wpp-btn" onclick="Modals.open('whatsapp', '${c.phone}', '${safeName}', JSON.stringify({cliente:'${safeName}', data_aniversario:'${c.birth_date ? new Date(c.birth_date).toLocaleDateString() : ''}'})); event.stopPropagation()"><i class="ph ph-whatsapp-logo"></i></a>
-                <h4 style="color:var(--primary); font-size:1.2rem; margin-bottom:10px">${c.name}</h4><p><i class="ph ph-phone"></i> ${c.phone}</p>
-                <p style="font-size:0.8rem; color:var(--muted); margin-top:5px"><i class="ph ph-cake"></i> ${c.birth_date ? new Date(c.birth_date).toLocaleDateString('pt-BR') : 'Não cadastrado'}</p>
-                <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap">
-                    <button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Render.perfilCliente('${c.id}', '${safeName}')"><i class="ph ph-user"></i> Perfil</button>
-                    <button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Render.anamnese('${c.id}', '${safeName}')"><i class="ph ph-file-text"></i> Ficha</button>
-                    <button class="btn-secondary" style="width:100%; border:1px solid #ccc" onclick="Modals.open('edit_cliente', '${c.id}')"><i class="ph ph-pencil"></i> Editar Dados</button>
-                </div>
-            </div>`;
+            return `<div class="card cliente-card"><a href="#" class="wpp-btn" onclick="Modals.open('whatsapp', '${c.phone}', '${safeName}', JSON.stringify({cliente:'${safeName}', data_aniversario:'${c.birth_date ? new Date(c.birth_date).toLocaleDateString() : ''}'})); event.stopPropagation()"><i class="ph ph-whatsapp-logo"></i></a><h4 style="color:var(--primary); font-size:1.2rem; margin-bottom:10px">${c.name}</h4><p><i class="ph ph-phone"></i> ${c.phone}</p><p style="font-size:0.8rem; color:var(--muted); margin-top:5px"><i class="ph ph-cake"></i> ${c.birth_date ? new Date(c.birth_date).toLocaleDateString('pt-BR') : 'Não cadastrado'}</p><div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap"><button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Render.perfilCliente('${c.id}', '${safeName}')"><i class="ph ph-user"></i> Perfil</button><button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Render.anamnese('${c.id}', '${safeName}')"><i class="ph ph-file-text"></i> Ficha</button><button class="btn-secondary" style="width:100%; border:1px solid #ccc" onclick="Modals.open('edit_cliente', '${c.id}')"><i class="ph ph-pencil"></i> Editar Dados</button></div></div>`;
         }).join('');
     },
+    filterClientes(term) { term = term.toLowerCase(); const filtered = (window.allClientes || []).filter(c => c.name.toLowerCase().includes(term) || (c.phone && c.phone.includes(term))); this.renderClientesList(filtered); },
     
-    filterClientes(term) {
-        term = term.toLowerCase();
-        const filtered = (window.allClientes || []).filter(c => 
-            c.name.toLowerCase().includes(term) || (c.phone && c.phone.includes(term))
-        );
-        this.renderClientesList(filtered);
-    },
-    
-    anamnese(id, name) {
-        document.getElementById('current-anamnese-client-id').value = id;
-        document.getElementById('anamnese-title').textContent = `Ficha de: ${name}`;
-        Nav.showView('anamnese'); Actions.loadAnamnese(id);
-    },
+    anamnese(id, name) { document.getElementById('current-anamnese-client-id').value = id; document.getElementById('anamnese-title').textContent = `Ficha de: ${name}`; Nav.showView('anamnese'); Actions.loadAnamnese(id); },
     
     async perfilCliente(id, name) {
-        document.getElementById('current-perfil-client-id').value = id;
-        document.getElementById('perfil-cliente-title').textContent = `Perfil: ${name}`;
-        Nav.showView('perfil-cliente');
-        
+        document.getElementById('current-perfil-client-id').value = id; document.getElementById('perfil-cliente-title').textContent = `Perfil: ${name}`; Nav.showView('perfil-cliente');
         const { data: comandas } = await db.from('comandas').select('*, users!comandas_professional_id_fkey(name)').eq('client_id', id).eq('status', 'fechada').order('created_at', {ascending: false});
         const { data: debts } = await db.from('debts').select('*').eq('client_id', id).gt('remaining_amount', 0).maybeSingle();
         const debitosDiv = document.getElementById('perfil-debitos-destaque');
-        
-        if (debts && debts.remaining_amount > 0) {
-            debitosDiv.innerHTML = `<div class="card" style="background:#ffebee; border-left:5px solid #d32f2f; margin-bottom:10px;">
-                <h4 style="color:#d32f2f; margin-bottom:5px;"><i class="ph ph-warning-circle"></i> Atenção: Cliente possui débitos ativos</h4>
-                <p style="font-size:1.1rem">Valor Pendente: <b>${U.money(debts.remaining_amount)}</b></p>
-                <button class="btn-primary" style="margin-top:10px; background:#d32f2f; width:auto; padding:0.5rem 1rem" onclick="Nav.showView('cobrancas')">Ir para Cobranças</button>
-            </div>`;
-        } else { debitosDiv.innerHTML = ''; }
-
+        if (debts && debts.remaining_amount > 0) { debitosDiv.innerHTML = `<div class="card" style="background:#ffebee; border-left:5px solid #d32f2f; margin-bottom:10px;"><h4 style="color:#d32f2f; margin-bottom:5px;"><i class="ph ph-warning-circle"></i> Atenção: Cliente possui débitos ativos</h4><p style="font-size:1.1rem">Valor Pendente: <b>${U.money(debts.remaining_amount)}</b></p><button class="btn-primary" style="margin-top:10px; background:#d32f2f; width:auto; padding:0.5rem 1rem" onclick="Nav.showView('cobrancas')">Ir para Cobranças</button></div>`; } else { debitosDiv.innerHTML = ''; }
         document.getElementById('perfil-info').innerHTML = `<div class="card" style="border-left:4px solid var(--primary);"><h4 style="font-size:1.2rem;">Total de Visitas Concluídas: ${comandas.length}</h4></div>`;
-        const list = document.getElementById('perfil-visitas-list');
-        if(!comandas || comandas.length === 0) { list.innerHTML = "<p style='color:var(--muted); padding:2rem; text-align:center;'>Nenhum histórico.</p>"; return; }
-
-        list.innerHTML = comandas.map(c => {
-            const itens = (c.items||[]).map(i => i.name).join(', ');
-            return `<div class="card" style="margin-bottom:10px;">
-                <h4 style="color:var(--primary-dark); font-size:1.1rem; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;"><i class="ph ph-calendar"></i> ${U.date(c.created_at)}</h4>
-                <p style="margin-bottom:5px;"><b>Ticket Associado:</b> ${c.ticket || 'S/N'}</p>
-                <p style="margin-bottom:5px;"><b>Profissional que Abriu:</b> ${c.users?.name || 'Não informado'}</p>
-                <p style="margin-bottom:5px;"><b>Serviços/Produtos:</b> ${itens || 'Nenhum detalhe salvo'}</p>
-                <p><b>Total Investido:</b> ${U.money(c.total)}</p>
-            </div>`;
-        }).join('');
+        const list = document.getElementById('perfil-visitas-list'); if(!comandas || comandas.length === 0) { list.innerHTML = "<p style='color:var(--muted); padding:2rem; text-align:center;'>Nenhum histórico.</p>"; return; }
+        list.innerHTML = comandas.map(c => { const itens = (c.items||[]).map(i => i.name).join(', '); return `<div class="card" style="margin-bottom:10px;"><h4 style="color:var(--primary-dark); font-size:1.1rem; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;"><i class="ph ph-calendar"></i> ${U.date(c.created_at)}</h4><p style="margin-bottom:5px;"><b>Ticket Associado:</b> ${c.ticket || 'S/N'}</p><p style="margin-bottom:5px;"><b>Profissional que Abriu:</b> ${c.users?.name || 'Não informado'}</p><p style="margin-bottom:5px;"><b>Serviços/Produtos:</b> ${itens || 'Nenhum detalhe salvo'}</p><p><b>Total Investido:</b> ${U.money(c.total)}</p></div>`; }).join('');
     },
 
     async cobrancas(tab = 'pendentes') {
-        document.getElementById('tab-pendentes-tour').classList.toggle('active-tab', tab === 'pendentes');
-        document.getElementById('tab-pendentes-tour').style.border = tab === 'pendentes' ? 'none' : '1px solid transparent';
-        document.getElementById('tab-pagos').classList.toggle('active-tab', tab === 'pagos');
-        document.getElementById('tab-pagos').style.border = tab === 'pagos' ? 'none' : '1px solid transparent';
-        
+        document.getElementById('tab-pendentes-tour').classList.toggle('active-tab', tab === 'pendentes'); document.getElementById('tab-pendentes-tour').style.border = tab === 'pendentes' ? 'none' : '1px solid transparent';
+        document.getElementById('tab-pagos').classList.toggle('active-tab', tab === 'pagos'); document.getElementById('tab-pagos').style.border = tab === 'pagos' ? 'none' : '1px solid transparent';
         let query = db.from('debts').select('*, clients(name)').order('created_at', {ascending: false});
-        if(tab === 'pendentes') query = query.gt('remaining_amount', 0);
-        else query = query.eq('remaining_amount', 0);
-
-        const { data: debts, error } = await query;
-        const cont = document.getElementById('cobrancas-list');
-        if(error) return cont.innerHTML = `<p style='color:#d32f2f'><i class="ph ph-warning-circle"></i> Erro: ${error.message}</p>`;
-        if (!debts || debts.length === 0) return cont.innerHTML = `<p style='color:var(--muted)'>Nenhum registro ${tab === 'pendentes'?'em aberto':'pago'}.</p>`;
-        
+        if(tab === 'pendentes') query = query.gt('remaining_amount', 0); else query = query.eq('remaining_amount', 0);
+        const { data: debts, error } = await query; const cont = document.getElementById('cobrancas-list');
+        if(error) return cont.innerHTML = `<p style='color:#d32f2f'><i class="ph ph-warning-circle"></i> Erro: ${error.message}</p>`; if (!debts || debts.length === 0) return cont.innerHTML = `<p style='color:var(--muted)'>Nenhum registro ${tab === 'pendentes'?'em aberto':'pago'}.</p>`;
         let htmlFinal = '';
         for (let d of debts) {
-            const fTkt = `FAT-${d.id.substring(0,5).toUpperCase()}`; 
-            const ticketsArr = d.comanda_ticket ? d.comanda_ticket.split(', ').map(t => t.trim()) : [];
+            const fTkt = `FAT-${d.id.substring(0,5).toUpperCase()}`; const ticketsArr = d.comanda_ticket ? d.comanda_ticket.split(', ').map(t => t.trim()) : [];
             const { data: relatedComandas } = await db.from('comandas').select('items, created_at, ticket').in('ticket', ticketsArr);
-            
             let htmlList = ''; let profsEnvolvidos = [];
             if(relatedComandas) {
                 relatedComandas.forEach(rc => {
                     const dt = U.date(rc.created_at);
                     if(rc.items) {
                         htmlList += `<div style="font-size:0.75rem; color:#666; margin-top:10px; border-bottom:1px dashed #ccc; padding-bottom:3px;">Comanda Origem: ${rc.ticket} (${dt})</div>`;
-                        rc.items.forEach(i => { 
-                            if(i.prof_name && !profsEnvolvidos.includes(i.prof_name)) profsEnvolvidos.push(i.prof_name);
-                            htmlList += `<div style="display:flex; justify-content:space-between; padding:5px 0; font-size:0.95rem;"><span>${i.name}</span><b>${U.money(i.price)}</b></div>`; 
-                        });
+                        rc.items.forEach(i => { if(i.prof_name && !profsEnvolvidos.includes(i.prof_name)) profsEnvolvidos.push(i.prof_name); htmlList += `<div style="display:flex; justify-content:space-between; padding:5px 0; font-size:0.95rem;"><span>${i.name}</span><b>${U.money(i.price)}</b></div>`; });
                     }
                 });
             }
-
             let badgesPagamento = '';
             if(tab === 'pagos' && d.payment_details) {
-                const pd = typeof d.payment_details === 'string' ? JSON.parse(d.payment_details) : d.payment_details;
-                badgesPagamento += `<div style="margin-top:10px; padding-top:10px; border-top:1px solid #eee; display:flex; gap:5px; flex-wrap:wrap">`;
-                if(pd.pix) badgesPagamento += `<span style="background:#e0f2f1; color:#00695c; padding:3px 8px; border-radius:8px; font-size:0.8rem">Pix: ${U.money(pd.pix)}</span>`;
-                if(pd.dinheiro) badgesPagamento += `<span style="background:#e8f5e9; color:#2e7d32; padding:3px 8px; border-radius:8px; font-size:0.8rem">Dinheiro: ${U.money(pd.dinheiro)}</span>`;
-                if(pd.credito) badgesPagamento += `<span style="background:#fff3e0; color:#e65100; padding:3px 8px; border-radius:8px; font-size:0.8rem">Crédito: ${U.money(pd.credito)}</span>`;
-                if(pd.debito) badgesPagamento += `<span style="background:#e3f2fd; color:#1565c0; padding:3px 8px; border-radius:8px; font-size:0.8rem">Débito: ${U.money(pd.debito)}</span>`;
-                if(pd.desconto) badgesPagamento += `<span style="background:#ffebee; color:#d32f2f; padding:3px 8px; border-radius:8px; font-size:0.8rem">Desconto: ${pd.desconto}%</span>`;
-                badgesPagamento += `</div>`;
+                const pd = typeof d.payment_details === 'string' ? JSON.parse(d.payment_details) : d.payment_details; badgesPagamento += `<div style="margin-top:10px; padding-top:10px; border-top:1px solid #eee; display:flex; gap:5px; flex-wrap:wrap">`;
+                if(pd.pix) badgesPagamento += `<span style="background:#e0f2f1; color:#00695c; padding:3px 8px; border-radius:8px; font-size:0.8rem">Pix: ${U.money(pd.pix)}</span>`; if(pd.dinheiro) badgesPagamento += `<span style="background:#e8f5e9; color:#2e7d32; padding:3px 8px; border-radius:8px; font-size:0.8rem">Dinheiro: ${U.money(pd.dinheiro)}</span>`;
+                if(pd.credito) badgesPagamento += `<span style="background:#fff3e0; color:#e65100; padding:3px 8px; border-radius:8px; font-size:0.8rem">Crédito: ${U.money(pd.credito)}</span>`; if(pd.debito) badgesPagamento += `<span style="background:#e3f2fd; color:#1565c0; padding:3px 8px; border-radius:8px; font-size:0.8rem">Débito: ${U.money(pd.debito)}</span>`;
+                if(pd.desconto) badgesPagamento += `<span style="background:#ffebee; color:#d32f2f; padding:3px 8px; border-radius:8px; font-size:0.8rem">Desconto: ${pd.desconto}%</span>`; badgesPagamento += `</div>`;
             }
-
-            htmlFinal += `
-            <div class="card" style="padding:0; overflow:hidden; border:1px solid ${tab==='pendentes'?'#d32f2f':'#2e7d32'};">
-                <div style="background:${tab==='pendentes'?'#fffee6':'#f1f8e9'}; padding:20px; font-family:'Courier New', Courier, monospace; color:#333; border-bottom:2px dashed #ccc;">
-                    <h3 style="text-align:center; font-family:'Courier New', monospace; font-weight:bold; margin-bottom:5px; font-size:1.4rem; color:${tab==='pendentes'?'#d32f2f':'#2e7d32'}">${tab==='pendentes'?'FATURA DE COBRANÇA':'RECIBO DE PAGAMENTO'}</h3>
-                    <h4 style="text-align:center; margin-bottom:15px; font-size:1rem; color:#666">${fTkt}</h4>
-                    <p style="margin-bottom:5px; border-bottom:1px solid #ddd; padding-bottom:10px;"><b>Cliente:</b> ${d.clients?.name}</p>
-                    <p style="margin-bottom:5px; font-size:0.85rem"><b>Profissionais:</b> ${profsEnvolvidos.join(', ') || 'N/A'}</p>
-                    
-                    <div style="padding:10px 0; margin-bottom:15px; max-height:200px; overflow-y:auto; border-bottom:1px dashed #999;">
-                        ${htmlList || 'Nenhum detalhe de itens encontrado.'}
-                    </div>
-                    
-                    <div style="font-size:0.85rem; color:#666; margin-bottom:10px; text-align:right;">Total Bruto Consumido: ${U.money(d.total_amount)}</div>
-                    <div style="display:flex; justify-content:space-between; font-size:1.4rem; font-weight:bold; color:${tab==='pendentes'?'#d32f2f':'#2e7d32'}; padding-top:10px">
-                        <span>${tab==='pendentes'?'FALTA PAGAR:':'PAGO COM SUCESSO'}</span>
-                        <span>${tab==='pendentes'? U.money(d.remaining_amount) : ''}</span>
-                    </div>
-                    ${badgesPagamento}
-                </div>
-                ${tab === 'pendentes' ? `
-                <div style="padding:15px; display:flex; gap:10px; background:#fff">
-                    <button class="btn-primary" style="flex:1; background:#2e7d32;" onclick="Modals.open('debitar', '${d.id}', ${d.remaining_amount}, '${fTkt}')"><i class="ph ph-money"></i> Receber Pagamento</button>
-                    <button class="btn-secondary" style="width:auto;" onclick="Modals.open('desconto', '${d.id}', ${d.remaining_amount})"><i class="ph ph-percent"></i> Desc.</button>
-                </div>` : ''}
-            </div>`;
+            htmlFinal += `<div class="card" style="padding:0; overflow:hidden; border:1px solid ${tab==='pendentes'?'#d32f2f':'#2e7d32'};"><div style="background:${tab==='pendentes'?'#fffee6':'#f1f8e9'}; padding:20px; font-family:'Courier New', Courier, monospace; color:#333; border-bottom:2px dashed #ccc;"><h3 style="text-align:center; font-family:'Courier New', monospace; font-weight:bold; margin-bottom:5px; font-size:1.4rem; color:${tab==='pendentes'?'#d32f2f':'#2e7d32'}">${tab==='pendentes'?'FATURA DE COBRANÇA':'RECIBO DE PAGAMENTO'}</h3><h4 style="text-align:center; margin-bottom:15px; font-size:1rem; color:#666">${fTkt}</h4><p style="margin-bottom:5px; border-bottom:1px solid #ddd; padding-bottom:10px;"><b>Cliente:</b> ${d.clients?.name}</p><p style="margin-bottom:5px; font-size:0.85rem"><b>Profissionais:</b> ${profsEnvolvidos.join(', ') || 'N/A'}</p><div style="padding:10px 0; margin-bottom:15px; max-height:200px; overflow-y:auto; border-bottom:1px dashed #999;">${htmlList || 'Nenhum detalhe de itens encontrado.'}</div><div style="font-size:0.85rem; color:#666; margin-bottom:10px; text-align:right;">Total Bruto Consumido: ${U.money(d.total_amount)}</div><div style="display:flex; justify-content:space-between; font-size:1.4rem; font-weight:bold; color:${tab==='pendentes'?'#d32f2f':'#2e7d32'}; padding-top:10px"><span>${tab==='pendentes'?'FALTA PAGAR:':'PAGO COM SUCESSO'}</span><span>${tab==='pendentes'? U.money(d.remaining_amount) : ''}</span></div>${badgesPagamento}</div>${tab === 'pendentes' ? `<div style="padding:15px; display:flex; gap:10px; background:#fff"><button class="btn-primary" style="flex:1; background:#2e7d32;" onclick="Modals.open('debitar', '${d.id}', ${d.remaining_amount}, '${fTkt}')"><i class="ph ph-money"></i> Receber Pagamento</button><button class="btn-secondary" style="width:auto;" onclick="Modals.open('desconto', '${d.id}', ${d.remaining_amount})"><i class="ph ph-percent"></i> Desc.</button></div>` : ''}</div>`;
         }
         cont.innerHTML = htmlFinal;
     },
 
-    async servicos() {
-        const { data } = await db.from('services').select('*').order('name');
-        window.allServicos = data || [];
-        this.renderServicosList(window.allServicos);
-    },
-
+    async servicos() { const { data } = await db.from('services').select('*').order('name'); window.allServicos = data || []; this.renderServicosList(window.allServicos); },
     renderServicosList(data) {
-        const cont = document.getElementById('servicos-list');
-        if(!data || data.length === 0) { cont.innerHTML = '<p style="color:var(--muted); padding: 1rem;">Nenhum serviço encontrado.</p>'; return; }
-        cont.innerHTML = data.map(s => `
-            <div class="card">
-                <div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding-bottom:10px">
-                    <h4 style="font-size:1.2rem;">${s.name} <span style="font-size:0.8rem; font-weight:normal; color:#888;">(${s.duration || 60}min)</span></h4>
-                    <div>
-                        <button onclick="Modals.open('edit_servico', '${s.id}')" style="background:none; border:none; cursor:pointer; color:var(--primary); font-size:1.2rem; margin-right:5px"><i class="ph ph-pencil"></i></button>
-                        <button onclick="Actions.deleteService('${s.id}')" style="background:none; border:none; cursor:pointer; color:#d32f2f; font-size:1.2rem"><i class="ph ph-trash"></i></button>
-                    </div>
-                </div>
-                <div style="margin:10px 0; color:var(--muted)">
-                    <p>Comissão Pro: <b style="color:var(--text)">${s.commission}%</b></p>
-                    ${s.has_assistant?`<p>Auxiliar: <b style="color:var(--text)">${s.assistant_commission}%</b></p>`:''}
-                    <p>Custo Fixo Retido: <b style="color:#d32f2f">${s.cost || 0}%</b></p>
-                </div>
-                <div class="val" style="font-size:1.5rem">${U.money(s.price)}</div>
-            </div>`).join('');
+        const cont = document.getElementById('servicos-list'); if(!data || data.length === 0) { cont.innerHTML = '<p style="color:var(--muted); padding: 1rem;">Nenhum serviço encontrado.</p>'; return; }
+        cont.innerHTML = data.map(s => `<div class="card"><div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding-bottom:10px"><h4 style="font-size:1.2rem;">${s.name} <span style="font-size:0.8rem; font-weight:normal; color:#888;">(${s.duration || 60}min)</span></h4><div><button onclick="Modals.open('edit_servico', '${s.id}')" style="background:none; border:none; cursor:pointer; color:var(--primary); font-size:1.2rem; margin-right:5px"><i class="ph ph-pencil"></i></button><button onclick="Actions.deleteService('${s.id}')" style="background:none; border:none; cursor:pointer; color:#d32f2f; font-size:1.2rem"><i class="ph ph-trash"></i></button></div></div><div style="margin:10px 0; color:var(--muted)"><p>Comissão Pro: <b style="color:var(--text)">${s.commission}%</b></p>${s.has_assistant?`<p>Auxiliar: <b style="color:var(--text)">${s.assistant_commission}%</b></p>`:''}<p>Custo Fixo Retido: <b style="color:#d32f2f">${s.cost || 0}%</b></p></div><div class="val" style="font-size:1.5rem">${U.money(s.price)}</div></div>`).join('');
     },
-
-    filterServicos(term) {
-        term = term.toLowerCase();
-        const filtered = (window.allServicos || []).filter(s => s.name.toLowerCase().includes(term));
-        this.renderServicosList(filtered);
-    },
+    filterServicos(term) { term = term.toLowerCase(); const filtered = (window.allServicos || []).filter(s => s.name.toLowerCase().includes(term)); this.renderServicosList(filtered); },
     
     async produtos() {
-        const { data } = await db.from('products').select('*').order('name');
-        window.allProdutos = data || [];
-        
-        const htmlTop = `
-            <div class="card" style="margin-bottom:20px; padding: 10px;">
-                <div class="input-group" style="margin:0;">
-                    <input type="text" placeholder="Buscar produto pelo nome..." onkeyup="Render.filterProdutos(this.value)" style="padding:1rem; border-radius:8px; border:1px solid var(--border); font-size: 1rem;">
-                </div>
-            </div>
-            <div id="produtos-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;"></div>
-        `;
-        document.getElementById('produtos-list').innerHTML = htmlTop;
+        const { data } = await db.from('products').select('*').order('name'); window.allProdutos = data || [];
+        document.getElementById('produtos-list').innerHTML = `<div class="card" style="margin-bottom:20px; padding: 10px;"><div class="input-group" style="margin:0;"><input type="text" placeholder="Buscar produto pelo nome..." onkeyup="Render.filterProdutos(this.value)" style="padding:1rem; border-radius:8px; border:1px solid var(--border); font-size: 1rem;"></div></div><div id="produtos-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;"></div>`;
         this.renderProdutosList(window.allProdutos);
     },
-    
     renderProdutosList(data) {
-        const grid = document.getElementById('produtos-grid');
-        if(!grid) return;
-        if(data.length === 0) {
-            grid.innerHTML = '<p style="color:var(--muted); padding: 1rem;">Nenhum produto encontrado.</p>';
-            return;
-        }
-        grid.innerHTML = data.map(p => `
-            <div class="card" style="border-top: 4px solid ${p.stock <= p.min_stock ? '#d32f2f' : 'var(--primary)'}">
-                <h4 style="font-size:1.1rem; margin-bottom:5px">${p.name}</h4>
-                <div style="margin:10px 0; background:#f9f9f9; padding:10px; border-radius:8px; display:flex; justify-content:space-between">
-                    <div><span style="font-size:0.7rem; color:var(--muted)">Preço Venda</span><p style="font-weight:bold">${U.money(p.price)}</p></div>
-                    <div style="text-align:right"><span style="font-size:0.7rem; color:var(--muted)">Comissão</span><p style="font-weight:bold">${p.commission}%</p></div>
-                </div>
-                <div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px">
-                    <div><span style="font-size:0.8rem; color:var(--muted)">Estoque Atual</span><div class="val" style="font-size:1.4rem; color:${p.stock <= p.min_stock ? '#d32f2f' : 'var(--text)'}">${p.stock}</div></div>
-                    <button class="btn-secondary" style="width:auto; padding:0.6rem 1.2rem" onclick="Modals.open('add_estoque', '${p.id}', '${p.stock}')">+ Repor</button>
-                </div>
-            </div>`).join('');
+        const grid = document.getElementById('produtos-grid'); if(!grid) return; if(data.length === 0) { grid.innerHTML = '<p style="color:var(--muted); padding: 1rem;">Nenhum produto encontrado.</p>'; return; }
+        grid.innerHTML = data.map(p => `<div class="card" style="border-top: 4px solid ${p.stock <= p.min_stock ? '#d32f2f' : 'var(--primary)'}"><h4 style="font-size:1.1rem; margin-bottom:5px">${p.name}</h4><div style="margin:10px 0; background:#f9f9f9; padding:10px; border-radius:8px; display:flex; justify-content:space-between"><div><span style="font-size:0.7rem; color:var(--muted)">Preço Venda</span><p style="font-weight:bold">${U.money(p.price)}</p></div><div style="text-align:right"><span style="font-size:0.7rem; color:var(--muted)">Comissão</span><p style="font-weight:bold">${p.commission}%</p></div></div><div style="display:flex; justify-content:space-between; align-items:center; margin-top:15px"><div><span style="font-size:0.8rem; color:var(--muted)">Estoque Atual</span><div class="val" style="font-size:1.4rem; color:${p.stock <= p.min_stock ? '#d32f2f' : 'var(--text)'}">${p.stock}</div></div><button class="btn-secondary" style="width:auto; padding:0.6rem 1.2rem" onclick="Modals.open('add_estoque', '${p.id}', '${p.stock}')">+ Repor</button></div></div>`).join('');
     },
-    
-    filterProdutos(term) {
-        term = term.toLowerCase();
-        const filtered = (window.allProdutos || []).filter(p => p.name.toLowerCase().includes(term));
-        this.renderProdutosList(filtered);
-    },
+    filterProdutos(term) { term = term.toLowerCase(); const filtered = (window.allProdutos || []).filter(p => p.name.toLowerCase().includes(term)); this.renderProdutosList(filtered); },
     
     async comandas() {
         let query = db.from('comandas').select('*, clients(name)').order('created_at', {ascending: false});
-        
-        const qFilter = document.getElementById('filter-comanda-quinzena')?.value;
-        if (qFilter) {
-            const range = U.getQuinzenaDates(qFilter);
-            query = query.gte('created_at', range.start).lte('created_at', range.end);
-        }
-
+        const qFilter = document.getElementById('filter-comanda-quinzena')?.value; if (qFilter) { const range = U.getQuinzenaDates(qFilter); query = query.gte('created_at', range.start).lte('created_at', range.end); }
         const { data } = await query;
-        document.getElementById('comandas-list').innerHTML = (!data || data.length === 0) ? '<p style="color:var(--muted)">Sem comandas para este período.</p>' : data.map(c => `
-            <div class="card" style="border-left: 5px solid ${c.status === 'aberta' ? 'var(--primary)' : '#ccc'}">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                    <div>
-                        <span style="font-size:0.8rem; color:var(--primary); font-weight:bold; letter-spacing:1px">${c.ticket || 'TKT-####'}</span>
-                        <h4 style="font-size:1.2rem; margin-top:5px">${c.clients?.name || 'Desconhecido'}</h4>
-                        <p style="font-size:0.8rem; color:var(--muted)"><i class="ph ph-list-bullets"></i> Itens Lançados: ${(c.items||[]).length}</p>
-                    </div>
-                    <span style="font-size:0.7rem; font-weight:bold; padding: 4px 10px; border-radius:20px; background:${c.status === 'aberta' ? 'var(--primary-light)' : '#eee'}; color:${c.status === 'aberta' ? 'var(--primary-dark)' : 'var(--muted)'}">${c.status.toUpperCase()}</span>
-                </div>
-                <div class="val" style="font-size:1.8rem; margin:15px 0;">${U.money(c.total)}</div>
-                <button class="btn-secondary" style="width:100%; padding:0.8rem" onclick="Modals.open('edit_comanda', '${c.id}')"><i class="ph ph-list-plus"></i> ${c.status === 'aberta' ? 'Lançar Itens / Fechar' : 'Visualizar Ticket'}</button>
-            </div>`).join('');
+        document.getElementById('comandas-list').innerHTML = (!data || data.length === 0) ? '<p style="color:var(--muted)">Sem comandas para este período.</p>' : data.map(c => `<div class="card" style="border-left: 5px solid ${c.status === 'aberta' ? 'var(--primary)' : '#ccc'}"><div style="display:flex; justify-content:space-between; align-items:flex-start;"><div><span style="font-size:0.8rem; color:var(--primary); font-weight:bold; letter-spacing:1px">${c.ticket || 'TKT-####'}</span><h4 style="font-size:1.2rem; margin-top:5px">${c.clients?.name || 'Desconhecido'}</h4><p style="font-size:0.8rem; color:var(--muted)"><i class="ph ph-list-bullets"></i> Itens Lançados: ${(c.items||[]).length}</p></div><span style="font-size:0.7rem; font-weight:bold; padding: 4px 10px; border-radius:20px; background:${c.status === 'aberta' ? 'var(--primary-light)' : '#eee'}; color:${c.status === 'aberta' ? 'var(--primary-dark)' : 'var(--muted)'}">${c.status.toUpperCase()}</span></div><div class="val" style="font-size:1.8rem; margin:15px 0;">${U.money(c.total)}</div><button class="btn-secondary" style="width:100%; padding:0.8rem" onclick="Modals.open('edit_comanda', '${c.id}')"><i class="ph ph-list-plus"></i> ${c.status === 'aberta' ? 'Lançar Itens / Fechar' : 'Visualizar Ticket'}</button></div>`).join('');
     },
 
     async mensagens() {
         const { data } = await db.from('message_templates').select('*');
-        document.getElementById('mensagens-list').innerHTML = data.map(m => `
-            <div class="card"><h4 style="color:var(--primary); border-bottom:1px solid #eee; padding-bottom:10px">${m.title}</h4>
-            <p style="margin:15px 0; font-style:italic; color:var(--muted)">"${m.content}"</p>
-            <div style="display:flex; gap:10px">
-                <button class="btn-secondary" style="flex:1" onclick="Modals.open('edit_mensagem', '${m.id}')"><i class="ph ph-pencil"></i> Editar</button>
-                <button class="btn-secondary" style="flex:1; color:#d32f2f; background:#ffebee" onclick="Actions.deleteMensagem('${m.id}')"><i class="ph ph-trash"></i> Excluir</button>
-            </div></div>`).join('');
+        document.getElementById('mensagens-list').innerHTML = data.map(m => `<div class="card"><h4 style="color:var(--primary); border-bottom:1px solid #eee; padding-bottom:10px">${m.title}</h4><p style="margin:15px 0; font-style:italic; color:var(--muted)">"${m.content}"</p><div style="display:flex; gap:10px"><button class="btn-secondary" style="flex:1" onclick="Modals.open('edit_mensagem', '${m.id}')"><i class="ph ph-pencil"></i> Editar</button><button class="btn-secondary" style="flex:1; color:#d32f2f; background:#ffebee" onclick="Actions.deleteMensagem('${m.id}')"><i class="ph ph-trash"></i> Excluir</button></div></div>`).join('');
     },
     
     async funcionarios() {
         const { data } = await db.from('users').select('*').neq('username', 'admin.teste').neq('is_deleted', true).order('name');
         document.getElementById('funcionarios-list').innerHTML = data.map(u => {
-            const isActive = u.active !== false;
-            return `
-            <div class="card" style="border-left: 4px solid ${isActive ? 'var(--primary)' : '#999'}; opacity: ${isActive ? '1' : '0.6'}">
-                <h4 style="font-size:1.2rem; margin-bottom:5px">${u.name}</h4>
-                <p style="font-size:0.9rem; color:var(--muted)"><i class="ph ph-user"></i> Login: <b>${u.username}</b></p>
-                <p style="font-size:0.8rem; margin-top:5px; padding:3px 8px; border-radius:10px; display:inline-block; background:${u.role==='owner'?'#ffebee':'#e8f5e9'}; color:${u.role==='owner'?'#d32f2f':'#2e7d32'}">${u.role.toUpperCase()}</p>
-                ${!isActive ? `<p style="font-size:0.8rem; color:#d32f2f; margin-top:5px; font-weight:bold">CONTA DESATIVADA</p>` : ''}
-                <div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap">
-                    <button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Modals.open('edit_funcionario', '${u.id}')"><i class="ph ph-pencil"></i> Editar Perfil</button>
-                    <button class="btn-secondary" style="flex:1; min-width:120px; ${isActive ? 'color:#d32f2f;' : 'color:#2e7d32;'}" onclick="Actions.toggleFuncionarioStatus('${u.id}', ${isActive})"><i class="ph ${isActive ? 'ph-prohibit' : 'ph-check-circle'}"></i> ${isActive ? 'Desativar' : 'Ativar'}</button>
-                    <button class="btn-secondary" style="flex:1; min-width:120px; color:#d32f2f;" onclick="Actions.deleteFuncionario('${u.id}')"><i class="ph ph-trash"></i> Excluir</button>
-                </div>
-            </div>`;
+            const isActive = u.active !== false; return `<div class="card" style="border-left: 4px solid ${isActive ? 'var(--primary)' : '#999'}; opacity: ${isActive ? '1' : '0.6'}"><h4 style="font-size:1.2rem; margin-bottom:5px">${u.name}</h4><p style="font-size:0.9rem; color:var(--muted)"><i class="ph ph-user"></i> Login: <b>${u.username}</b></p><p style="font-size:0.8rem; margin-top:5px; padding:3px 8px; border-radius:10px; display:inline-block; background:${u.role==='owner'?'#ffebee':'#e8f5e9'}; color:${u.role==='owner'?'#d32f2f':'#2e7d32'}">${u.role.toUpperCase()}</p>${!isActive ? `<p style="font-size:0.8rem; color:#d32f2f; margin-top:5px; font-weight:bold">CONTA DESATIVADA</p>` : ''}<div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap"><button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Modals.open('edit_funcionario', '${u.id}')"><i class="ph ph-pencil"></i> Editar Perfil</button><button class="btn-secondary" style="flex:1; min-width:120px; ${isActive ? 'color:#d32f2f;' : 'color:#2e7d32;'}" onclick="Actions.toggleFuncionarioStatus('${u.id}', ${isActive})"><i class="ph ${isActive ? 'ph-prohibit' : 'ph-check-circle'}"></i> ${isActive ? 'Desativar' : 'Ativar'}</button><button class="btn-secondary" style="flex:1; min-width:120px; color:#d32f2f;" onclick="Actions.deleteFuncionario('${u.id}')"><i class="ph ph-trash"></i> Excluir</button></div></div>`;
         }).join('');
     },
     
     async despesas() {
-        const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); 
-        const { data } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
-        
-        let totais = { 'Custos Fixos': 0, 'Comissões': 0, 'Pessoal/Pagamentos': 0, 'Custos Variáveis': 0 };
-        let despesasOnly = [];
-        data.forEach(d => { 
-            if(!App.inflowCategories.includes(d.category)) {
-                despesasOnly.push(d);
-                if(totais[d.category] !== undefined) totais[d.category] += d.amount; else totais['Custos Variáveis'] += d.amount; 
-            }
-        });
+        const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); const { data } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
+        let totais = { 'Custos Fixos': 0, 'Comissões': 0, 'Pessoal/Pagamentos': 0, 'Custos Variáveis': 0 }; let despesasOnly = [];
+        data.forEach(d => { if(!App.inflowCategories.includes(d.category)) { despesasOnly.push(d); if(totais[d.category] !== undefined) totais[d.category] += d.amount; else totais['Custos Variáveis'] += d.amount; } });
         despesasOnly.sort((a,b) => new Date(b.date) - new Date(a.date));
-        
-        document.getElementById('despesas-list').innerHTML = `
-            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:20px">
-                <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #d32f2f"><p style="font-size:0.8rem">Custos Fixos (Retido)</p><div class="val" style="color:#d32f2f; font-size:1.2rem">-${U.money(totais['Custos Fixos'])}</div></div>
-                <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #cd7f32"><p style="font-size:0.8rem">Comissões Autom.</p><div class="val" style="color:#cd7f32; font-size:1.2rem">-${U.money(totais['Comissões'])}</div></div>
-                <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #8e24aa"><p style="font-size:0.8rem">Pessoal/Equipe</p><div class="val" style="color:#8e24aa; font-size:1.2rem">-${U.money(totais['Pessoal/Pagamentos'])}</div></div>
-                <div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #e65100"><p style="font-size:0.8rem">Variáveis/Insumos</p><div class="val" style="color:#e65100; font-size:1.2rem">-${U.money(totais['Custos Variáveis'])}</div></div>
-            </div>` + 
-            despesasOnly.map(d => {
-                let color = '#d32f2f';
-                if(d.category === 'Comissões') color = '#cd7f32'; else if(d.category === 'Pessoal/Pagamentos') color = '#8e24aa'; else if(d.category === 'Custos Variáveis') color = '#e65100';
-                return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${color}">
-                    <div><h4>${d.description}</h4><p style="font-size:0.8rem; color:var(--muted)">${d.category} • ${U.date(d.date)}</p></div>
-                    <div class="val" style="color:${color}">-${U.money(d.amount)}</div>
-                </div>`;
-            }).join('');
-            
-        if(App.charts.despesas) App.charts.despesas.destroy();
-        App.charts.despesas = new Chart(document.getElementById('chart-despesas'), { type: 'pie', data: { labels: Object.keys(totais), datasets: [{ data: Object.values(totais), backgroundColor: ['#d32f2f', '#cd7f32', '#8e24aa', '#e65100'] }] }});
+        document.getElementById('despesas-list').innerHTML = `<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:20px"><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #d32f2f"><p style="font-size:0.8rem">Custos Fixos (Retido)</p><div class="val" style="color:#d32f2f; font-size:1.2rem">-${U.money(totais['Custos Fixos'])}</div></div><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #cd7f32"><p style="font-size:0.8rem">Comissões Autom.</p><div class="val" style="color:#cd7f32; font-size:1.2rem">-${U.money(totais['Comissões'])}</div></div><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #8e24aa"><p style="font-size:0.8rem">Pessoal/Equipe</p><div class="val" style="color:#8e24aa; font-size:1.2rem">-${U.money(totais['Pessoal/Pagamentos'])}</div></div><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #e65100"><p style="font-size:0.8rem">Variáveis/Insumos</p><div class="val" style="color:#e65100; font-size:1.2rem">-${U.money(totais['Custos Variáveis'])}</div></div></div>` + 
+            despesasOnly.map(d => { let color = '#d32f2f'; if(d.category === 'Comissões') color = '#cd7f32'; else if(d.category === 'Pessoal/Pagamentos') color = '#8e24aa'; else if(d.category === 'Custos Variáveis') color = '#e65100'; return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${color}"><div><h4>${d.description}</h4><p style="font-size:0.8rem; color:var(--muted)">${d.category} • ${U.date(d.date)}</p></div><div class="val" style="color:${color}">-${U.money(d.amount)}</div></div>`; }).join('');
+        if(App.charts.despesas) App.charts.despesas.destroy(); App.charts.despesas = new Chart(document.getElementById('chart-despesas'), { type: 'pie', data: { labels: Object.keys(totais), datasets: [{ data: Object.values(totais), backgroundColor: ['#d32f2f', '#cd7f32', '#8e24aa', '#e65100'] }] }});
     },
 
+    /* PASSO 3: SOLICITAÇÃO 04 (Filtro Personalizado para Comissões) */
     async comissao() {
         const isOwner = App.role === 'owner';
+        
+        const dashContainer = document.getElementById('comissao-dashboard-tour');
+        if(dashContainer) {
+            let fDiv = document.getElementById('custom-filter-com-div');
+            if(!fDiv) {
+                fDiv = document.createElement('div'); fDiv.id = 'custom-filter-com-div';
+                fDiv.style = "margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;";
+                fDiv.innerHTML = `<button class="btn-secondary" style="width:auto; border:1px solid var(--primary); color:var(--primary)" onclick="Modals.open('filtro_comissoes')"><i class="ph ph-funnel"></i> Período Personalizado</button>
+                                  <button id="btn-clear-com" class="btn-secondary hidden" style="width:auto; color:#d32f2f; border:1px solid #d32f2f;" onclick="Actions.clearFilterComissoes()"><i class="ph ph-x"></i> Limpar Filtro</button>
+                                  <div id="com-filter-info" style="font-size:0.9rem; color:var(--primary-dark); font-weight:bold; width: 100%;"></div>`;
+                dashContainer.parentNode.insertBefore(fDiv, dashContainer);
+            }
+            const btnClear = document.getElementById('btn-clear-com'); const infoDiv = document.getElementById('com-filter-info'); const defaultSel = document.getElementById('filter-comissao-quinzena');
+            
+            if(App.filters.comissoes) {
+                btnClear.classList.remove('hidden'); if(defaultSel) defaultSel.style.display = 'none';
+                let f = App.filters.comissoes;
+                infoDiv.innerHTML = `<i class="ph ph-funnel"></i> Filtrando de: ${U.date(f.start + 'T00:00:00').slice(0,10)} até ${U.date(f.end + 'T00:00:00').slice(0,10)} ${f.prof_name ? `| Colaborador(a): ${f.prof_name}` : ''}`;
+            } else {
+                btnClear.classList.add('hidden'); infoDiv.innerHTML = ''; if(defaultSel) defaultSel.style.display = 'block';
+            }
+        }
+
         let query = db.from('comandas').select('*');
         
-        const qFilter = document.getElementById('filter-comissao-quinzena')?.value || U.getCurrentQuinzenaValue();
-        const range = U.getQuinzenaDates(qFilter);
-        query = query.gte('created_at', range.start).lte('created_at', range.end).eq('status', 'fechada');
+        if (App.filters.comissoes) {
+            let f = App.filters.comissoes;
+            query = query.gte('created_at', f.start + 'T00:00:00Z').lte('created_at', f.end + 'T23:59:59Z').eq('status', 'fechada');
+        } else {
+            const qFilter = document.getElementById('filter-comissao-quinzena')?.value || U.getCurrentQuinzenaValue();
+            const range = U.getQuinzenaDates(qFilter);
+            query = query.gte('created_at', range.start).lte('created_at', range.end).eq('status', 'fechada');
+        }
 
         const { data } = await query;
-        
         let html = ''; let totalComissao = 0; let rank = {};
+        
         data.forEach(c => {
             if(!c.items) return; 
             c.items.forEach(i => {
+                if (isOwner && App.filters.comissoes && App.filters.comissoes.prof_id) {
+                    if (i.prof_id !== App.filters.comissoes.prof_id) return;
+                }
                 if(!isOwner && i.prof_id !== App.user.id) return;
 
                 if(i.commission) {
-                    const v = (i.price * i.commission) / 100;
-                    totalComissao += v;
+                    const v = (i.price * i.commission) / 100; totalComissao += v;
                     if(i.prof_name) rank[i.prof_name] = (rank[i.prof_name]||0) + v;
-                    
                     if(!isOwner) html += `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:3px solid #2e7d32"><div><h4>${i.name}</h4><p style="font-size:0.8rem; color:var(--muted)">Ref: ${c.ticket||'-'} • Taxa: ${i.commission}%</p></div><div class="val" style="color:#2e7d32; font-size:1.3rem">+${U.money(v)}</div></div>`;
                 }
             });
@@ -961,76 +608,111 @@ const Render = {
         
         if(isOwner) {
             const sorted = Object.entries(rank).sort((a,b)=>b[1]-a[1]);
-            html = `<div class="card" style="margin-bottom:20px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); color:white; padding:2rem; box-shadow:0 10px 20px rgba(183, 110, 121, 0.3)"><h3 style="color:white; font-weight:400; opacity:0.9">Total de Comissões Geradas na Quinzena</h3><div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div></div>
-            <h3 style="margin:20px 0 15px 0">Ranking de Comissionamento</h3><div class="data-grid">` + 
-            sorted.map((s,i) => {
-                let color = '#cd7f32'; if(i===0) color='#ffd700'; else if(i===1) color='#c0c0c0';
-                return `<div class="card"><div style="display:flex; justify-content:space-between; align-items:center"><h4 style="font-size:1.1rem">${i+1}º ${s[0]}</h4><i class="ph ph-medal" style="color:${color}; font-size:2rem"></i></div><div class="val" style="margin-top:15px; font-size:1.8rem">${U.money(s[1])}</div></div>`;
-            }).join('') + '</div>';
+            let profFilterActive = (App.filters.comissoes && App.filters.comissoes.prof_id);
+            let titleTotal = profFilterActive ? `Total de Comissão de ${App.filters.comissoes.prof_name}` : `Total de Comissões Geradas`;
+
+            html = `<div class="card" style="margin-bottom:20px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); color:white; padding:2rem; box-shadow:0 10px 20px rgba(183, 110, 121, 0.3)"><h3 style="color:white; font-weight:400; opacity:0.9">${titleTotal}</h3><div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div></div>`;
+            
+            if (!profFilterActive) {
+                html += `<h3 style="margin:20px 0 15px 0">Ranking de Comissionamento</h3><div class="data-grid">` + 
+                sorted.map((s,i) => {
+                    let color = '#cd7f32'; if(i===0) color='#ffd700'; else if(i===1) color='#c0c0c0';
+                    return `<div class="card"><div style="display:flex; justify-content:space-between; align-items:center"><h4 style="font-size:1.1rem">${i+1}º ${s[0]}</h4><i class="ph ph-medal" style="color:${color}; font-size:2rem"></i></div><div class="val" style="margin-top:15px; font-size:1.8rem">${U.money(s[1])}</div></div>`;
+                }).join('') + '</div>';
+            }
         } else {
             html = `<div class="card" style="margin-bottom:20px; background:var(--primary); color:white; padding:2rem"><h4 style="color:white; font-weight:400">Minha Comissão Total</h4><div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div></div><div class="data-list">` + html + `</div>`;
         }
-        document.getElementById('comissao-dashboard-tour').innerHTML = html;
+        if(dashContainer) dashContainer.innerHTML = html;
     },
     
+    /* PASSO 3: SOLICITAÇÃO 05 (Botão de Injetar Receita Manual no Fluxo) */
     async 'resumo-financeiro'() {
+        const rc = document.getElementById('resumo-cards');
+        if(rc && !document.getElementById('btn-add-receita-wrapper')) {
+            let w = document.createElement('div'); w.id = 'btn-add-receita-wrapper';
+            w.style = "margin-bottom:15px; display:flex; justify-content: flex-end;";
+            w.innerHTML = `<button class="btn-primary" style="background:#2e7d32; width:auto;" onclick="Modals.open('nova_receita')"><i class="ph ph-plus-circle"></i> Lançar Receita/Entrada Manual</button>`;
+            rc.parentNode.insertBefore(w, rc);
+        }
+
         const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); 
         const { data: desp } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
         
         const { extrato, totalIn, totalOut } = U.buildExtrato(desp);
         const lucro = totalIn - totalOut;
         
-        document.getElementById('resumo-cards').innerHTML = `
-            <div class="card" style="border-bottom:4px solid #2e7d32"><h4>Faturamento (Pago)</h4><div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(totalIn)}</div></div>
-            <div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custos & Comissões (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(totalOut)}</div></div>
-            <div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
+        rc.innerHTML = `<div class="card" style="border-bottom:4px solid #2e7d32"><h4>Faturamento (Pago)</h4><div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(totalIn)}</div></div><div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custos & Comissões (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(totalOut)}</div></div><div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
         
         let subDash = { 'Pix':0, 'Dinheiro':0, 'Cartão Crédito':0, 'Cartão Débito':0 };
         desp.forEach(d => { if(subDash[d.category] !== undefined) subDash[d.category] += d.amount; });
         
-        document.getElementById('resumo-pagamentos-cards').innerHTML = `
-            <div class="card" style="text-align:center"><i class="ph ph-qr-code" style="font-size:2rem; color:#00695c"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Pix</p><div class="val" style="font-size:1.2rem; color:#00695c">${U.money(subDash['Pix'])}</div></div>
-            <div class="card" style="text-align:center"><i class="ph ph-money" style="font-size:2rem; color:#2e7d32"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Dinheiro</p><div class="val" style="font-size:1.2rem; color:#2e7d32">${U.money(subDash['Dinheiro'])}</div></div>
-            <div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#e65100"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Crédito</p><div class="val" style="font-size:1.2rem; color:#e65100">${U.money(subDash['Cartão Crédito'])}</div></div>
-            <div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#1565c0"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Débito</p><div class="val" style="font-size:1.2rem; color:#1565c0">${U.money(subDash['Cartão Débito'])}</div></div>`;
-
+        document.getElementById('resumo-pagamentos-cards').innerHTML = `<div class="card" style="text-align:center"><i class="ph ph-qr-code" style="font-size:2rem; color:#00695c"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Pix</p><div class="val" style="font-size:1.2rem; color:#00695c">${U.money(subDash['Pix'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-money" style="font-size:2rem; color:#2e7d32"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Dinheiro</p><div class="val" style="font-size:1.2rem; color:#2e7d32">${U.money(subDash['Dinheiro'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#e65100"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Crédito</p><div class="val" style="font-size:1.2rem; color:#e65100">${U.money(subDash['Cartão Crédito'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#1565c0"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Débito</p><div class="val" style="font-size:1.2rem; color:#1565c0">${U.money(subDash['Cartão Débito'])}</div></div>`;
         document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações na quinzena.</p>' :
-            extrato.map(i => `
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;">
-                <div style="flex:1">
-                    <b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Saída'} - ${i.category}</b>
-                    <p style="margin-top:5px; font-weight:600; font-size:1.1rem">${U.formatDesc(i.desc)}</p>
-                    <span style="font-size:0.8rem; color:var(--muted); display:inline-block; margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(i.date)}</span>
-                </div>
-                <div style="text-align:right">
-                    <span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.3rem; display:block">${i.type==='in'?'+':'-'} ${U.money(i.val)}</span>
-                    <span style="font-size:0.85rem; color:var(--muted); font-weight:bold">Caixa: ${U.money(i.saldo)}</span>
-                </div>
-            </div>`).join('');
+            extrato.map(i => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;"><div style="flex:1"><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Saída'} - ${i.category}</b><p style="margin-top:5px; font-weight:600; font-size:1.1rem">${U.formatDesc(i.desc)}</p><span style="font-size:0.8rem; color:var(--muted); display:inline-block; margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(i.date)}</span></div><div style="text-align:right"><span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.3rem; display:block">${i.type==='in'?'+':'-'} ${U.money(i.val)}</span><span style="font-size:0.85rem; color:var(--muted); font-weight:bold">Caixa: ${U.money(i.saldo)}</span></div></div>`).join('');
     },
 
+    /* PASSO 3: SOLICITAÇÃO 03 (Filtro Personalizado para Relatórios) */
     async relatorios() {
-        const qFilter = document.getElementById('filter-relatorios').value;
-        const range = U.getQuinzenaDates(qFilter);
-        const { data: desp } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end).order('date', {ascending: false});
+        const relContainer = document.getElementById('relatorio-despesas-conteudo');
+        if(relContainer) {
+            let fDiv = document.getElementById('custom-filter-rel-div');
+            if(!fDiv) {
+                fDiv = document.createElement('div'); fDiv.id = 'custom-filter-rel-div';
+                fDiv.style = "margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;";
+                fDiv.innerHTML = `<button class="btn-secondary" style="width:auto; border:1px solid var(--primary); color:var(--primary)" onclick="Modals.open('filtro_relatorios')"><i class="ph ph-funnel"></i> Filtro Avançado (Período)</button>
+                                  <button id="btn-clear-rel" class="btn-secondary hidden" style="width:auto; color:#d32f2f; border:1px solid #d32f2f;" onclick="Actions.clearFilterRelatorios()"><i class="ph ph-x"></i> Limpar Filtro</button>
+                                  <div id="rel-filter-info" style="font-size:0.9rem; color:var(--primary-dark); font-weight:bold; width:100%;"></div>`;
+                relContainer.parentNode.insertBefore(fDiv, relContainer);
+            }
+            const btnClear = document.getElementById('btn-clear-rel'); const infoDiv = document.getElementById('rel-filter-info'); const defaultSel = document.getElementById('filter-relatorios');
+            
+            if(App.filters.relatorios) {
+                btnClear.classList.remove('hidden'); if(defaultSel) defaultSel.style.display = 'none';
+                let f = App.filters.relatorios;
+                infoDiv.innerHTML = `<i class="ph ph-funnel"></i> Filtrando de: ${U.date(f.start + 'T00:00:00').slice(0,10)} até ${U.date(f.end + 'T00:00:00').slice(0,10)} | Exibindo: ${f.tipo} ${f.prof_name ? `(${f.prof_name})` : ''}`;
+            } else {
+                btnClear.classList.add('hidden'); infoDiv.innerHTML = ''; if(defaultSel) defaultSel.style.display = 'block';
+            }
+        }
+
+        let desp = [];
+        if (App.filters.relatorios) {
+            let f = App.filters.relatorios;
+            let query = db.from('despesas').select('*').gte('date', f.start + 'T00:00:00Z').lte('date', f.end + 'T23:59:59Z');
+            if (f.tipo === 'Custos Fixos') query = query.eq('category', 'Custos Fixos');
+            else if (f.tipo === 'Comissões') query = query.eq('category', 'Comissões');
+            
+            const { data } = await query.order('date', {ascending: false});
+            desp = data || [];
+            
+            if (f.tipo === 'Comissões' && f.prof_name) {
+                desp = desp.filter(d => d.description.includes(`Comissão ${f.prof_name}:`));
+            }
+        } else {
+            const qFilter = document.getElementById('filter-relatorios').value;
+            const range = U.getQuinzenaDates(qFilter);
+            const { data } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end).order('date', {ascending: false});
+            desp = data || [];
+        }
 
         const { extrato, totalIn, totalOut } = U.buildExtrato(desp);
         const despesasOnly = desp.filter(d => !App.inflowCategories.includes(d.category));
 
         let htmlDesp = '';
-        if(despesasOnly.length === 0) { htmlDesp = '<p style="color:var(--muted); text-align:center;">Sem gastos registrados.</p>'; }
+        if(despesasOnly.length === 0) { htmlDesp = '<p style="color:var(--muted); text-align:center;">Sem gastos registrados para este filtro.</p>'; }
         else { htmlDesp = despesasOnly.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${U.formatDesc(d.description)}</b><br><span style="font-size:0.8rem; color:#888"><i class="ph ph-clock"></i> ${U.date(d.date)}</span></div><div style="color:#d32f2f; font-weight:bold">-${U.money(d.amount)}</div></div>`).join(''); }
-        
-        document.getElementById('relatorio-despesas-conteudo').innerHTML = htmlDesp;
+        if(relContainer) relContainer.innerHTML = htmlDesp;
         window.currentDespesasData = despesasOnly;
 
         let htmlFluxo = '';
-        if(extrato.length === 0) { htmlFluxo = '<p style="color:var(--muted); text-align:center;">Nenhuma movimentação.</p>'; }
+        if(extrato.length === 0) { htmlFluxo = '<p style="color:var(--muted); text-align:center;">Nenhuma movimentação para este filtro.</p>'; }
         else {
             htmlFluxo += `<div style="background:#f9f9f9; padding:15px; border-radius:8px; display:flex; justify-content:space-around; margin-bottom:15px;"><div>Entradas: <b style="color:#2e7d32">${U.money(totalIn)}</b></div><div>Saídas: <b style="color:#d32f2f">-${U.money(totalOut)}</b></div><div>Líquido: <b style="color:${(totalIn-totalOut)>=0?'#2e7d32':'#d32f2f'}">${U.money(totalIn-totalOut)}</b></div></div>`;
             htmlFluxo += extrato.map(i => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}">${i.type==='in'?'[+]':'[-]'}</b> ${U.formatDesc(i.desc)}<br><span style="font-size:0.8rem; color:#888; display:inline-block; margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(i.date)}</span></div><div style="text-align:right"><b>${U.money(i.val)}</b><br><span style="font-size:0.75rem; color:#666">Caixa: ${U.money(i.saldo)}</span></div></div>`).join('');
         }
-        document.getElementById('relatorio-fluxo-conteudo').innerHTML = htmlFluxo;
+        const fluxoContainer = document.getElementById('relatorio-fluxo-conteudo');
+        if(fluxoContainer) fluxoContainer.innerHTML = htmlFluxo;
         window.currentFluxoData = extrato; window.currentTotaisFluxo = { receita: totalIn, gasto: totalOut, lucro: totalIn - totalOut };
     },
 
@@ -1042,17 +724,11 @@ const Render = {
             if(c.items) { 
                 c.items.forEach(i => { 
                     if(i.prof_name) rankFunc[i.prof_name] = (rankFunc[i.prof_name]||0) + i.price;
-                    if(i.type === 'service') { 
-                        rankServ[i.name] = rankServ[i.name] || { qtd: 0, receita: 0 }; 
-                        rankServ[i.name].qtd += 1; 
-                        rankServ[i.name].receita += i.price; 
-                    } 
+                    if(i.type === 'service') { rankServ[i.name] = rankServ[i.name] || { qtd: 0, receita: 0 }; rankServ[i.name].qtd += 1; rankServ[i.name].receita += i.price; } 
                 }); 
             }
         });
-        const tkMedio = data.length ? totalFaturamento / data.length : 0;
-        const totalAgendas = agendas.length || 1;
-        const ocupacao = Math.min(100, Math.round((data.length / totalAgendas) * 100));
+        const tkMedio = data.length ? totalFaturamento / data.length : 0; const totalAgendas = agendas.length || 1; const ocupacao = Math.min(100, Math.round((data.length / totalAgendas) * 100));
         
         document.getElementById('perf-kpis').innerHTML = `
             <div class="card" style="text-align:center; padding:2rem"><p style="font-weight:bold; color:var(--muted); margin-bottom:10px">Ticket Médio (Bruto)</p><div class="val" style="font-size:2rem">${U.money(tkMedio)}</div></div>
@@ -1393,6 +1069,68 @@ const Modals = {
                 <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar</button></form>`;
         }
         
+        /* PASSO 3: MODAIS DE FILTROS PERSONALIZADOS E RECEITA MANUAL */
+        else if (type === 'filtro_relatorios') {
+            const { data: users } = await db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true).order('name');
+            const uOpts = users.map(u => `<option value="${u.name}">${u.name}</option>`).join('');
+            
+            html += `<h3>Filtro Avançado (Relatórios)</h3>
+            <form onsubmit="Actions.applyFilterRelatorios(event)">
+                <div style="display:flex; gap:10px;">
+                    <div class="input-group"><label>Data Inicial</label><input type="date" id="frel-start" required></div>
+                    <div class="input-group"><label>Data Final</label><input type="date" id="frel-end" required></div>
+                </div>
+                <div class="input-group">
+                    <label>Filtrar Qual Movimentação?</label>
+                    <select id="frel-tipo" required onchange="document.getElementById('frel-prof-div').style.display = this.value === 'Comissões' ? 'block' : 'none'">
+                        <option value="Todos">Todas (Custos, Comissões e Receitas)</option>
+                        <option value="Custos Fixos">Apenas Custos Fixos</option>
+                        <option value="Comissões">Apenas Comissões</option>
+                    </select>
+                </div>
+                <div class="input-group" id="frel-prof-div" style="display:none;">
+                    <label>De Qual Colaborador?</label>
+                    <select id="frel-prof"><option value="">-- Todos os Colaboradores --</option>${uOpts}</select>
+                </div>
+                <button type="submit" class="btn-primary" style="padding:1.2rem">Pesquisar Período</button>
+            </form>`;
+        }
+        else if (type === 'filtro_comissoes') {
+            const { data: users } = await db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true).order('name');
+            const uOpts = users.map(u => `<option value="${u.id}|${u.name}">${u.name}</option>`).join('');
+            
+            html += `<h3>Filtro de Comissões</h3>
+            <form onsubmit="Actions.applyFilterComissoes(event)">
+                <div style="display:flex; gap:10px;">
+                    <div class="input-group"><label>Data Inicial</label><input type="date" id="fcom-start" required></div>
+                    <div class="input-group"><label>Data Final</label><input type="date" id="fcom-end" required></div>
+                </div>
+                ${App.role === 'owner' ? `
+                <div class="input-group">
+                    <label>De Qual Colaborador?</label>
+                    <select id="fcom-prof"><option value="">-- Todos os Colaboradores --</option>${uOpts}</select>
+                </div>` : ''}
+                <button type="submit" class="btn-primary" style="padding:1.2rem">Pesquisar Período</button>
+            </form>`;
+        }
+        else if (type === 'nova_receita') {
+            html += `<h3>Injetar Receita (Entrada)</h3>
+            <form onsubmit="Actions.createReceita(event)">
+                <div class="input-group"><label>Do que se trata? (Descrição)</label><input type="text" id="fr-desc" required placeholder="Ex: Venda Avulsa, Troco Adicional..."></div>
+                <div class="input-group">
+                    <label>Forma de Entrada</label>
+                    <select id="fr-cat" required style="padding:1.2rem">
+                        <option value="Pix">Pix</option>
+                        <option value="Dinheiro">Dinheiro</option>
+                        <option value="Cartão Crédito">Cartão de Crédito</option>
+                        <option value="Cartão Débito">Cartão de Débito</option>
+                    </select>
+                </div>
+                <div class="input-group"><label>Valor Positivo (R$)</label><input type="number" id="fr-val" step="0.01" min="0.01" required style="padding:1.2rem; font-size:1.2rem"></div>
+                <button type="submit" class="btn-primary" style="padding:1.2rem; background:#2e7d32">Confirmar Entrada</button>
+            </form>`;
+        }
+        
         html += `</div>`; cont.innerHTML = html; cont.classList.remove('hidden');
 
         if(type === 'whatsapp' && window.currentWppVars && window.currentWppVars._kind) {
@@ -1428,6 +1166,27 @@ const Actions = {
             doc.autoTable({ startY: 55, head: [['Data/Hora', 'Tipo', 'Descrição', 'Valor', 'Caixa']], body: rows, theme: 'striped', headStyles: { fillColor: [183, 110, 121] } });
             doc.save(`AQC_Fluxo_${quinzenaStr}.pdf`);
         }
+    },
+    
+    /* PASSO 3: AÇÕES DE FILTROS E RECEITA */
+    applyFilterRelatorios(e) {
+        e.preventDefault();
+        App.filters.relatorios = { start: document.getElementById('frel-start').value, end: document.getElementById('frel-end').value, tipo: document.getElementById('frel-tipo').value, prof_name: document.getElementById('frel-prof').value };
+        Modals.close(); Render.relatorios();
+    },
+    clearFilterRelatorios() { App.filters.relatorios = null; Render.relatorios(); },
+
+    applyFilterComissoes(e) {
+        e.preventDefault(); const profVal = document.getElementById('fcom-prof') ? document.getElementById('fcom-prof').value : '';
+        App.filters.comissoes = { start: document.getElementById('fcom-start').value, end: document.getElementById('fcom-end').value, prof_id: profVal ? profVal.split('|')[0] : null, prof_name: profVal ? profVal.split('|')[1] : null };
+        Modals.close(); Render.comissao();
+    },
+    clearFilterComissoes() { App.filters.comissoes = null; Render.comissao(); },
+
+    async createReceita(e) {
+        e.preventDefault();
+        await db.from('despesas').insert({ description: "ENTRADA MANUAL: " + document.getElementById('fr-desc').value, amount: document.getElementById('fr-val').value, category: document.getElementById('fr-cat').value, date: new Date().toISOString() }); 
+        Modals.close(); UI.toast('Valor positivo injetado com sucesso no Fluxo de Caixa!'); Render['resumo-financeiro']();
     },
 
     async updatePassword(e) {

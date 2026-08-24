@@ -588,42 +588,55 @@ const Render = {
         }
 
         const { data } = await query;
-        let html = ''; let totalComissao = 0; let rank = {};
+        let htmlCards = ''; let totalComissao = 0; let rank = {};
         
         data.forEach(c => {
             if(!c.items) return; 
             c.items.forEach(i => {
-                if (isOwner && App.filters.comissoes && App.filters.comissoes.prof_id) {
-                    if (i.prof_id !== App.filters.comissoes.prof_id) return;
+                let showCard = false;
+
+                if (isOwner) {
+                    if (App.filters.comissoes && App.filters.comissoes.prof_id) {
+                        if (i.prof_id !== App.filters.comissoes.prof_id) return;
+                        showCard = true; 
+                    }
+                } else {
+                    if (i.prof_id !== App.user.id) return;
+                    showCard = true;
                 }
-                if(!isOwner && i.prof_id !== App.user.id) return;
 
                 if(i.commission) {
                     const v = (i.price * i.commission) / 100; totalComissao += v;
                     if(i.prof_name) rank[i.prof_name] = (rank[i.prof_name]||0) + v;
-                    if(!isOwner) html += `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:3px solid #2e7d32"><div><h4>${i.name}</h4><p style="font-size:0.8rem; color:var(--muted)">Ref: ${c.ticket||'-'} • Taxa: ${i.commission}%</p></div><div class="val" style="color:#2e7d32; font-size:1.3rem">+${U.money(v)}</div></div>`;
+                    
+                    if (showCard) {
+                        htmlCards += `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:3px solid #2e7d32; margin-bottom:10px;"><div><h4>${i.name}</h4><p style="font-size:0.8rem; color:var(--muted)"><i class="ph ph-calendar"></i> ${U.date(c.created_at).slice(0,10)} • Ref: ${c.ticket||'-'} • Taxa: ${i.commission}%</p></div><div class="val" style="color:#2e7d32; font-size:1.3rem">+${U.money(v)}</div></div>`;
+                    }
                 }
             });
         });
         
+        let finalHtml = '';
         if(isOwner) {
             const sorted = Object.entries(rank).sort((a,b)=>b[1]-a[1]);
             let profFilterActive = (App.filters.comissoes && App.filters.comissoes.prof_id);
             let titleTotal = profFilterActive ? `Total de Comissão de ${App.filters.comissoes.prof_name}` : `Total de Comissões Geradas`;
 
-            html = `<div class="card" style="margin-bottom:20px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); color:white; padding:2rem; box-shadow:0 10px 20px rgba(183, 110, 121, 0.3)"><h3 style="color:white; font-weight:400; opacity:0.9">${titleTotal}</h3><div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div></div>`;
+            finalHtml = `<div class="card" style="margin-bottom:20px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); color:white; padding:2rem; box-shadow:0 10px 20px rgba(183, 110, 121, 0.3)"><h3 style="color:white; font-weight:400; opacity:0.9">${titleTotal}</h3><div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div></div>`;
             
-            if (!profFilterActive) {
-                html += `<h3 style="margin:20px 0 15px 0">Ranking de Comissionamento</h3><div class="data-grid">` + 
+            if (profFilterActive) {
+                 finalHtml += `<h3 style="margin:20px 0 15px 0">Detalhamento dos Serviços</h3><div class="data-list">${htmlCards || '<p style="color:var(--muted)">Nenhum registro encontrado para este período.</p>'}</div>`;
+            } else {
+                finalHtml += `<h3 style="margin:20px 0 15px 0">Ranking de Comissionamento</h3><div class="data-grid">` + 
                 sorted.map((s,i) => {
                     let color = '#cd7f32'; if(i===0) color='#ffd700'; else if(i===1) color='#c0c0c0';
                     return `<div class="card"><div style="display:flex; justify-content:space-between; align-items:center"><h4 style="font-size:1.1rem">${i+1}º ${s[0]}</h4><i class="ph ph-medal" style="color:${color}; font-size:2rem"></i></div><div class="val" style="margin-top:15px; font-size:1.8rem">${U.money(s[1])}</div></div>`;
                 }).join('') + '</div>';
             }
         } else {
-            html = `<div class="card" style="margin-bottom:20px; background:var(--primary); color:white; padding:2rem"><h4 style="color:white; font-weight:400">Minha Comissão Total</h4><div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div></div><div class="data-list">` + html + `</div>`;
+            finalHtml = `<div class="card" style="margin-bottom:20px; background:var(--primary); color:white; padding:2rem"><h4 style="color:white; font-weight:400">Minha Comissão Total</h4><div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div></div><div class="data-list">${htmlCards || '<p style="color:var(--muted)">Nenhum registro encontrado para este período.</p>'}</div>`;
         }
-        if(dashContainer) dashContainer.innerHTML = html;
+        if(dashContainer) dashContainer.innerHTML = finalHtml;
     },
     
     /* PASSO 3: SOLICITAÇÃO 05 (Botão de Injetar Receita Manual no Fluxo) */

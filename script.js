@@ -78,7 +78,7 @@ const U = {
 
         (desp || []).forEach(d => {
             const isIncome = App.inflowCategories.includes(d.category);
-            const valNum = Number(d.amount) || 0; // Correção: Garante que é número e não texto
+            const valNum = Number(d.amount) || 0;
             const item = { type: isIncome ? 'in' : 'out', desc: d.description, val: valNum, date: new Date(d.date), category: d.category };
             if(isIncome) totalIn += valNum; else totalOut += valNum;
             extrato.push(item);
@@ -404,12 +404,25 @@ const Render = {
             if (App.role !== 'owner') query = query.eq('user_id', App.user.id);
             const { data: agData, error: errAg } = await query; if(errAg) throw errAg;
 
-            let uQuery = db.from('users').select('id, name').neq('username', 'admin.teste').eq('active', true).neq('is_deleted', true).order('name');
+            let uQuery = db.from('users').select('id, name, schedule').neq('username', 'admin.teste').eq('active', true).neq('is_deleted', true).order('name');
             if(App.role !== 'owner') uQuery = uQuery.eq('id', App.user.id);
-            const { data: usersData } = await uQuery;
+            let { data: usersData } = await uQuery;
+
+            // Filtro Mágico da Escala: Remove quem não trabalha no dia da semana selecionado
+            if(usersData) {
+                const currentDayOfWeek = App.currentDate.getDay(); // 0 = Dom, 1 = Seg ... 6 = Sab
+                usersData = usersData.filter(u => {
+                    if(!u.schedule) return true; 
+                    const dayConf = u.schedule[String(currentDayOfWeek)];
+                    return dayConf ? dayConf.active !== false : true;
+                });
+            }
 
             const cont = document.getElementById('agenda-list');
-            if(!usersData || usersData.length === 0) { cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem"><p style="color:var(--muted)">Nenhum profissional encontrado.</p></div>`; return; }
+            if(!usersData || usersData.length === 0) { 
+                cont.innerHTML = `<div class="card" style="text-align:center; padding:4rem 1rem"><i class="ph ph-calendar-x" style="font-size:3rem; color:var(--muted); margin-bottom:10px;"></i><p style="color:var(--muted); font-size:1.1rem">Nenhum profissional escalado para trabalhar neste dia da semana.</p></div>`; 
+                return; 
+            }
 
             const isDesktop = window.innerWidth > 900; const pixelsPerMin = isDesktop ? 1 : 1.3; const slotHeight = isDesktop ? 60 : 78; const horaInicio = 7; const horaFim = 21;
             let html = `<div class="timeline-wrapper" style="overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border: 1px solid var(--border); border-radius: 8px;"><div class="timeline-header" style="display: flex; min-width: max-content; border-bottom: 1px solid var(--border);"><div class="time-col" style="position: sticky; left: 0; z-index: 20; background: var(--surface); border:none; min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);"></div>`;
@@ -657,7 +670,7 @@ const Render = {
         rc.innerHTML = `<div class="card" style="border-bottom:4px solid #2e7d32"><h4>Faturamento (Pago)</h4><div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(totalIn)}</div></div><div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custos & Comissões (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(totalOut)}</div></div><div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
         
         let subDash = { 'Pix':0, 'Dinheiro':0, 'Cartão Crédito':0, 'Cartão Débito':0 };
-        desp.forEach(d => { if(subDash[d.category] !== undefined) subDash[d.category] += Number(d.amount)||0; }); // Correção de segurança numérica
+        desp.forEach(d => { if(subDash[d.category] !== undefined) subDash[d.category] += Number(d.amount)||0; }); 
         
         document.getElementById('resumo-pagamentos-cards').innerHTML = `<div class="card" style="text-align:center"><i class="ph ph-qr-code" style="font-size:2rem; color:#00695c"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Pix</p><div class="val" style="font-size:1.2rem; color:#00695c">${U.money(subDash['Pix'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-money" style="font-size:2rem; color:#2e7d32"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Dinheiro</p><div class="val" style="font-size:1.2rem; color:#2e7d32">${U.money(subDash['Dinheiro'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#e65100"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Crédito</p><div class="val" style="font-size:1.2rem; color:#e65100">${U.money(subDash['Cartão Crédito'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#1565c0"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Débito</p><div class="val" style="font-size:1.2rem; color:#1565c0">${U.money(subDash['Cartão Débito'])}</div></div>`;
         document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações na quinzena.</p>' :
@@ -711,7 +724,6 @@ const Render = {
 
         const { extrato, totalIn, totalOut } = U.buildExtrato(desp);
         
-        // Correção na Abordagem da Lista Principal (Despesas ou Receitas dinamicamente)
         let isReceitaFilter = App.filters.relatorios?.tipo === 'Receitas';
         let targetList = isReceitaFilter 
             ? desp.filter(d => App.inflowCategories.includes(d.category)) 
@@ -727,7 +739,6 @@ const Render = {
         
         if(relContainer) relContainer.innerHTML = htmlDesp;
         
-        // Salva os dados atualizados para usar no Export de PDF
         window.currentDespesasData = targetList;
         window.currentRelatorioTipo = isReceitaFilter ? 'Receitas' : 'Despesas';
 
@@ -1087,14 +1098,38 @@ const Modals = {
                 <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar</button></form>`;
         }
         else if(type === 'funcionario' || type === 'edit_funcionario') {
-            let f = { name: '', role: 'colaborador', active: true }; if(param1) { const { data } = await db.from('users').select('*').eq('id', param1).single(); f = data; }
+            let f = { name: '', role: 'colaborador', active: true, phone: '', birth_date: '', schedule: null }; 
+            if(param1) { const { data } = await db.from('users').select('*').eq('id', param1).single(); f = data; }
+            
+            const sched = f.schedule || { "0":{active:true}, "1":{active:true}, "2":{active:true}, "3":{active:true}, "4":{active:true}, "5":{active:true}, "6":{active:true} };
+            
             html += `<h3>${param1 ? 'Editar Colaborador' : 'Novo Colaborador'}</h3><form onsubmit="Actions.saveFuncionario(event, '${param1 || ''}')">
                 <div class="input-group"><label>Nome Completo</label><input type="text" id="ff-nome" value="${f.name}" required></div>
-                <div class="input-group"><label>Nível de Acesso</label><select id="ff-role" required><option value="colaborador" ${f.role==='colaborador'?'selected':''}>Colaborador</option><option value="owner" ${f.role==='owner'?'selected':''}>Proprietário</option></select></div>
-                ${param1 ? `<div class="input-group" style="background:#f9f9f9; padding:15px; border-radius:12px"><label style="margin:0"><input type="checkbox" id="ff-ativo" ${f.active !== false ? 'checked' : ''}> Conta Ativa (Permitir Login)</label></div><button type="button" class="btn-secondary" style="margin-bottom:15px; color:var(--primary)" onclick="Actions.resetFuncionarioPassword('${param1}')"><i class="ph ph-key"></i> Senha para 123456</button>` : ''}
-                <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar</button></form>`;
+                
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                    <div class="input-group" style="flex:1; min-width:150px;"><label>Telefone/WhatsApp</label><input type="text" id="ff-fone" value="${f.phone || ''}" placeholder="Ex: 86999999999"></div>
+                    <div class="input-group" style="flex:1; min-width:150px;"><label>Data de Nascimento</label><input type="date" id="ff-nasc" value="${f.birth_date || ''}"></div>
+                </div>
+
+                <div class="input-group"><label>Nível de Acesso</label><select id="ff-role" required><option value="colaborador" ${f.role==='colaborador'?'selected':''}>Colaborador</option><option value="owner" ${f.role==='owner'?'selected':''}>Proprietário/Gestor</option></select></div>
+                
+                <div class="input-group" style="background:#f9f9f9; padding:15px; border-radius:12px; border:1px solid #eee;">
+                    <label style="margin-bottom:10px; color:var(--primary-dark); font-weight:bold;"><i class="ph ph-calendar-check"></i> Dias de Trabalho na Semana</label>
+                    <p style="font-size:0.8rem; color:var(--muted); margin-bottom:10px;">Desmarque os dias que este colaborador folga.</p>
+                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                        <label style="cursor:pointer; background:#fff; padding:6px 12px; border-radius:6px; border:1px solid #ccc; font-size:0.9rem"><input type="checkbox" id="chk-dom" ${sched["0"]?.active !== false ? 'checked' : ''}> Dom</label>
+                        <label style="cursor:pointer; background:#fff; padding:6px 12px; border-radius:6px; border:1px solid #ccc; font-size:0.9rem"><input type="checkbox" id="chk-seg" ${sched["1"]?.active !== false ? 'checked' : ''}> Seg</label>
+                        <label style="cursor:pointer; background:#fff; padding:6px 12px; border-radius:6px; border:1px solid #ccc; font-size:0.9rem"><input type="checkbox" id="chk-ter" ${sched["2"]?.active !== false ? 'checked' : ''}> Ter</label>
+                        <label style="cursor:pointer; background:#fff; padding:6px 12px; border-radius:6px; border:1px solid #ccc; font-size:0.9rem"><input type="checkbox" id="chk-qua" ${sched["3"]?.active !== false ? 'checked' : ''}> Qua</label>
+                        <label style="cursor:pointer; background:#fff; padding:6px 12px; border-radius:6px; border:1px solid #ccc; font-size:0.9rem"><input type="checkbox" id="chk-qui" ${sched["4"]?.active !== false ? 'checked' : ''}> Qui</label>
+                        <label style="cursor:pointer; background:#fff; padding:6px 12px; border-radius:6px; border:1px solid #ccc; font-size:0.9rem"><input type="checkbox" id="chk-sex" ${sched["5"]?.active !== false ? 'checked' : ''}> Sex</label>
+                        <label style="cursor:pointer; background:#fff; padding:6px 12px; border-radius:6px; border:1px solid #ccc; font-size:0.9rem"><input type="checkbox" id="chk-sab" ${sched["6"]?.active !== false ? 'checked' : ''}> Sáb</label>
+                    </div>
+                </div>
+
+                ${param1 ? `<div class="input-group" style="background:#f1f8e9; padding:15px; border-radius:12px; border:1px solid #c5e1a5"><label style="margin:0"><input type="checkbox" id="ff-ativo" ${f.active !== false ? 'checked' : ''}> Conta Ativa (Permitir Login no Sistema)</label></div><button type="button" class="btn-secondary" style="margin-bottom:15px; color:var(--primary)" onclick="Actions.resetFuncionarioPassword('${param1}')"><i class="ph ph-key"></i> Resetar Senha para 123456</button>` : ''}
+                <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar Colaborador</button></form>`;
         }
-        
         else if (type === 'filtro_relatorios') {
             const { data: users } = await db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true).order('name');
             const uOpts = users.map(u => `<option value="${u.name}">${u.name}</option>`).join('');
@@ -1178,7 +1213,6 @@ const Actions = {
         doc.setFontSize(12); doc.setTextColor(50, 50, 50);
         
         if (viewType === 'despesas') {
-            // Verifica dinamicamente se o usuário pediu receitas ou despesas
             let isReceitas = window.currentRelatorioTipo === 'Receitas';
             let title = isReceitas ? 'Relatório de Entradas (Receitas)' : 'Relatório de Despesas';
             
@@ -1188,7 +1222,6 @@ const Actions = {
             
             const rows = window.currentDespesasData.map(d => [ U.date(d.date), d.category, d.description, U.money(d.amount) ]);
             
-            // Muda a cor do topo da tabela no PDF para verde (Receitas) ou Vermelho (Saídas)
             const corTema = isReceitas ? [46, 125, 50] : [183, 110, 121];
             
             doc.autoTable({ startY: 45, head: [['Data/Hora', 'Categoria', 'Descrição', 'Valor (R$)']], body: rows, theme: 'striped', headStyles: { fillColor: corTema } });
@@ -1220,8 +1253,6 @@ const Actions = {
 
     async createReceita(e) {
         e.preventDefault();
-        
-        // Correção: Extrai o valor preenchido e garante que seja salvo com formato numérico decimal.
         const valorReceita = parseFloat(document.getElementById('fr-val').value) || 0;
         
         await db.from('despesas').insert({ 
@@ -1234,7 +1265,6 @@ const Actions = {
         Modals.close(); 
         UI.toast('Valor positivo injetado com sucesso no Fluxo de Caixa!'); 
         
-        // Atualiza instantaneamente as abas se o usuário estiver lá
         Render['resumo-financeiro']();
         if (App.view === 'relatorios') { Render.relatorios(); }
     },
@@ -1286,14 +1316,42 @@ const Actions = {
         const palavras = nomeDisplay.toLowerCase().split(/\s+/);
         const username = `${palavras[0]}${palavras.length>1?'.'+palavras[palavras.length-1]:''}`.replace(/[^a-z0-9.]/g, '');
         const role = document.getElementById('ff-role').value;
+        const phone = document.getElementById('ff-fone').value;
+        const birthDate = document.getElementById('ff-nasc').value || null;
+        
+        const schedule = {
+            "0": { active: document.getElementById('chk-dom').checked },
+            "1": { active: document.getElementById('chk-seg').checked },
+            "2": { active: document.getElementById('chk-ter').checked },
+            "3": { active: document.getElementById('chk-qua').checked },
+            "4": { active: document.getElementById('chk-qui').checked },
+            "5": { active: document.getElementById('chk-sex').checked },
+            "6": { active: document.getElementById('chk-sab').checked }
+        };
+
+        const payload = { 
+            name: nomeDisplay, 
+            role: role, 
+            phone: phone, 
+            birth_date: birthDate, 
+            schedule: schedule 
+        };
+
         if(id) {
-            await db.from('users').update({ name: nomeDisplay, role: role, active: document.getElementById('ff-ativo').checked }).eq('id', id);
-            Modals.close(); UI.toast('Atualizado!'); Render.funcionarios();
+            payload.active = document.getElementById('ff-ativo').checked;
+            await db.from('users').update(payload).eq('id', id);
+            Modals.close(); UI.toast('Atualizado com sucesso!'); Render.funcionarios();
         } else {
-            await db.from('users').insert({ name: nomeDisplay, username: username, password: '123456', role: role, first_login: true, active: true, is_deleted: false });
-            UI.confirm(`Usuário: ${username}\nSenha Temp: 123456`, () => { Modals.close(); Render.funcionarios(); });
+            payload.username = username;
+            payload.password = '123456';
+            payload.first_login = true;
+            payload.active = true;
+            payload.is_deleted = false;
+            await db.from('users').insert(payload);
+            UI.confirm(`Usuário Criado: ${username}\nSenha Temp: 123456`, () => { Modals.close(); Render.funcionarios(); });
         }
     },
+    
     async resetFuncionarioPassword(id) { await db.from('users').update({ password: '123456', first_login: true }).eq('id', id); Modals.close(); UI.toast('Senha 123456'); Render.funcionarios(); },
     async deleteFuncionario(id) { UI.confirm('Inativar e esconder colaborador permanentemente?', async () => { await db.from('users').update({ is_deleted: true, active: false }).eq('id', id); UI.toast('Conta removida.'); Render.funcionarios(); }); },
     async toggleFuncionarioStatus(id, isActive) { await db.from('users').update({ active: !isActive }).eq('id', id); Render.funcionarios(); },

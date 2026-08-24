@@ -109,7 +109,7 @@ const U = {
     }
 };
 
-/* --- COMPONENTE CUSTOM SELECT COM BUSCA --- */
+/* --- COMPONENTE CUSTOM SELECT COM BUSCA MELHORADO --- */
 const CustomSelect = {
     render(id, placeholder, optionsHtml, onChangeGlobalName = '', initialValue = '') {
         return `
@@ -130,14 +130,43 @@ const CustomSelect = {
         </div>`;
     },
     toggle(id) {
-        document.querySelectorAll('.aqc-select-menu').forEach(el => {
-            if(el.id !== `menu-${id}`) el.style.display = 'none';
-        });
         const menu = document.getElementById(`menu-${id}`);
-        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
-        if (menu.style.display === 'block') {
+        const wrapper = document.getElementById(`wrapper-${id}`);
+        const isOpening = menu.style.display === 'none' || menu.style.display === '';
+
+        // Fecha todos os outros e reseta z-index
+        document.querySelectorAll('.aqc-select-menu').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.aqc-custom-select').forEach(el => {
+            el.style.zIndex = '1';
+            if(el.parentElement) el.parentElement.style.zIndex = '';
+        });
+
+        if (isOpening) {
+            menu.style.display = 'flex';
+            
+            // Força a prioridade máxima
+            wrapper.style.zIndex = '999999';
+            if(wrapper.parentElement) {
+                wrapper.parentElement.style.position = 'relative';
+                wrapper.parentElement.style.zIndex = '999999';
+            }
+
+            // Algoritmo de Inteligência de Espaço: Abre pra cima ou pra baixo
+            const rect = wrapper.getBoundingClientRect();
+            const spaceBelow = window.innerHeight - rect.bottom;
+            
+            if (spaceBelow < 280) { // Se não tiver ~280px sobrando embaixo
+                menu.style.top = 'auto';
+                menu.style.bottom = 'calc(100% + 5px)'; // Sobe o menu
+                menu.style.boxShadow = '0 -10px 30px rgba(0,0,0,0.25)';
+            } else {
+                menu.style.top = 'calc(100% + 5px)';
+                menu.style.bottom = 'auto'; // Desce o menu normal
+                menu.style.boxShadow = '0 10px 30px rgba(0,0,0,0.25)';
+            }
+
             const input = menu.querySelector('input');
-            if(input) input.focus();
+            if(input) { input.value = ''; CustomSelect.filter(id, ''); input.focus(); }
         }
     },
     filter(id, term) {
@@ -156,11 +185,21 @@ const CustomSelect = {
         input.value = val;
         input.dispatchEvent(new Event('change'));
         document.getElementById(`menu-${id}`).style.display = 'none';
+        
+        // Reseta as prioridades
+        const wrapper = document.getElementById(`wrapper-${id}`);
+        wrapper.style.zIndex = '1';
+        if(wrapper.parentElement) wrapper.parentElement.style.zIndex = '';
     },
     closeAll() {
         document.querySelectorAll('.aqc-select-menu').forEach(el => el.style.display = 'none');
+        document.querySelectorAll('.aqc-custom-select').forEach(el => {
+            el.style.zIndex = '1';
+            if(el.parentElement) el.parentElement.style.zIndex = '';
+        });
     }
 };
+
 document.addEventListener('click', CustomSelect.closeAll);
 window.handleNewClient = function(val) {
     const div = document.getElementById('fa-new-cli-div');
@@ -980,7 +1019,7 @@ const Render = {
 
         let htmlDesp = '';
         if(despesasOnly.length === 0) { htmlDesp = '<p style="color:var(--muted); text-align:center;">Sem gastos registrados.</p>'; }
-        else { htmlDesp = despesasOnly.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${U.formatDesc(d.description)}</b><br><span style="font-size:0.8rem; color:#888"><i class="ph ph-clock"></i> ${U.date(d.date)} - ${d.category}</span></div><div style="color:#d32f2f; font-weight:bold">-${U.money(d.amount)}</div></div>`).join(''); }
+        else { htmlDesp = despesasOnly.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${U.formatDesc(d.description)}</b><br><span style="font-size:0.8rem; color:#888"><i class="ph ph-clock"></i> ${U.date(d.date)}</span></div><div style="color:#d32f2f; font-weight:bold">-${U.money(d.amount)}</div></div>`).join(''); }
         
         document.getElementById('relatorio-despesas-conteudo').innerHTML = htmlDesp;
         window.currentDespesasData = despesasOnly;
@@ -1127,7 +1166,6 @@ const Modals = {
                 `:''}</div>
             </div>`).join('');
             
-            /* PASSO 3: O botão de deletar recebeu margin-right: 40px para afastar do X */
             let delBtnHtml = (App.role === 'owner' && !isFechada) ? `<button class="btn-secondary" style="width:auto; padding:0.5rem 0.8rem; color:#d32f2f; border:1px solid #d32f2f; margin-right: 40px;" onclick="Actions.deleteComanda('${comanda.id}')"><i class="ph ph-trash"></i> Deletar</button>` : '';
 
             html += `<div style="text-align: left; margin-bottom: 20px;">
@@ -1144,7 +1182,6 @@ const Modals = {
             </div>`;
             
             if(!isFechada) {
-                /* PASSO 1: Integração do Custom Select no modal de Editar Comanda */
                 const sOpts = servicos.map(s => {
                     const val = encodeURIComponent(JSON.stringify({id: s.id, name: s.name, price: s.price, cost: s.cost || 0, commission: s.commission, type: 'service'}));
                     return `<li onclick="CustomSelect.select('add-item-sel', '${val}', '${s.name.replace(/'/g, "\\'")} - ${U.money(s.price)}')">${s.name} - ${U.money(s.price)}</li>`;
@@ -1176,7 +1213,6 @@ const Modals = {
             }
         }
         else if (type === 'edit_price') {
-            /* PASSO 2: Modal Customizado no lugar do prompt nativo */
             const item = JSON.parse(param3);
             html += `<div style="text-align: center; margin-bottom: 20px;">
                 <h3 style="margin: 0; color: var(--primary-dark);">Alterar valor de: ${item.name}</h3>
@@ -1200,7 +1236,6 @@ const Modals = {
                 db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true).order('name')
             ]);
             
-            /* PASSO 1: Custom Select no Agendamento */
             const cliOpts = `<li onclick="CustomSelect.select('fa-cli', 'NEW', '+ CADASTRAR NOVO CLIENTE AQUI')" style="font-weight:bold; color:#2e7d32;">+ CADASTRAR NOVO CLIENTE AQUI</li>` + 
                 c.data.map(x=>`<li onclick="CustomSelect.select('fa-cli', '${x.id}', '${x.name.replace(/'/g, "\\'")}')">${x.name}</li>`).join('');
             
@@ -1262,7 +1297,6 @@ const Modals = {
         else if(type === 'comanda') {
             const { data: c } = await db.from('clients').select('id,name').order('name');
             
-            /* PASSO 1: Custom Select na Geração da Comanda */
             const cliOptsCom = `<li onclick="CustomSelect.select('fcom-cli', 'NEW', '+ CADASTRAR NOVO CLIENTE AQUI')" style="font-weight:bold; color:#2e7d32;">+ CADASTRAR NOVO CLIENTE AQUI</li>` + 
                 c.map(x=>`<li onclick="CustomSelect.select('fcom-cli', '${x.id}', '${x.name.replace(/'/g, "\\'")}')">${x.name}</li>`).join('');
                 
@@ -1641,14 +1675,12 @@ const Actions = {
         Modals.close(); setTimeout(() => Modals.open('edit_comanda', id), 100);
     },
     
-    /* PASSO 2: Chamada do Novo Modal de Editar Preço (Substituindo o Prompt NATIVO) */
     async editComandaItemPrice(id, idx) {
         const { data: c } = await db.from('comandas').select('items').eq('id', id).single();
         const item = c.items[idx];
         Modals.open('edit_price', id, idx, JSON.stringify(item));
     },
 
-    /* PASSO 2: Função que salva o preço editado no novo modal */
     async saveComandaItemPrice(e, id, idx) {
         e.preventDefault();
         const novoValorStr = document.getElementById('edit-price-val').value;
@@ -1920,22 +1952,21 @@ const Actions = {
     }
 };
 
-/* PASSO 1: INJETOR DE CSS PARA O DROPDOWN CUSTOMIZADO */
+/* --- INJETOR DE CSS --- */
 const initCSS = () => {
     if(document.getElementById('aqc-custom-styles')) return;
     const style = document.createElement('style');
     style.id = 'aqc-custom-styles';
     style.innerHTML = `
-        .aqc-custom-select { position: relative; width: 100%; font-family: inherit; }
-        .aqc-select-trigger { background: #fff; border: 1px solid var(--border); padding: 1.2rem; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; color: var(--text); }
-        .aqc-select-menu { position: absolute; top: 100%; left: 0; width: 100%; background: #fff; border: 1px solid var(--border); border-radius: 8px; margin-top: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); z-index: 9999; display: flex; flex-direction: column; max-height: 300px; }
-        .aqc-select-search-box { padding: 10px; border-bottom: 1px solid #eee; position: sticky; top: 0; background: #fff; border-radius: 8px 8px 0 0; }
-        .aqc-select-search-box input { width: 100%; padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px; outline: none; font-size: 1rem; font-family: inherit; }
-        .aqc-select-options { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; }
-        .aqc-select-options li { padding: 12px 15px; cursor: pointer; border-bottom: 1px solid #f9f9f9; color: var(--text); font-size: 0.95rem; }
+        .aqc-custom-select { position: relative; width: 100%; font-family: inherit; z-index: 1; }
+        .aqc-select-trigger { background: #fff; border: 1px solid var(--border); padding: 1.2rem; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; color: var(--text); font-size: 1rem; }
+        .aqc-select-menu { position: absolute; left: 0; width: 100%; background: #ffffff; border: 1px solid #ccc; border-radius: 8px; z-index: 999999; display: flex; flex-direction: column; max-height: 250px; }
+        .aqc-select-search-box { padding: 10px; border-bottom: 1px solid #eee; position: sticky; top: 0; background: #f9f9f9; border-radius: 8px 8px 0 0; z-index: 2; }
+        .aqc-select-search-box input { width: 100%; padding: 10px 12px; border: 1px solid #ccc; border-radius: 6px; outline: none; font-size: 1rem; font-family: inherit; background: #fff; }
+        .aqc-select-options { list-style: none; padding: 0; margin: 0; overflow-y: auto; flex: 1; background: #fff; border-radius: 0 0 8px 8px; position: relative; z-index: 1; }
+        .aqc-select-options li { padding: 14px 15px; cursor: pointer; border-bottom: 1px solid #f1f1f1; color: var(--text); font-size: 0.95rem; background: #fff; transition: background 0.2s; }
         .aqc-select-options li:hover { background: #f1f8e9; }
-        .aqc-select-options li.optgroup-label { font-weight: bold; background: #f5f5f5; cursor: default; color: var(--muted); font-size: 0.9rem; text-transform: uppercase; }
-        .aqc-select-options li.optgroup-label:hover { background: #f5f5f5; }
+        .aqc-select-options li.optgroup-label { font-weight: bold; background: #f5f5f5; cursor: default; color: var(--muted); font-size: 0.85rem; text-transform: uppercase; padding: 8px 15px; border-bottom: none; }
     `;
     document.head.appendChild(style);
 };

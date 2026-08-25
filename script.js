@@ -407,7 +407,6 @@ const Render = {
             if(App.role !== 'owner') uQuery = uQuery.eq('id', App.user.id);
             let { data: usersData } = await uQuery;
 
-            // Novo Comportamento da Escala (Sol. 07): Mantém na lista, mas marca como 'isOffDay' para pintar de rosa e liberar
             if(usersData) {
                 const currentDayOfWeek = App.currentDate.getDay();
                 usersData.forEach(u => {
@@ -475,7 +474,17 @@ const Render = {
     },
     filterClientes(term) { term = term.toLowerCase(); const filtered = (window.allClientes || []).filter(c => c.name.toLowerCase().includes(term) || (c.phone && c.phone.includes(term))); this.renderClientesList(filtered); },
     
-    observacoes(id, name) { document.getElementById('current-observacao-client-id').value = id; document.getElementById('observacao-title').textContent = `Observações de: ${name}`; Nav.showView('observacoes'); Actions.loadObservacoes(id); },
+    observacoes(id, name) {
+        document.getElementById('current-observacao-client-id').value = id;
+        if (name) {
+            window.currentObsClientName = name;
+            document.getElementById('observacao-title').textContent = `Observações de: ${name}`;
+        } else if (window.currentObsClientName) {
+            document.getElementById('observacao-title').textContent = `Observações de: ${window.currentObsClientName}`;
+        }
+        Nav.showView('observacoes'); 
+        Actions.loadObservacoes(id); 
+    },
     
     async perfilCliente(id, name) {
         document.getElementById('current-perfil-client-id').value = id; document.getElementById('perfil-cliente-title').textContent = `Perfil: ${name}`; Nav.showView('perfil-cliente');
@@ -1109,7 +1118,6 @@ const Modals = {
             <form onsubmit="Actions.discountDebt(event, '${param1}', ${param2})"><div class="input-group"><label>Porcentagem (%)</label><input type="number" id="f-val" step="0.01" required></div><button type="submit" class="btn-primary" style="padding:1.2rem">Confirmar</button></form>`;
         }
         else if(type === 'nova_observacao') {
-            // Utilizamos data-client-id fixado diretamente no formulário para assegurar que é à prova de falhas!
             html += `<h3>Nova Observação</h3>
             <form id="form-nova-obs" data-client-id="${param1}" onsubmit="Actions.saveObservacao(event)">
                 <div class="input-group">
@@ -1359,39 +1367,109 @@ const Actions = {
     
     async saveObservacao(e) {
         e.preventDefault(); 
-        const idCliente = e.target.getAttribute('data-client-id');
-        
-        if (!idCliente || idCliente === 'undefined' || idCliente === 'null') {
-            return UI.toast('Erro Crítico: Cliente não identificado. Tente abrir a tela novamente.', 'error');
-        }
+        const btn = e.target.querySelector('button[type="submit"]');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = 'Salvando...'; btn.disabled = true;
 
-        // Reutilizamos a tabela 'anamnesis', mapeando Técnica -> history e Observação -> notes.
-        await db.from('anamnesis').insert({ 
-            client_id: idCliente, 
-            user_id: App.user.id, 
-            history: document.getElementById('fo-tecnica').value, 
-            notes: document.getElementById('fo-obs').value 
-        });
-        
-        Modals.close(); 
-        UI.toast('Observação registrada com sucesso!'); 
-        this.loadObservacoes(idCliente);
+        try {
+            const idCliente = e.target.getAttribute('data-client-id');
+            if (!idCliente || idCliente === 'undefined' || idCliente === 'null') {
+                throw new Error('Erro Crítico: Cliente não identificado. Volte e tente novamente.');
+            }
+
+            const tecnica = document.getElementById('fo-tecnica').value.trim();
+            const obs = document.getElementById('fo-obs').value.trim();
+
+            if (!tecnica && !obs) {
+                throw new Error('Preencha ao menos a técnica ou a observação antes de salvar.');
+            }
+
+            const { error } = await db.from('anamnesis').insert({ 
+                client_id: idCliente, 
+                user_id: App.user.id, 
+                history: tecnica, 
+                notes: obs 
+            });
+
+            if (error) throw new Error(error.message);
+            
+            Modals.close(); 
+            UI.toast('Observação registrada com sucesso!'); 
+            await this.loadObservacoes(idCliente);
+        } catch (err) {
+            UI.toast(err.message, 'error');
+        } finally {
+            if (btn) { btn.innerHTML = originalText; btn.disabled = false; }
+        }
     },
     
     async loadObservacoes(id) {
         const div = document.getElementById('observacao-history-list');
-        const { data } = await db.from('anamnesis').select('*, users!user_id(name)').eq('client_id', id).order('created_at', {ascending: false});
         
-        if(!data || !data.length) return div.innerHTML = "<p style='color:var(--muted); text-align:center; padding:2rem'>Nenhum registro encontrado.</p>";
+        div.innerHTML = `
+            <div style="text-align:center; padding:3rem 1rem;">
+                <i class="ph ph-spinner ph-spin" style="font-size: 2.5rem; color: var(--primary);"></i>
+                <p style="color:var(--muted); margin-top:10px;">Carregando histórico do cliente...</p>
+            </div>`;
+
+        const { data, error } = await db.from('anamnesis')
+            .select('*, users!user_id(name)')
+            .eq('client_id', id)
+            .order('created_at', {ascending: false});
         
-        div.innerHTML = data.map(d => `
-        <div class="card" style="border-left: 4px solid var(--primary); background:#fffafb">
-            <h4 style="font-size:0.9rem; color:var(--muted); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px">
-                <i class="ph ph-calendar-blank"></i> ${U.date(d.created_at)} &nbsp;•&nbsp; <i class="ph ph-user"></i> Prof: ${d.users?.name || 'N/A'}
-            </h4>
-            ${d.history ? `<p style="margin-bottom:8px"><b>Técnica Aplicada:</b> ${d.history}</p>` : ''}
-            ${d.notes ? `<p style="padding:15px; background:white; border:1px solid #eee; border-radius:12px; margin-top:10px"><b>Observação:</b><br>${d.notes}</p>` : ''}
-        </div>`).join('');
+        if (error) {
+            div.innerHTML = `<p style="color:#d32f2f; text-align:center; padding:2rem;">Erro ao carregar: ${error.message}</p>`;
+            return;
+        }
+        
+        if(!data || !data.length) {
+            div.innerHTML = `
+                <div style="text-align:center; padding: 3rem 1rem; border: 2px dashed #eee; border-radius: 12px; margin-top: 20px;">
+                    <i class="ph ph-file-text" style="font-size: 3rem; color: var(--muted); margin-bottom: 10px;"></i>
+                    <p style="color:var(--muted); font-size: 1.1rem;">Nenhum histórico registrado para este cliente.</p>
+                    <p style="color:var(--muted); font-size: 0.9rem; margin-top: 5px;">Clique em "Nova Observação" para iniciar o prontuário.</p>
+                </div>`;
+            return;
+        }
+        
+        div.innerHTML = `<div style="display: flex; flex-direction: column; gap: 15px; margin-top: 15px;">` + data.map((d, index) => {
+            const dataFormatada = U.date(d.created_at);
+            const isLatest = index === 0; 
+            
+            return `
+            <div class="card" style="border-left: 4px solid ${isLatest ? 'var(--primary)' : '#b0bec5'}; background: ${isLatest ? '#fffafb' : '#ffffff'}; box-shadow: 0 4px 10px rgba(0,0,0,0.03); position:relative;">
+                
+                ${isLatest ? `<span style="position:absolute; top:-12px; right:20px; background:var(--primary); color:white; font-size:0.7rem; padding:4px 12px; border-radius:20px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.2);">MAIS RECENTE</span>` : ''}
+
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 12px;">
+                    <div>
+                        <span style="color: ${isLatest ? 'var(--primary-dark)' : '#546e7a'}; font-size: 0.85rem; font-weight: bold; background: ${isLatest ? 'var(--primary-light)' : '#eceff1'}; padding: 4px 10px; border-radius: 20px;">
+                            <i class="ph ph-calendar-check"></i> ${dataFormatada}
+                        </span>
+                    </div>
+                    <div style="text-align: right;">
+                        <span style="font-size: 0.75rem; color: var(--muted);">Registrado por:</span>
+                        <p style="font-weight: bold; font-size: 0.9rem; color: var(--text); margin-top: 2px;">
+                            <i class="ph ph-user-circle"></i> ${d.users?.name || 'Sistema'}
+                        </p>
+                    </div>
+                </div>
+                
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    ${d.history ? `
+                    <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 3px solid #6c757d;">
+                        <span style="font-size: 0.75rem; color: #6c757d; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 5px;"><i class="ph ph-flask"></i> Técnica Aplicada</span>
+                        <p style="color: #333; line-height: 1.5; font-size: 0.95rem; margin:0;">${d.history.replace(/\n/g, '<br>')}</p>
+                    </div>` : ''}
+                    
+                    ${d.notes ? `
+                    <div style="background: #fff3e0; padding: 12px; border-radius: 8px; border-left: 3px solid #ff9800;">
+                        <span style="font-size: 0.75rem; color: #e65100; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 5px;"><i class="ph ph-warning-circle"></i> Observações / Alertas</span>
+                        <p style="color: #333; line-height: 1.5; font-size: 0.95rem; margin:0;">${d.notes.replace(/\n/g, '<br>')}</p>
+                    </div>` : ''}
+                </div>
+            </div>`;
+        }).join('') + `</div>`;
     },
 
     async saveFuncionario(e, id) {
@@ -1506,7 +1584,6 @@ const Actions = {
                 throw new Error('Horário ocupado! Marque a opção "Forçar Encaixe" se for estritamente necessário.');
             }
 
-            // NOVA VALIDAÇÃO DE ERRO NO INSERT
             const { error: insertErr } = await db.from('appointments').insert({ 
                 client_id: clientId, 
                 service_id: service_id, 

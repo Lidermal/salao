@@ -1,5 +1,4 @@
-/** 
- * SISTEMA ESTÚDIO AMOR QUE CUIDA
+/** * SISTEMA ESTÚDIO AMOR QUE CUIDA
  */
 
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
@@ -218,7 +217,7 @@ const Tour = {
         { role: 'all', view: 'agenda', target: '#btn-novo-agendamento-tour', mobileTarget: '.fab-button', title: '1. Agenda Inteligente', text: 'Aqui você visualiza e gerencia horários. Clique aqui para agendar um cliente, gerar um encaixe ou bloquear a agenda.' },
         { role: 'all', view: 'comandas', target: '#btn-nova-comanda-tour', mobileTarget: '.fab-button', title: '2. Abertura de Comandas', text: 'O cliente chegou? Abra uma comanda, adicione os serviços/produtos e vincule o profissional que realizou o atendimento.' },
         { role: 'all', view: 'cobrancas', target: '#tab-pendentes-tour', mobileTarget: '#tab-pendentes-tour', title: '3. Cobranças e Recebimentos', text: 'Comandas fechadas geram faturas. Aqui você dá baixa no pagamento misturando Pix, Cartão, Dinheiro e aplicando descontos.' },
-        { role: 'all', view: 'clientes', center: true, title: '4. Gestão de Clientes', text: 'Veja o histórico de visitas, crie Fichas de Anamnese personalizadas para procedimentos e mande mensagens no WhatsApp.' },
+        { role: 'all', view: 'clientes', center: true, title: '4. Gestão de Clientes', text: 'Veja o histórico de visitas, crie Registros de Observações personalizadas e mande mensagens no WhatsApp.' },
         { role: 'owner', view: 'servicos', center: true, title: '5. Catálogo de Serviços', text: 'Cadastre serviços definindo a duração na agenda, preço, custo fixo retido pelo salão e a comissão padrão do profissional.' },
         { role: 'owner', view: 'produtos', center: true, title: '6. Estoque de Produtos', text: 'Controle produtos para venda. O sistema alerta quando o estoque está baixo e calcula a comissão por venda automaticamente.' },
         { role: 'all', view: 'comissao', center: true, title: '7. Fechamento de Comissões', text: 'Painel automático. Profissionais vêem apenas seus próprios ganhos na quinzena. O gestor visualiza o Ranking geral do salão.' },
@@ -336,7 +335,7 @@ const Nav = {
         App.view = id;
         document.querySelectorAll('.view').forEach(v => v.classList.remove('active')); document.getElementById(`view-${id}`).classList.add('active');
         document.querySelectorAll('.nav-link, .b-item').forEach(el => el.classList.remove('active')); document.querySelectorAll(`[data-view="${id}"]`).forEach(el => el.classList.add('active'));
-        const titles = { perfil: 'Meu Perfil', agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', anamnese:'Ficha de Avaliação', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', relatorios:'Relatórios & Arquivos' };
+        const titles = { perfil: 'Meu Perfil', agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', observacoes:'Histórico de Observações', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', relatorios:'Relatórios & Arquivos' };
         document.getElementById('page-title').textContent = titles[id] || 'Amor que Cuida';
         if (id === 'agenda') { Render.showMonthView(); } 
         else if (id === 'perfil') {
@@ -345,7 +344,7 @@ const Nav = {
             if(App.avatars[App.user.id]) { preview.innerHTML = ''; preview.style.backgroundImage = `url(${App.avatars[App.user.id]})`; preview.style.backgroundSize = 'cover'; preview.style.backgroundPosition = 'center'; } 
             else { preview.innerHTML = App.user.name.substring(0,2).toUpperCase(); preview.style.backgroundImage = 'none'; }
         } else {
-            const detailViews = ['anamnese', 'perfil-cliente'];
+            const detailViews = ['observacoes', 'perfil-cliente'];
             if(Render[id] && !detailViews.includes(id)) { if(id === 'cobrancas') Render.cobrancas('pendentes'); else Render[id](); }
         }
     },
@@ -471,12 +470,12 @@ const Render = {
     renderClientesList(data) {
         document.getElementById('clientes-list').innerHTML = data.map(c => {
             const safeName = c.name.replace(/'/g, "\\'").replace(/"/g, '&quot;'); 
-            return `<div class="card cliente-card"><a href="#" class="wpp-btn" onclick="Modals.open('whatsapp', '${c.phone}', '${safeName}', JSON.stringify({cliente:'${safeName}', data_aniversario:'${c.birth_date ? new Date(c.birth_date).toLocaleDateString() : ''}'})); event.stopPropagation()"><i class="ph ph-whatsapp-logo"></i></a><h4 style="color:var(--primary); font-size:1.2rem; margin-bottom:10px">${c.name}</h4><p><i class="ph ph-phone"></i> ${c.phone}</p><p style="font-size:0.8rem; color:var(--muted); margin-top:5px"><i class="ph ph-cake"></i> ${c.birth_date ? new Date(c.birth_date).toLocaleDateString('pt-BR') : 'Não cadastrado'}</p><div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap"><button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Render.perfilCliente('${c.id}', '${safeName}')"><i class="ph ph-user"></i> Perfil</button><button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Render.anamnese('${c.id}', '${safeName}')"><i class="ph ph-file-text"></i> Ficha</button><button class="btn-secondary" style="width:100%; border:1px solid #ccc" onclick="Modals.open('edit_cliente', '${c.id}')"><i class="ph ph-pencil"></i> Editar Dados</button></div></div>`;
+            return `<div class="card cliente-card"><a href="#" class="wpp-btn" onclick="Modals.open('whatsapp', '${c.phone}', '${safeName}', JSON.stringify({cliente:'${safeName}', data_aniversario:'${c.birth_date ? new Date(c.birth_date).toLocaleDateString() : ''}'})); event.stopPropagation()"><i class="ph ph-whatsapp-logo"></i></a><h4 style="color:var(--primary); font-size:1.2rem; margin-bottom:10px">${c.name}</h4><p><i class="ph ph-phone"></i> ${c.phone}</p><p style="font-size:0.8rem; color:var(--muted); margin-top:5px"><i class="ph ph-cake"></i> ${c.birth_date ? new Date(c.birth_date).toLocaleDateString('pt-BR') : 'Não cadastrado'}</p><div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap"><button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Render.perfilCliente('${c.id}', '${safeName}')"><i class="ph ph-user"></i> Perfil</button><button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Render.observacoes('${c.id}', '${safeName}')"><i class="ph ph-file-text"></i> Observações</button><button class="btn-secondary" style="width:100%; border:1px solid #ccc" onclick="Modals.open('edit_cliente', '${c.id}')"><i class="ph ph-pencil"></i> Editar Dados</button></div></div>`;
         }).join('');
     },
     filterClientes(term) { term = term.toLowerCase(); const filtered = (window.allClientes || []).filter(c => c.name.toLowerCase().includes(term) || (c.phone && c.phone.includes(term))); this.renderClientesList(filtered); },
     
-    anamnese(id, name) { document.getElementById('current-anamnese-client-id').value = id; document.getElementById('anamnese-title').textContent = `Ficha de: ${name}`; Nav.showView('anamnese'); Actions.loadAnamnese(id); },
+    observacoes(id, name) { document.getElementById('current-observacao-client-id').value = id; document.getElementById('observacao-title').textContent = `Observações de: ${name}`; Nav.showView('observacoes'); Actions.loadObservacoes(id); },
     
     async perfilCliente(id, name) {
         document.getElementById('current-perfil-client-id').value = id; document.getElementById('perfil-cliente-title').textContent = `Perfil: ${name}`; Nav.showView('perfil-cliente');
@@ -835,7 +834,11 @@ const Modals = {
                     <p><strong><i class="ph ph-phone"></i> Fone:</strong> ${a.clients?.phone || 'N/A'} ${a.clients?.phone ? `<button onclick="Actions.sendConfirmacao('${a.id}')" style="background:var(--primary-light); border:none; padding:4px 8px; border-radius:6px; color:#25D366; cursor:pointer; margin-left:10px;"><i class="ph ph-whatsapp-logo"></i> Abrir</button>` : ''}</p>
                     <p><strong><i class="ph ph-sparkle"></i> Serviço:</strong> ${a.services?.name}</p>
                     <p><strong><i class="ph ph-identification-badge"></i> Profissional:</strong> ${a.users?.name}</p>
-                    <div style="background:#fff; border:1px solid #eee; padding:10px; border-radius:8px; margin-top:5px;"><p style="margin-bottom:5px;"><strong><i class="ph ph-calendar"></i> Data:</strong> ${new Date(a.date + 'T12:00:00').toLocaleDateString('pt-BR')}</p><p><strong><i class="ph ph-clock"></i> Horário:</strong> ${a.time.slice(0,5)} às ${endStr}</p></div>
+                    <div style="background:#fff; border:1px solid #eee; padding:10px; border-radius:8px; margin-top:5px;">
+                        <p style="margin-bottom:5px;"><strong><i class="ph ph-calendar"></i> Data:</strong> ${new Date(a.date + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
+                        <p style="margin-bottom:5px;"><strong><i class="ph ph-clock"></i> Horário:</strong> ${a.time.slice(0,5)} às ${endStr}</p>
+                        <p style="margin-top:5px; border-top:1px dashed #ccc; padding-top:5px;"><strong><i class="ph ph-user-plus"></i> Agendado por:</strong> ${a.created_by_name || 'Desconhecido'}</p>
+                    </div>
                     ${a.is_encaixe ? `<p style="color:#e65100; font-weight:bold; background:#fff3e0; padding:10px; border-radius:8px; text-align:center;"><i class="ph ph-warning"></i> Encaixe Forçado</p>` : ''}
                 </div><div style="display:flex; flex-direction:column; gap:10px;">
                     ${a.status === 'agendado' ? `<button class="btn-primary" style="background:#2e7d32; padding:1.2rem; width:100%" onclick="Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i> Cliente Chegou</button>` : ''}
@@ -1105,13 +1108,20 @@ const Modals = {
             html += `<h3>Aplicar Desconto (%)</h3><div style="background:#f9f9f9; padding:20px; border-radius:12px; margin-bottom:20px; border-left:5px solid #d32f2f"><b style="font-size:2rem; color:#d32f2f">${U.money(param2)}</b></div>
             <form onsubmit="Actions.discountDebt(event, '${param1}', ${param2})"><div class="input-group"><label>Porcentagem (%)</label><input type="number" id="f-val" step="0.01" required></div><button type="submit" class="btn-primary" style="padding:1.2rem">Confirmar</button></form>`;
         }
-        else if(type === 'nova_anamnese') {
-            html += `<h3>Ficha de Anamnese</h3><form onsubmit="Actions.saveAnamnese(event, '${param1}')">
-            <div class="input-group"><label>Histórico Capilar</label><textarea id="fa-hist" rows="2" required></textarea></div>
-            <div class="input-group"><label>Hábitos de Cuidado</label><textarea id="fa-hab" rows="2" required></textarea></div>
-            <div class="input-group"><label>Objetivo</label><textarea id="fa-obj" rows="2" required></textarea></div>
-            <div class="input-group"><label>Diagnóstico Profissional</label><textarea id="fa-obs" rows="3" required></textarea></div>
-            <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar Prontuário</button></form>`;
+        else if(type === 'nova_observacao') {
+            // Utilizamos data-client-id fixado diretamente no formulário para assegurar que é à prova de falhas!
+            html += `<h3>Nova Observação</h3>
+            <form id="form-nova-obs" data-client-id="${param1}" onsubmit="Actions.saveObservacao(event)">
+                <div class="input-group">
+                    <label>Técnica Aplicada (Não obrigatório)</label>
+                    <textarea id="fo-tecnica" rows="2" placeholder="Qual técnica foi utilizada?"></textarea>
+                </div>
+                <div class="input-group">
+                    <label>Observação (Não obrigatório)</label>
+                    <textarea id="fo-obs" rows="3" placeholder="Detalhes, fórmulas, restrições..."></textarea>
+                </div>
+                <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar Registro</button>
+            </form>`;
         }
         else if(type === 'cliente' || type === 'edit_cliente') {
             let c = { name: '', phone: '', birth_date: '' }; if(param1) { const { data } = await db.from('clients').select('*').eq('id', param1).single(); c = data; }
@@ -1347,16 +1357,41 @@ const Actions = {
         Modals.close(); UI.toast('Cliente salvo!'); Render.clientes();
     },
     
-    async saveAnamnese(e, idCliente) {
+    async saveObservacao(e) {
         e.preventDefault(); 
-        await db.from('anamnesis').insert({ client_id: idCliente, user_id: App.user.id, history: document.getElementById('fa-hist').value, habits: document.getElementById('fa-hab').value, objectives: document.getElementById('fa-obj').value, notes: document.getElementById('fa-obs').value });
-        Modals.close(); UI.toast('Registrado!'); this.loadAnamnese(idCliente);
+        const idCliente = e.target.getAttribute('data-client-id');
+        
+        if (!idCliente || idCliente === 'undefined' || idCliente === 'null') {
+            return UI.toast('Erro Crítico: Cliente não identificado. Tente abrir a tela novamente.', 'error');
+        }
+
+        // Reutilizamos a tabela 'anamnesis', mapeando Técnica -> history e Observação -> notes.
+        await db.from('anamnesis').insert({ 
+            client_id: idCliente, 
+            user_id: App.user.id, 
+            history: document.getElementById('fo-tecnica').value, 
+            notes: document.getElementById('fo-obs').value 
+        });
+        
+        Modals.close(); 
+        UI.toast('Observação registrada com sucesso!'); 
+        this.loadObservacoes(idCliente);
     },
-    async loadAnamnese(id) {
-        const div = document.getElementById('anamnese-history-list');
+    
+    async loadObservacoes(id) {
+        const div = document.getElementById('observacao-history-list');
         const { data } = await db.from('anamnesis').select('*, users!user_id(name)').eq('client_id', id).order('created_at', {ascending: false});
-        if(!data || !data.length) return div.innerHTML = "<p style='color:var(--muted); text-align:center; padding:2rem'>Nenhum registro clínico.</p>";
-        div.innerHTML = data.map(d => `<div class="card" style="border-left: 4px solid var(--primary); background:#fffafb"><h4 style="font-size:0.9rem; color:var(--muted); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px"><i class="ph ph-calendar-blank"></i> ${U.date(d.created_at)} &nbsp;•&nbsp; <i class="ph ph-user"></i> Prof: ${d.users?.name || 'N/A'}</h4><p style="margin-bottom:8px"><b>Histórico:</b> ${d.history}</p><p style="margin-bottom:8px"><b>Hábitos:</b> ${d.habits}</p><p style="margin-bottom:8px"><b>Objetivo:</b> ${d.objectives}</p><p style="padding:15px; background:white; border:1px solid #eee; border-radius:12px; margin-top:15px"><b style="color:var(--primary-dark)">Diagnóstico:</b><br>${d.notes}</p></div>`).join('');
+        
+        if(!data || !data.length) return div.innerHTML = "<p style='color:var(--muted); text-align:center; padding:2rem'>Nenhum registro encontrado.</p>";
+        
+        div.innerHTML = data.map(d => `
+        <div class="card" style="border-left: 4px solid var(--primary); background:#fffafb">
+            <h4 style="font-size:0.9rem; color:var(--muted); margin-bottom:15px; border-bottom:1px solid #eee; padding-bottom:10px">
+                <i class="ph ph-calendar-blank"></i> ${U.date(d.created_at)} &nbsp;•&nbsp; <i class="ph ph-user"></i> Prof: ${d.users?.name || 'N/A'}
+            </h4>
+            ${d.history ? `<p style="margin-bottom:8px"><b>Técnica Aplicada:</b> ${d.history}</p>` : ''}
+            ${d.notes ? `<p style="padding:15px; background:white; border:1px solid #eee; border-radius:12px; margin-top:10px"><b>Observação:</b><br>${d.notes}</p>` : ''}
+        </div>`).join('');
     },
 
     async saveFuncionario(e, id) {
@@ -1471,7 +1506,17 @@ const Actions = {
                 throw new Error('Horário ocupado! Marque a opção "Forçar Encaixe" se for estritamente necessário.');
             }
 
-            await db.from('appointments').insert({ client_id: clientId, service_id: service_id, user_id: user_id, date: date, time: time, is_encaixe: encaixe, status: 'agendado' });
+            // Inserimos criated_by_name para o Modal de Detalhes
+            await db.from('appointments').insert({ 
+                client_id: clientId, 
+                service_id: service_id, 
+                user_id: user_id, 
+                date: date, 
+                time: time, 
+                is_encaixe: encaixe, 
+                status: 'agendado',
+                created_by_name: App.user.name
+            });
             
             Modals.close(); 
             UI.toast('Horário salvo com sucesso!'); 

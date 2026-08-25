@@ -3,9 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Estúdio Amor que Cuida</title>
+    <title>Espaço Amor que Cuida</title>
     
-    <!-- Ícone do navegador (Favicon) e Tela Inicial do iPhone -->
     <link rel="icon" type="image/jpeg" href="logoaqc.jpeg">
     <link rel="apple-touch-icon" href="logoaqc.jpeg">
     
@@ -21,10 +20,9 @@
 <body>
 
     <div id="splash-screen" style="position: fixed; inset: 0; background: var(--primary); z-index: 9999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; transition: opacity 0.5s;">
-        <!-- Logo na Splash Screen substituindo a tesoura -->
         <img src="logoaqc.jpeg" alt="Amor que Cuida" style="width: 140px; height: 140px; border-radius: 50%; object-fit: cover; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); border: 4px solid #fff; animation: pulse 1.5s infinite;">
         
-        <h1 style="color: white; font-size: 2.8rem; margin-bottom: 0.5rem; text-align:center; font-family: 'Playfair Display', serif;">Estúdio Amor Que Cuida</h1>
+        <h1 style="color: white; font-size: 2.8rem; margin-bottom: 0.5rem; text-align:center; font-family: 'Playfair Display', serif;">Espaço Amor Que Cuida</h1>
         <p style="font-size: 1.2rem; font-weight: 300; letter-spacing: 2px;">by Andressa Vieira</p>
     </div>
     <style> @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } } </style>
@@ -41,7 +39,6 @@
         </div>
     </div>
 
-    <!-- ONBOARDING / TOUR GUIADO -->
     <div id="tour-overlay" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999998; transition: 0.3s; pointer-events: auto;">
         <div id="tour-dialog" style="position: absolute; background: var(--surface); padding: 20px; border-radius: 12px; width: 340px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 5px solid var(--primary); transition: all 0.3s ease;">
             <h3 id="tour-title" style="margin-bottom: 10px; font-size:1.2rem; color:var(--primary-dark)">Título</h3>
@@ -54,7 +51,6 @@
         </div>
     </div>
 
-    <!-- LOGIN -->
     <div id="auth-layer" class="auth-layer active">
         <section id="login-screen" class="screen active">
             <div class="login-card">
@@ -69,11 +65,9 @@
         </section>
     </div>
 
-    <!-- LAYOUT PRINCIPAL -->
     <div id="system-layout" class="hidden">
         <aside class="sidebar" id="main-sidebar">
             <div class="sidebar-brand">
-                <!-- Logo na Sidebar substituindo a tesoura -->
                 <img src="logoaqc.jpeg" alt="Logo" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; margin-right: 10px; border: 2px solid var(--primary);">
                 <span id="brand-name">Amor que Cuida</span>
                 <button class="close-sidebar mobile-only" onclick="Nav.closeMenu()"><i class="ph ph-x"></i></button>
@@ -125,7 +119,6 @@
 
             <div class="views-container">
                 
-                <!-- VIEW PERFIL NOVO -->
                 <section id="view-perfil" class="view">
                     <div class="card" style="text-align:center; max-width: 450px; margin: 1rem auto; padding: 2rem;">
                         <div id="perfil-foto-preview" style="width:130px; height:130px; border-radius:50%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-size:3rem; font-weight:bold; margin:0 auto 1.5rem auto; border: 4px solid var(--primary-light)">US</div>
@@ -141,12 +134,10 @@
                     </div>
                 </section>
 
-                <!-- VIEW AGENDA -->
                 <section id="view-agenda" class="view active">
                     <div style="display:flex; justify-content:space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
                         <h2 id="day-view-title" class="hidden" style="color: var(--primary-dark); font-size: 1.3rem;">...</h2>
                         <div style="display: flex; gap: 10px; margin-left: auto;">
-                            <!-- ID para o Tour focar na Agenda -->
                             <button id="btn-novo-agendamento-tour" class="btn-primary desktop-only" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem;" onclick="Modals.open('agendamento')"><i class="ph ph-plus"></i> Novo Agendamento</button>
                             <button class="btn-secondary desktop-only" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem; border: 1px solid #d32f2f; color: #d32f2f;" onclick="Modals.open('bloquear_agenda')"><i class="ph ph-prohibit"></i> Bloquear</button>
                             <button class="btn-secondary hidden" id="btn-voltar-mes" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem;" onclick="Render.showMonthView()"><i class="ph ph-arrow-left"></i> Voltar ao Mês</button>
@@ -175,19 +166,15 @@
                     </div>
                 </section>
                 
-                <!-- VIEW COBRANÇAS -->
                 <section id="view-cobrancas" class="view">
                     <div style="display:flex; gap:10px; margin-bottom:20px; border-bottom: 2px solid var(--border); padding-bottom: 10px;">
-                        <!-- ID para o Tour focar nas Cobranças -->
                         <button class="btn-secondary active-tab" id="tab-pendentes-tour" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px;" onclick="Render.cobrancas('pendentes')">Em Aberto / Pendentes</button>
                         <button class="btn-secondary" id="tab-pagos" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px; background: transparent; border: 1px solid transparent;" onclick="Render.cobrancas('pagos')">Histórico de Pagos</button>
                     </div>
                     <div id="cobrancas-list" class="data-grid"></div>
                 </section>
                 
-                <!-- VIEW COMANDAS -->
                 <section id="view-comandas" class="view">
-                    <!-- ID para o Tour focar na Comanda -->
                     <button id="btn-nova-comanda-tour" class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('comanda')">+ Gerar Nova Comanda</button>
                     <div style="margin-bottom:15px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
                         <label style="font-size:0.9rem; font-weight:bold">Filtrar Quinzena / Mês:</label>
@@ -196,7 +183,6 @@
                     <div id="comandas-list" class="data-grid"></div>
                 </section>
                 
-                <!-- VIEW CLIENTES (COM BARRA DE PESQUISA NOVA) -->
                 <section id="view-clientes" class="view">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:20px; flex-wrap:wrap">
                         <button class="btn-primary desktop-only" style="width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('cliente')">+ Cadastrar Cliente</button>
@@ -208,14 +194,14 @@
                     <div id="clientes-list" class="data-grid"></div>
                 </section>
 
-                <section id="view-anamnese" class="view">
+                <section id="view-observacoes" class="view">
                     <div class="header-actions" style="display:flex; gap:15px; margin-bottom:2rem; align-items:center;">
                         <button class="btn-secondary" onclick="Nav.showView('clientes')" style="width: auto; padding:0.5rem 1rem"><i class="ph ph-arrow-left"></i> Voltar</button>
-                        <h2 id="anamnese-title">Ficha de Avaliação</h2>
-                        <input type="hidden" id="current-anamnese-client-id">
+                        <h2 id="observacao-title">Histórico de Observações</h2>
+                        <input type="hidden" id="current-observacao-client-id">
                     </div>
-                    <button class="btn-primary" onclick="Modals.open('nova_anamnese', document.getElementById('current-anamnese-client-id').value)" style="margin-bottom: 1.5rem; width:auto; padding:0.8rem 1.5rem">+ Nova Avaliação Clínica</button>
-                    <div id="anamnese-history-list" class="data-list"></div>
+                    <button class="btn-primary" onclick="Modals.open('nova_observacao', document.getElementById('current-observacao-client-id').value)" style="margin-bottom: 1.5rem; width:auto; padding:0.8rem 1.5rem">+ Nova Observação</button>
+                    <div id="observacao-history-list" class="data-list"></div>
                 </section>
 
                 <section id="view-perfil-cliente" class="view">
@@ -225,7 +211,7 @@
                         <input type="hidden" id="current-perfil-client-id">
                     </div>
                     <div id="perfil-debitos-destaque" style="margin-bottom: 1.5rem;"></div>
-                    <div id="perfil-anamnese-destaque" style="margin-bottom: 1.5rem;"></div>
+                    <div id="perfil-observacao-destaque" style="margin-bottom: 1.5rem;"></div>
                     <div id="perfil-info" style="margin-bottom: 2rem;"></div>
                     <h3 style="margin-bottom: 15px;">Histórico de Visitas no Salão</h3>
                     <div id="perfil-visitas-list" class="data-list"></div>
@@ -271,7 +257,6 @@
                         <label style="font-size:0.9rem; font-weight:bold">Visualizar Quinzena:</label>
                         <select id="filter-comissao-quinzena" class="quinzena-select" onchange="Render.comissao()" style="padding:0.5rem; border-radius:8px; border:1px solid var(--border); flex:1"></select>
                     </div>
-                    <!-- ID para o Tour focar na Comissão -->
                     <div id="comissao-dashboard-tour"></div>
                 </section>
                 
@@ -285,7 +270,6 @@
                     <h3 style="margin-bottom: 10px; color: var(--primary-dark);">Receitas por Forma de Pagamento</h3>
                     <div id="resumo-pagamentos-cards" class="data-grid" style="margin-bottom:2rem"></div>
 
-                    <!-- ID para o Tour focar no Extrato -->
                     <div class="card" id="extrato-caixa-tour" style="margin-bottom:1rem">
                         <h3 style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:10px">Extrato Detalhado</h3>
                         <div id="extrato-list" class="data-list"></div>

@@ -1506,8 +1506,8 @@ const Actions = {
                 throw new Error('Horário ocupado! Marque a opção "Forçar Encaixe" se for estritamente necessário.');
             }
 
-            // Inserimos criated_by_name para o Modal de Detalhes
-            await db.from('appointments').insert({ 
+            // NOVA VALIDAÇÃO DE ERRO NO INSERT
+            const { error: insertErr } = await db.from('appointments').insert({ 
                 client_id: clientId, 
                 service_id: service_id, 
                 user_id: user_id, 
@@ -1517,6 +1517,8 @@ const Actions = {
                 status: 'agendado',
                 created_by_name: App.user.name
             });
+            
+            if (insertErr) throw new Error(`Falha ao salvar no banco: ${insertErr.message}`);
             
             Modals.close(); 
             UI.toast('Horário salvo com sucesso!'); 

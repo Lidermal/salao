@@ -18,7 +18,9 @@ const App = {
     settings: {},
     avatars: {}, 
     inflowCategories: ['Pix', 'Dinheiro', 'Cartão Crédito', 'Cartão Débito'],
-    filters: { relatorios: null, comissoes: null }
+    filters: { relatorios: null, comissoes: null },
+    // NOVO: Guarda o estado da tela de comandas (data e status da aba)
+    comandasState: { status: 'aberta', date: new Date().toISOString().split('T')[0] } 
 };
 
 const U = {
@@ -103,7 +105,7 @@ const U = {
 
     initFilters() {
         const opts = this.generateQuinzenasOptions();
-        ['filter-comanda-quinzena', 'filter-comissao-quinzena', 'filter-relatorios'].forEach(id => {
+        ['filter-comissao-quinzena', 'filter-relatorios'].forEach(id => {
             const el = document.getElementById(id);
             if(el) { el.innerHTML = opts; el.value = this.getCurrentQuinzenaValue(); }
         });
@@ -345,7 +347,11 @@ const Nav = {
             else { preview.innerHTML = App.user.name.substring(0,2).toUpperCase(); preview.style.backgroundImage = 'none'; }
         } else {
             const detailViews = ['observacoes', 'perfil-cliente'];
-            if(Render[id] && !detailViews.includes(id)) { if(id === 'cobrancas') Render.cobrancas('pendentes'); else Render[id](); }
+            if(Render[id] && !detailViews.includes(id)) { 
+                if(id === 'cobrancas') Render.cobrancas('pendentes'); 
+                else if (id === 'comandas') Render.comandas();
+                else Render[id](); 
+            }
         }
     },
     toggleMenu() { document.getElementById('main-sidebar').classList.toggle('open'); document.getElementById('mobile-overlay').classList.toggle('hidden'); },
@@ -548,11 +554,79 @@ const Render = {
     },
     filterProdutos(term) { term = term.toLowerCase(); const filtered = (window.allProdutos || []).filter(p => p.name.toLowerCase().includes(term)); this.renderProdutosList(filtered); },
     
-    async comandas() {
-        let query = db.from('comandas').select('*, clients(name)').order('created_at', {ascending: false});
-        const qFilter = document.getElementById('filter-comanda-quinzena')?.value; if (qFilter) { const range = U.getQuinzenaDates(qFilter); query = query.gte('created_at', range.start).lte('created_at', range.end); }
-        const { data } = await query;
-        document.getElementById('comandas-list').innerHTML = (!data || data.length === 0) ? '<p style="color:var(--muted)">Sem comandas para este período.</p>' : data.map(c => `<div class="card" style="border-left: 5px solid ${c.status === 'aberta' ? 'var(--primary)' : '#ccc'}"><div style="display:flex; justify-content:space-between; align-items:flex-start;"><div><span style="font-size:0.8rem; color:var(--primary); font-weight:bold; letter-spacing:1px">${c.ticket || 'TKT-####'}</span><h4 style="font-size:1.2rem; margin-top:5px">${c.clients?.name || 'Desconhecido'}</h4><p style="font-size:0.8rem; color:var(--muted)"><i class="ph ph-list-bullets"></i> Itens Lançados: ${(c.items||[]).length}</p></div><span style="font-size:0.7rem; font-weight:bold; padding: 4px 10px; border-radius:20px; background:${c.status === 'aberta' ? 'var(--primary-light)' : '#eee'}; color:${c.status === 'aberta' ? 'var(--primary-dark)' : 'var(--muted)'}">${c.status.toUpperCase()}</span></div><div class="val" style="font-size:1.8rem; margin:15px 0;">${U.money(c.total)}</div><button class="btn-secondary" style="width:100%; padding:0.8rem" onclick="Modals.open('edit_comanda', '${c.id}')"><i class="ph ph-list-plus"></i> ${c.status === 'aberta' ? 'Lançar Itens / Fechar' : 'Visualizar Ticket'}</button></div>`).join('');
+    // ATUALIZAÇÃO DA FUNÇÃO COMANDAS PARA SUPORTAR POR DIA E POR STATUS
+    async comandas(targetStatus = null, targetDate = null) {
+        // Atualiza os estados no App
+        if (targetStatus) App.comandasState.status = targetStatus;
+        if (targetDate) App.comandasState.date = targetDate;
+        else {
+            const el = document.getElementById('filter-comanda-data');
+            if (el && el.value) App.comandasState.date = el.value;
+        }
+
+        const currentStatus = App.comandasState.status;
+        const currentDate = App.comandasState.date;
+
+        // Atualiza a interface (estilos dos botões)
+        const tabAbertas = document.getElementById('tab-comandas-abertas');
+        const tabFechadas = document.getElementById('tab-comandas-fechadas');
+        
+        if(tabAbertas) {
+            tabAbertas.classList.toggle('active-tab', currentStatus === 'aberta');
+            tabAbertas.style.background = currentStatus === 'aberta' ? '#f0f0f0' : 'transparent';
+            tabAbertas.style.border = currentStatus === 'aberta' ? 'none' : '1px solid transparent';
+        }
+        if(tabFechadas) {
+            tabFechadas.classList.toggle('active-tab', currentStatus === 'fechada');
+            tabFechadas.style.background = currentStatus === 'fechada' ? '#f0f0f0' : 'transparent';
+            tabFechadas.style.border = currentStatus === 'fechada' ? 'none' : '1px solid transparent';
+        }
+
+        const dateInput = document.getElementById('filter-comanda-data');
+        if (dateInput && dateInput.value !== currentDate) {
+            dateInput.value = currentDate;
+        }
+
+        // Definir o intervalo do dia selecionado
+        const startOfDay = `${currentDate}T00:00:00`;
+        const endOfDay = `${currentDate}T23:59:59`;
+
+        try {
+            const { data, error } = await db.from('comandas')
+                .select('*, clients(name)')
+                .eq('status', currentStatus)
+                .gte('created_at', startOfDay)
+                .lte('created_at', endOfDay)
+                .order('created_at', {ascending: false});
+
+            const container = document.getElementById('comandas-list');
+            
+            if (error) throw error;
+
+            if (!data || data.length === 0) {
+                const parts = currentDate.split('-');
+                const brDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                container.innerHTML = `<div style="text-align:center; grid-column: 1 / -1; padding: 3rem 1rem; border:2px dashed var(--border); border-radius:12px;"><i class="ph ph-receipt" style="font-size: 3rem; color: var(--muted); margin-bottom: 10px;"></i><p style="color:var(--muted); font-size:1.1rem;">Nenhuma comanda <b>${currentStatus}</b> neste dia.<br><br> ${brDate}</p></div>`;
+                return;
+            }
+
+            container.innerHTML = data.map(c => `
+                <div class="card" style="border-left: 5px solid ${c.status === 'aberta' ? 'var(--primary)' : '#8E8E93'}; position: relative; overflow:hidden;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start;">
+                        <div>
+                            <span style="font-size:0.8rem; color:var(--primary); font-weight:bold; letter-spacing:1px">${c.ticket || 'TKT-####'}</span>
+                            <h4 style="font-size:1.2rem; margin-top:5px">${c.clients?.name || 'Desconhecido'}</h4>
+                            <p style="font-size:0.8rem; color:var(--muted); margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(c.created_at).slice(11, 16)} • <i class="ph ph-list-bullets"></i> Itens: ${(c.items||[]).length}</p>
+                        </div>
+                        <span style="font-size:0.7rem; font-weight:bold; padding: 4px 10px; border-radius:20px; background:${c.status === 'aberta' ? 'var(--primary-light)' : '#eee'}; color:${c.status === 'aberta' ? 'var(--primary-dark)' : 'var(--muted)'}">${c.status.toUpperCase()}</span>
+                    </div>
+                    <div class="val" style="font-size:1.8rem; margin:15px 0;">${U.money(c.total)}</div>
+                    <button class="btn-secondary" style="width:100%; padding:0.8rem; background: ${c.status === 'aberta' ? 'var(--primary)' : '#f0f0f0'}; color: ${c.status === 'aberta' ? 'white' : 'var(--text)'}" onclick="Modals.open('edit_comanda', '${c.id}')"><i class="ph ${c.status === 'aberta' ? 'ph-plus-circle' : 'ph-eye'}"></i> ${c.status === 'aberta' ? 'Lançar Itens / Fechar' : 'Visualizar Ticket'}</button>
+                </div>`).join('');
+                
+        } catch (e) {
+            document.getElementById('comandas-list').innerHTML = `<p style="color:var(--muted)">Erro ao carregar: ${e.message}</p>`;
+        }
     },
 
     async mensagens() {
@@ -1247,7 +1321,19 @@ const Modals = {
 };
 
 const Actions = {
-    
+    // NOVA FUNÇÃO: Trocar data na tela de Comandas
+    changeComandaDate(dir) {
+        const dateInput = document.getElementById('filter-comanda-data');
+        if(!dateInput || !dateInput.value) return;
+        
+        let d = new Date(dateInput.value + 'T12:00:00');
+        d.setDate(d.getDate() + dir);
+        
+        const newDate = U.iso(d);
+        dateInput.value = newDate;
+        Render.comandas(null, newDate);
+    },
+
     consultarDisponibilidade(phone, name) {
         if(!phone || phone === 'undefined') return UI.toast('Profissional não possui telefone cadastrado.', 'error');
         const msg = `Oii ${name}, gostaria da sua disponibilidade para atendimento hoje?`;

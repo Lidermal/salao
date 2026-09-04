@@ -175,11 +175,20 @@
                 </section>
                 
                 <section id="view-comandas" class="view">
-                    <button id="btn-nova-comanda-tour" class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('comanda')">+ Gerar Nova Comanda</button>
-                    <div style="margin-bottom:15px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
-                        <label style="font-size:0.9rem; font-weight:bold">Filtrar Quinzena / Mês:</label>
-                        <select id="filter-comanda-quinzena" class="quinzena-select" onchange="Render.comandas()" style="padding:0.5rem; border-radius:8px; border:1px solid var(--border); flex:1"></select>
+                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:20px; flex-wrap:wrap">
+                        <button id="btn-nova-comanda-tour" class="btn-primary desktop-only" style="width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('comanda')">+ Gerar Nova Comanda</button>
+                        <div style="display:flex; gap:10px; align-items:center; flex:1; min-width:200px;">
+                            <label style="font-size:0.9rem; font-weight:bold; white-space:nowrap;">Filtrar por Dia:</label>
+                            <input type="date" id="filter-comanda-data" onchange="Render.comandas()" style="padding:0.8rem; border-radius:8px; border:1px solid var(--border); flex:1; font-size:1rem;">
+                        </div>
+                        <button class="btn-primary mobile-only" style="width:100%; padding: 0.8rem 1.5rem; margin-top:10px;" onclick="Modals.open('comanda')">+ Nova Comanda</button>
                     </div>
+                    
+                    <div style="display:flex; gap:10px; margin-bottom:20px; border-bottom: 2px solid var(--border); padding-bottom: 10px;">
+                        <button class="btn-secondary active-tab" id="tab-comandas-abertas" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px; border:none;" onclick="Render.comandas('aberta')">Comandas Abertas</button>
+                        <button class="btn-secondary" id="tab-comandas-fechadas" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px; background: transparent; border: 1px solid transparent;" onclick="Render.comandas('fechada')">Comandas Fechadas</button>
+                    </div>
+
                     <div id="comandas-list" class="data-grid"></div>
                 </section>
                 

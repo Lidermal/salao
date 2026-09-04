@@ -174,13 +174,20 @@
                     <div id="cobrancas-list" class="data-grid"></div>
                 </section>
                 
+                <!-- ABA COMANDAS MODIFICADA -->
                 <section id="view-comandas" class="view">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:20px; flex-wrap:wrap">
                         <button id="btn-nova-comanda-tour" class="btn-primary desktop-only" style="width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('comanda')">+ Gerar Nova Comanda</button>
-                        <div style="display:flex; gap:10px; align-items:center; flex:1; min-width:200px;">
-                            <label style="font-size:0.9rem; font-weight:bold; white-space:nowrap;">Filtrar por Dia:</label>
-                            <input type="date" id="filter-comanda-data" onchange="Render.comandas()" style="padding:0.8rem; border-radius:8px; border:1px solid var(--border); flex:1; font-size:1rem;">
+                        
+                        <div style="display:flex; align-items:center; flex:1; min-width:200px; justify-content:center; gap:5px;">
+                            <!-- Navegador de Data -->
+                            <div style="display:flex; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+                                <button class="btn-secondary" style="border-radius:0; width:45px; padding:0.8rem; background:#f9f9f9;" onclick="Actions.changeComandaDate(-1)" title="Dia Anterior"><i class="ph ph-caret-left"></i></button>
+                                <input type="date" id="filter-comanda-data" onchange="Render.comandas(null, this.value)" style="border:none; padding:0.8rem; font-size:1rem; background:transparent; font-weight:bold; color:var(--text); text-align:center; min-width: 140px;">
+                                <button class="btn-secondary" style="border-radius:0; width:45px; padding:0.8rem; background:#f9f9f9;" onclick="Actions.changeComandaDate(1)" title="Próximo Dia"><i class="ph ph-caret-right"></i></button>
+                            </div>
                         </div>
+
                         <button class="btn-primary mobile-only" style="width:100%; padding: 0.8rem 1.5rem; margin-top:10px;" onclick="Modals.open('comanda')">+ Nova Comanda</button>
                     </div>
                     
@@ -340,6 +347,6 @@
 
     <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
     
-    <script src="script.js?v=13"></script>
+    <script src="script.js?v=14"></script>
 </body>
 </html>

@@ -19,7 +19,6 @@ const App = {
     avatars: {}, 
     inflowCategories: ['Pix', 'Dinheiro', 'Cartão Crédito', 'Cartão Débito'],
     filters: { relatorios: null, comissoes: null },
-    // NOVO: Guarda o estado da tela de comandas (data e status da aba)
     comandasState: { status: 'aberta', date: new Date().toISOString().split('T')[0] } 
 };
 
@@ -504,8 +503,21 @@ const Render = {
     },
 
     async cobrancas(tab = 'pendentes') {
-        document.getElementById('tab-pendentes-tour').classList.toggle('active-tab', tab === 'pendentes'); document.getElementById('tab-pendentes-tour').style.border = tab === 'pendentes' ? 'none' : '1px solid transparent';
-        document.getElementById('tab-pagos').classList.toggle('active-tab', tab === 'pagos'); document.getElementById('tab-pagos').style.border = tab === 'pagos' ? 'none' : '1px solid transparent';
+        const tabPendentes = document.getElementById('tab-pendentes-tour');
+        const tabPagos = document.getElementById('tab-pagos');
+
+        // RESOLUÇÃO DO BUG VISUAL NAS ABAS DA TELA DE COBRANÇAS AQUI
+        if (tabPendentes) {
+            tabPendentes.classList.toggle('active-tab', tab === 'pendentes');
+            tabPendentes.style.background = tab === 'pendentes' ? '#f0f0f0' : 'transparent';
+            tabPendentes.style.border = tab === 'pendentes' ? 'none' : '1px solid transparent';
+        }
+        if (tabPagos) {
+            tabPagos.classList.toggle('active-tab', tab === 'pagos');
+            tabPagos.style.background = tab === 'pagos' ? '#f0f0f0' : 'transparent';
+            tabPagos.style.border = tab === 'pagos' ? 'none' : '1px solid transparent';
+        }
+
         let query = db.from('debts').select('*, clients(name)').order('created_at', {ascending: false});
         if(tab === 'pendentes') query = query.gt('remaining_amount', 0); else query = query.eq('remaining_amount', 0);
         const { data: debts, error } = await query; const cont = document.getElementById('cobrancas-list');
@@ -554,9 +566,7 @@ const Render = {
     },
     filterProdutos(term) { term = term.toLowerCase(); const filtered = (window.allProdutos || []).filter(p => p.name.toLowerCase().includes(term)); this.renderProdutosList(filtered); },
     
-    // ATUALIZAÇÃO DA FUNÇÃO COMANDAS PARA SUPORTAR POR DIA E POR STATUS
     async comandas(targetStatus = null, targetDate = null) {
-        // Atualiza os estados no App
         if (targetStatus) App.comandasState.status = targetStatus;
         if (targetDate) App.comandasState.date = targetDate;
         else {
@@ -567,7 +577,6 @@ const Render = {
         const currentStatus = App.comandasState.status;
         const currentDate = App.comandasState.date;
 
-        // Atualiza a interface (estilos dos botões)
         const tabAbertas = document.getElementById('tab-comandas-abertas');
         const tabFechadas = document.getElementById('tab-comandas-fechadas');
         
@@ -587,7 +596,6 @@ const Render = {
             dateInput.value = currentDate;
         }
 
-        // Definir o intervalo do dia selecionado
         const startOfDay = `${currentDate}T00:00:00`;
         const endOfDay = `${currentDate}T23:59:59`;
 
@@ -1321,7 +1329,6 @@ const Modals = {
 };
 
 const Actions = {
-    // NOVA FUNÇÃO: Trocar data na tela de Comandas
     changeComandaDate(dir) {
         const dateInput = document.getElementById('filter-comanda-data');
         if(!dateInput || !dateInput.value) return;

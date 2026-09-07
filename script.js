@@ -506,7 +506,6 @@ const Render = {
         const tabPendentes = document.getElementById('tab-pendentes-tour');
         const tabPagos = document.getElementById('tab-pagos');
 
-        // RESOLUÇÃO DO BUG VISUAL NAS ABAS DA TELA DE COBRANÇAS AQUI
         if (tabPendentes) {
             tabPendentes.classList.toggle('active-tab', tab === 'pendentes');
             tabPendentes.style.background = tab === 'pendentes' ? '#f0f0f0' : 'transparent';
@@ -684,7 +683,7 @@ const Render = {
             }
         }
 
-        let query = db.from('comandas').select('*');
+        let query = db.from('comandas').select('*, clients(name)').order('created_at', {ascending: false});
         
         if (App.filters.comissoes) {
             let f = App.filters.comissoes;
@@ -696,53 +695,135 @@ const Render = {
         }
 
         const { data } = await query;
-        let htmlCards = ''; let totalComissao = 0; let rank = {};
+        let totalComissao = 0; 
+        let rank = {}; 
+        let details = [];
+        let profFilterActive = (App.filters.comissoes && App.filters.comissoes.prof_id);
         
         data.forEach(c => {
             if(!c.items) return; 
+            const clientName = c.clients?.name || 'Cliente';
+            
+            // Garantindo formatação de data robusta
+            const dateTimeStr = U.date(c.created_at);
+            const parts = dateTimeStr.split(/[\s,]+/);
+            const dateStr = parts[0]; 
+            const timeStr = parts[1] || '00:00'; 
+
             c.items.forEach(i => {
                 let showCard = false;
 
                 if (isOwner) {
-                    if (App.filters.comissoes && App.filters.comissoes.prof_id) {
+                    if (profFilterActive) {
                         if (i.prof_id !== App.filters.comissoes.prof_id) return;
-                        showCard = true; 
                     }
+                    showCard = true; 
                 } else {
                     if (i.prof_id !== App.user.id) return;
                     showCard = true;
                 }
 
                 if(i.commission) {
-                    const v = (i.price * i.commission) / 100; totalComissao += v;
-                    if(i.prof_name) rank[i.prof_name] = (rank[i.prof_name]||0) + v;
+                    const v = (i.price * i.commission) / 100; 
                     
+                    if (isOwner) {
+                        if(i.prof_id) {
+                            if(!rank[i.prof_id]) rank[i.prof_id] = { name: i.prof_name, total: 0 };
+                            rank[i.prof_id].total += v;
+                        }
+                    }
+
                     if (showCard) {
-                        htmlCards += `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:3px solid #2e7d32; margin-bottom:10px;"><div><h4>${i.name}</h4><p style="font-size:0.8rem; color:var(--muted)"><i class="ph ph-calendar"></i> ${U.date(c.created_at).slice(0,10)} • Ref: ${c.ticket||'-'} • Taxa: ${i.commission}%</p></div><div class="val" style="color:#2e7d32; font-size:1.3rem">+${U.money(v)}</div></div>`;
+                        totalComissao += v;
+                        details.push({
+                            date: dateStr,
+                            time: timeStr,
+                            client: clientName,
+                            service: i.name,
+                            prof_id: i.prof_id,
+                            prof_name: i.prof_name,
+                            pct: i.commission,
+                            val: v,
+                            ticket: c.ticket
+                        });
                     }
                 }
             });
         });
+
+        const groupedDetails = {};
+        details.forEach(d => {
+            if(!groupedDetails[d.date]) groupedDetails[d.date] = [];
+            groupedDetails[d.date].push(d);
+        });
+
+        let htmlCards = '';
+        if (details.length === 0) {
+            htmlCards = '<p style="color:var(--muted)">Nenhum registro encontrado para este período.</p>';
+        } else {
+            for (const [date, items] of Object.entries(groupedDetails)) {
+                htmlCards += `<div style="margin-bottom: 25px;">
+                    <div style="background: var(--primary-light); color: var(--primary-dark); padding: 8px 15px; border-radius: 8px; margin-bottom: 15px; display:inline-block; font-weight:bold; font-size:0.9rem;">
+                        <i class="ph ph-calendar"></i> ${date}
+                    </div>
+                    <div class="data-list">`;
+                items.forEach(i => {
+                    htmlCards += `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid #2e7d32; margin-bottom:0; padding:1.2rem;">
+                        <div>
+                            <h4 style="font-size:1.1rem; margin-bottom:5px; color:var(--text);">${i.service}</h4>
+                            <div style="font-size:0.85rem; color:var(--muted); display:flex; flex-direction:column; gap:4px;">
+                                <span style="color:var(--text); font-weight:600;"><i class="ph ph-user"></i> ${i.client}</span>
+                                <span><i class="ph ph-clock"></i> Horário: ${i.time}</span>
+                                ${isOwner && !profFilterActive ? `<span><i class="ph ph-identification-badge"></i> Profissional: <b>${i.prof_name}</b></span>` : ''}
+                                <span><i class="ph ph-receipt"></i> Ref: ${i.ticket||'-'} &nbsp;&bull;&nbsp; Taxa: ${i.pct}%</span>
+                            </div>
+                        </div>
+                        <div class="val" style="color:#2e7d32; font-size:1.4rem">+${U.money(i.val)}</div>
+                    </div>`;
+                });
+                htmlCards += `</div></div>`;
+            }
+        }
         
         let finalHtml = '';
         if(isOwner) {
-            const sorted = Object.entries(rank).sort((a,b)=>b[1]-a[1]);
-            let profFilterActive = (App.filters.comissoes && App.filters.comissoes.prof_id);
-            let titleTotal = profFilterActive ? `Total de Comissão de ${App.filters.comissoes.prof_name}` : `Total de Comissões Geradas`;
-
-            finalHtml = `<div class="card" style="margin-bottom:20px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); color:white; padding:2rem; box-shadow:0 10px 20px rgba(183, 110, 121, 0.3)"><h3 style="color:white; font-weight:400; opacity:0.9">${titleTotal}</h3><div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div></div>`;
+            const sortedRank = Object.entries(rank).sort((a,b)=>b[1].total-a[1].total);
+            let titleTotal = profFilterActive ? `Total de Comissão de ${App.filters.comissoes.prof_name}` : `Total de Comissões Geradas (Todos)`;
+            
+            finalHtml = `<div class="card" style="margin-bottom:20px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); color:white; padding:2rem; box-shadow:0 10px 20px rgba(183, 110, 121, 0.3)">
+                            <h3 style="color:white; font-weight:400; opacity:0.9">${titleTotal}</h3>
+                            <div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div>
+                         </div>`;
             
             if (profFilterActive) {
-                 finalHtml += `<h3 style="margin:20px 0 15px 0">Detalhamento dos Serviços</h3><div class="data-list">${htmlCards || '<p style="color:var(--muted)">Nenhum registro encontrado para este período.</p>'}</div>`;
+                 finalHtml += `<h3 style="margin:20px 0 15px 0">Detalhamento por Dia</h3>${htmlCards}`;
             } else {
-                finalHtml += `<h3 style="margin:20px 0 15px 0">Ranking de Comissionamento</h3><div class="data-grid">` + 
-                sorted.map((s,i) => {
+                finalHtml += `<h3 style="margin:20px 0 15px 0">Ranking de Comissionamento</h3>
+                              <p style="font-size:0.85rem; color:var(--muted); margin-bottom:15px;"><i class="ph ph-info"></i> Clique no card do profissional para ver seus ganhos detalhados em lista.</p>
+                              <div class="data-grid" style="margin-bottom:30px;">` + 
+                sortedRank.map((s,i) => {
                     let color = '#cd7f32'; if(i===0) color='#ffd700'; else if(i===1) color='#c0c0c0';
-                    return `<div class="card"><div style="display:flex; justify-content:space-between; align-items:center"><h4 style="font-size:1.1rem">${i+1}º ${s[0]}</h4><i class="ph ph-medal" style="color:${color}; font-size:2rem"></i></div><div class="val" style="margin-top:15px; font-size:1.8rem">${U.money(s[1])}</div></div>`;
+                    const profId = s[0];
+                    const profName = s[1].name;
+                    const val = s[1].total;
+                    return `<div class="card" style="cursor:pointer; transition:0.2s;" onclick="Actions.filterComissaoByProf('${profId}', '${profName.replace(/'/g, "\\'")}')" onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='var(--shadow-fab)';" onmouseout="this.style.transform='none'; this.style.boxShadow='var(--shadow)';">
+                                <div style="display:flex; justify-content:space-between; align-items:center">
+                                    <h4 style="font-size:1.1rem">${i+1}º ${profName}</h4>
+                                    <i class="ph ph-medal" style="color:${color}; font-size:2rem"></i>
+                                </div>
+                                <div class="val" style="margin-top:15px; font-size:1.8rem">${U.money(val)}</div>
+                                <div style="margin-top:10px; font-size:0.8rem; color:var(--primary); font-weight:bold; text-align:right;">Ver Detalhes <i class="ph ph-arrow-right"></i></div>
+                            </div>`;
                 }).join('') + '</div>';
+                
+                finalHtml += `<h3 style="margin:20px 0 15px 0; border-top: 1px solid var(--border); padding-top:20px;">Visão Geral Diária (Todos)</h3>${htmlCards}`;
             }
         } else {
-            finalHtml = `<div class="card" style="margin-bottom:20px; background:var(--primary); color:white; padding:2rem"><h4 style="color:white; font-weight:400">Minha Comissão Total</h4><div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div></div><div class="data-list">${htmlCards || '<p style="color:var(--muted)">Nenhum registro encontrado para este período.</p>'}</div>`;
+            finalHtml = `<div class="card" style="margin-bottom:20px; background:var(--primary); color:white; padding:2rem">
+                            <h4 style="color:white; font-weight:400">Minha Comissão Total</h4>
+                            <div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div>
+                         </div>
+                         <h3 style="margin:20px 0 15px 0">Meus Detalhamentos por Dia</h3>${htmlCards}`;
         }
         if(dashContainer) dashContainer.innerHTML = finalHtml;
     },
@@ -1410,6 +1491,22 @@ const Actions = {
         Modals.close(); Render.comissao();
     },
     clearFilterComissoes() { App.filters.comissoes = null; Render.comissao(); },
+    
+    // Função acionada ao clicar em um profissional específico do ranking
+    filterComissaoByProf(profId, profName) {
+        let s, e;
+        if(App.filters.comissoes) {
+            s = App.filters.comissoes.start;
+            e = App.filters.comissoes.end;
+        } else {
+            const qFilter = document.getElementById('filter-comissao-quinzena')?.value || U.getCurrentQuinzenaValue();
+            const range = U.getQuinzenaDates(qFilter);
+            s = range.start.slice(0,10);
+            e = range.end.slice(0,10);
+        }
+        App.filters.comissoes = { start: s, end: e, prof_id: profId, prof_name: profName };
+        Render.comissao();
+    },
 
     async createReceita(e) {
         e.preventDefault();

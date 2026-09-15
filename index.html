@@ -1,352 +1,321 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Espaço Amor que Cuida</title>
-    
-    <link rel="icon" type="image/jpeg" href="logoaqc.jpeg">
-    <link rel="apple-touch-icon" href="logoaqc.jpeg">
-    
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://unpkg.com/@phosphor-icons/web"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
-    
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Espaço Amor que Cuida</title>
+<link rel="icon" type="image/jpeg" href="logoaqc.jpeg">
+<link rel="apple-touch-icon" href="logoaqc.jpeg">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://unpkg.com/@phosphor-icons/web"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
+<div id="splash-screen" style="position: fixed; inset: 0; background: var(--primary); z-index: 9999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; transition: opacity 0.5s;">
+<img src="logoaqc.jpeg" alt="Amor que Cuida" style="width: 140px; height: 140px; border-radius: 50%; object-fit: cover; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); border: 4px solid #fff; animation: pulse 1.5s infinite;">
+<h1 style="color: white; font-size: 2.8rem; margin-bottom: 0.5rem; text-align:center; font-family: 'Playfair Display', serif;">Espaço Amor Que Cuida</h1>
+<p style="font-size: 1.2rem; font-weight: 300; letter-spacing: 2px;">by Andressa Vieira</p>
+</div>
+<style> @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } } </style>
+<div id="toast-container"></div>
+<div id="custom-confirm" class="overlay hidden" style="z-index: 999999;">
+<div class="modal" style="max-width: 400px; text-align: center;">
+<h3 id="confirm-title" style="margin-bottom: 1rem;">Atenção</h3>
+<p id="confirm-msg" style="margin-bottom: 2rem; color: var(--muted);"></p>
+<div style="display: flex; gap: 10px;">
+<button class="btn-secondary" id="confirm-cancel">Cancelar</button>
+<button class="btn-primary" id="confirm-ok">Confirmar</button>
+</div>
+</div>
+</div>
+<div id="tour-overlay" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999998; transition: 0.3s; pointer-events: auto;">
+<div id="tour-dialog" style="position: absolute; background: var(--surface); padding: 20px; border-radius: 12px; width: 340px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 5px solid var(--primary); transition: all 0.3s ease;">
+<h3 id="tour-title" style="margin-bottom: 10px; font-size:1.2rem; color:var(--primary-dark)">Título</h3>
+<p id="tour-desc" style="font-size: 0.95rem; color: var(--muted); margin-bottom: 20px; line-height: 1.4;"></p>
+<div style="display: flex; justify-content: space-between; align-items: center;">
+<button class="btn-secondary" style="width: auto; padding: 0.5rem 1rem; font-size:0.8rem" onclick="Tour.skip()">Pular Tour</button>
+<div id="tour-dots" style="display: flex; gap: 5px;"></div>
+<button class="btn-primary" id="tour-next-btn" style="width: auto; padding: 0.5rem 1rem; font-size:0.8rem" onclick="Tour.next()">Próximo <i class="ph ph-arrow-right"></i></button>
+</div>
+</div>
+</div>
+<div id="auth-layer" class="auth-layer active">
+<section id="login-screen" class="screen active">
+<div class="login-card">
+<i class="ph ph-lock-key text-primary" style="font-size: 2.5rem; margin-bottom: 1rem;"></i>
+<h2>Acesso ao Sistema</h2>
+<form id="login-form">
+<div class="input-group"><label>Usuário</label><input type="text" id="username" required></div>
+<div class="input-group"><label>Senha</label><input type="password" id="password" required></div>
+<button type="submit" class="btn-primary" id="btn-login">Entrar</button>
+</form>
+</div>
+</section>
+</div>
+<div id="system-layout" class="hidden">
+<aside class="sidebar" id="main-sidebar">
+<div class="sidebar-brand">
+<img src="logoaqc.jpeg" alt="Logo" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; margin-right: 10px; border: 2px solid var(--primary);">
+<span id="brand-name">Amor que Cuida</span>
+<button class="close-sidebar mobile-only" onclick="Nav.closeMenu()"><i class="ph ph-x"></i></button>
+</div>
+<nav class="sidebar-nav content-scroll">
+<div class="nav-section">MINHA CONTA</div>
+<a href="#" class="nav-link" data-view="perfil"><i class="ph ph-user-circle"></i> Meu Perfil</a>
+<div class="nav-section">ATENDIMENTO</div>
+<a href="#" class="nav-link active" data-view="agenda"><i class="ph ph-calendar"></i> Agenda</a>
+<a href="#" class="nav-link" data-view="comandas"><i class="ph ph-receipt"></i> Comandas</a>
+<a href="#" class="nav-link" data-view="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
+<a href="#" class="nav-link" data-view="clientes"><i class="ph ph-users"></i> Clientes</a>
+<div class="nav-section owner-only">GESTÃO DE ESTOQUE</div>
+<a href="#" class="nav-link owner-only" data-view="servicos"><i class="ph ph-sparkle"></i> Catálogo de Serviços</a>
+<a href="#" class="nav-link owner-only" data-view="produtos"><i class="ph ph-package"></i> Controle de Produtos</a>
+<div class="nav-section owner-only">GESTÃO FINANCEIRA</div>
+<a href="#" class="nav-link owner-only" data-view="despesas"><i class="ph ph-trend-down"></i> Controle de Despesas</a>
+<a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Comissionamento</a>
+<a href="#" class="nav-link owner-only" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Fluxo de Caixa</a>
+<a href="#" class="nav-link owner-only" data-view="relatorios"><i class="ph ph-folder-open"></i> Relatórios & Arquivos</a>
+<div class="nav-section owner-only">INTELIGÊNCIA & ADMIN</div>
+<a href="#" class="nav-link owner-only" data-view="performance"><i class="ph ph-chart-line-up"></i> Painel de Performance</a>
+<a href="#" class="nav-link owner-only" data-view="mensagens"><i class="ph ph-chat-circle-text"></i> Mensagens Prontas</a>
+<a href="#" class="nav-link owner-only" data-view="funcionarios"><i class="ph ph-identification-badge"></i> Equipe / Colaboradores</a>
+<div class="spacer" style="margin-top: 2rem;"></div>
+<a href="#" class="nav-link owner-only" data-view="configuracoes"><i class="ph ph-gear"></i> Configurações</a>
+<a href="#" class="nav-link logout" onclick="Auth.logout()"><i class="ph ph-sign-out"></i> Sair</a>
+</nav>
+</aside>
+<div id="mobile-overlay" class="overlay hidden" onclick="Nav.closeMenu()"></div>
+<main class="main-content">
+<header class="top-bar">
+<div style="display: flex; align-items: center; gap: 10px;">
+<button class="mobile-only" style="background:none; border:none; font-size:1.5rem; color:var(--primary)" onclick="Nav.toggleMenu()"><i class="ph ph-list"></i></button>
+<h1 id="page-title">Agenda</h1>
+</div>
+<div style="display: flex; align-items: center; gap: 15px;">
+<button class="btn-secondary desktop-only" style="padding: 0.5rem; width: auto; border-radius: 50%;" onclick="Tour.start()" title="Ver Tutorial da Tela"><i class="ph ph-question"></i></button>
+<div class="user-pill" style="cursor:pointer" onclick="Nav.showView('perfil')"><span id="header-user">Usuário</span><div class="avatar" id="header-avatar">US</div></div>
+</div>
+</header>
+<div class="views-container">
+<section id="view-perfil" class="view">
+<div class="card" style="text-align:center; max-width: 450px; margin: 1rem auto; padding: 2rem;">
+<div id="perfil-foto-preview" style="width:130px; height:130px; border-radius:50%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-size:3rem; font-weight:bold; margin:0 auto 1.5rem auto; border: 4px solid var(--primary-light)">US</div>
+<h3 id="perfil-nome" style="font-size:1.6rem; margin-bottom:5px;">Nome do Usuário</h3>
+<p id="perfil-role" style="color:var(--primary); margin-bottom:25px; text-transform:uppercase; font-size:0.85rem; font-weight:bold; letter-spacing:1px;">Função</p>
+<input type="file" id="perfil-foto-input" accept="image/*" style="display:none" onchange="Actions.previewAndSaveAvatar(event)">
+<div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap">
+<button class="btn-primary" style="width:auto; padding:0.8rem 1.5rem" onclick="document.getElementById('perfil-foto-input').click()"><i class="ph ph-camera"></i> Alterar / Nova Foto</button>
+<button class="btn-secondary" style="width:auto; padding:0.8rem 1.5rem; color:#d32f2f" onclick="Actions.deleteAvatar()"><i class="ph ph-trash"></i> Remover</button>
+</div>
+</div>
+</section>
+<section id="view-agenda" class="view active">
+<div style="display:flex; justify-content:space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
+<h2 id="day-view-title" class="hidden" style="color: var(--primary-dark); font-size: 1.3rem;">...</h2>
+<div style="display: flex; gap: 10px; margin-left: auto;">
+<button id="btn-novo-agendamento-tour" class="btn-primary desktop-only" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem;" onclick="Modals.open('agendamento')"><i class="ph ph-plus"></i> Novo Agendamento</button>
+<button class="btn-secondary desktop-only" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem; border: 1px solid #d32f2f; color: #d32f2f;" onclick="Modals.open('bloquear_agenda')"><i class="ph ph-prohibit"></i> Bloquear</button>
+<button class="btn-secondary hidden" id="btn-voltar-mes" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem;" onclick="Render.showMonthView()"><i class="ph ph-arrow-left"></i> Voltar ao Mês</button>
+</div>
+</div>
+<div id="agenda-month-view" class="ios-calendar">
+<div class="cal-header">
+<button onclick="Render.changeMonth(-1)"><i class="ph ph-caret-left"></i></button>
+<h3 id="cal-month-year" style="text-transform: capitalize;">...</h3>
+<button onclick="Render.changeMonth(1)"><i class="ph ph-caret-right"></i></button>
+</div>
+<div class="cal-grid" id="cal-grid"></div>
+<div class="cal-legend">
+<div><span class="dot livre"></span> Livre</div>
+<div><span class="dot agendado"></span> Agendado</div>
+<div><span class="dot bloqueado"></span> Bloqueado</div>
+</div>
+</div>
+<div id="agenda-day-view" class="hidden">
+<div class="ios-calendar" style="margin-bottom: 10px; padding: 0.5rem 0;">
+<div class="cal-days" id="cal-days-row" style="padding-bottom: 0;"></div>
+</div>
+<div id="agenda-list"></div>
+</div>
+</section>
+<section id="view-cobrancas" class="view">
+<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom: 2px solid var(--border); padding-bottom: 10px;">
+<button class="btn-secondary active-tab" id="tab-pendentes-tour" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px;" onclick="Render.cobrancas('pendentes')">Em Aberto / Pendentes</button>
+<button class="btn-secondary" id="tab-pagos" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px; background: transparent; border: 1px solid transparent;" onclick="Render.cobrancas('pagos')">Histórico de Pagos</button>
+</div>
+<div id="cobrancas-list" class="data-grid"></div>
+</section>
+<!-- ABA COMANDAS MODIFICADA -->
+<section id="view-comandas" class="view">
+<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:20px; flex-wrap:wrap">
+<button id="btn-nova-comanda-tour" class="btn-primary desktop-only" style="width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('comanda')">+ Gerar Nova Comanda</button>
+<div style="display:flex; align-items:center; flex:1; min-width:200px; justify-content:center; gap:5px;">
+<!-- Navegador de Data -->
+<div style="display:flex; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden;">
+<button class="btn-secondary" style="border-radius:0; width:45px; padding:0.8rem; background:#f9f9f9;" onclick="Actions.changeComandaDate(-1)" title="Dia Anterior"><i class="ph ph-caret-left"></i></button>
+<input type="date" id="filter-comanda-data" onchange="Render.comandas(null, this.value)" style="border:none; padding:0.8rem; font-size:1rem; background:transparent; font-weight:bold; color:var(--text); text-align:center; min-width: 140px;">
+<button class="btn-secondary" style="border-radius:0; width:45px; padding:0.8rem; background:#f9f9f9;" onclick="Actions.changeComandaDate(1)" title="Próximo Dia"><i class="ph ph-caret-right"></i></button>
+</div>
+</div>
+<button class="btn-primary mobile-only" style="width:100%; padding: 0.8rem 1.5rem; margin-top:10px;" onclick="Modals.open('comanda')">+ Nova Comanda</button>
+</div>
+<div style="display:flex; gap:10px; margin-bottom:20px; border-bottom: 2px solid var(--border); padding-bottom: 10px;">
+<button class="btn-secondary active-tab" id="tab-comandas-abertas" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px; border:none;" onclick="Render.comandas('aberta')">Comandas Abertas</button>
+<button class="btn-secondary" id="tab-comandas-fechadas" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px; background: transparent; border: 1px solid transparent;" onclick="Render.comandas('fechada')">Comandas Fechadas</button>
+</div>
+<div id="comandas-list" class="data-grid"></div>
+</section>
+<section id="view-clientes" class="view">
+<div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:20px; flex-wrap:wrap">
+<button class="btn-primary desktop-only" style="width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('cliente')">+ Cadastrar Cliente</button>
+<div class="input-group" style="margin:0; flex:1; min-width:250px;">
+<input type="text" id="search-cliente" placeholder="🔍 Buscar cliente por nome ou telefone..." onkeyup="Render.filterClientes(this.value)" style="padding:0.8rem; border-radius:8px; border: 1px solid var(--border);">
+</div>
+<button class="btn-primary mobile-only" style="width:100%; padding: 0.8rem 1.5rem; margin-top:10px;" onclick="Modals.open('cliente')">+ Cadastrar Cliente</button>
+</div>
+<div id="clientes-list" class="data-grid"></div>
+</section>
+<section id="view-observacoes" class="view">
+<div class="header-actions" style="display:flex; gap:15px; margin-bottom:2rem; align-items:center;">
+<button class="btn-secondary" onclick="Nav.showView('clientes')" style="width: auto; padding:0.5rem 1rem"><i class="ph ph-arrow-left"></i> Voltar</button>
+<h2 id="observacao-title">Histórico de Observações</h2>
+<input type="hidden" id="current-observacao-client-id">
+</div>
+<button class="btn-primary" onclick="Modals.open('nova_observacao', document.getElementById('current-observacao-client-id').value)" style="margin-bottom: 1.5rem; width:auto; padding:0.8rem 1.5rem">+ Nova Observação</button>
+<div id="observacao-history-list" class="data-list"></div>
+</section>
+<section id="view-perfil-cliente" class="view">
+<div class="header-actions" style="display:flex; gap:15px; margin-bottom:2rem; align-items:center;">
+<button class="btn-secondary" onclick="Nav.showView('clientes')" style="width: auto; padding:0.5rem 1rem"><i class="ph ph-arrow-left"></i> Voltar</button>
+<h2 id="perfil-cliente-title">Perfil do Cliente</h2>
+<input type="hidden" id="current-perfil-client-id">
+</div>
+<div id="perfil-debitos-destaque" style="margin-bottom: 1.5rem;"></div>
+<div id="perfil-observacao-destaque" style="margin-bottom: 1.5rem;"></div>
+<div id="perfil-info" style="margin-bottom: 2rem;"></div>
+<h3 style="margin-bottom: 15px;">Histórico de Visitas no Salão</h3>
+<div id="perfil-visitas-list" class="data-list"></div>
+</section>
+<section id="view-servicos" class="view">
+<button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('servico')">+ Cadastrar Serviço</button>
+<div class="card" style="margin-bottom:20px; padding: 10px;">
+<div class="input-group" style="margin:0;">
+<input type="text" id="search-servico" placeholder="🔍 Buscar serviço por nome..." onkeyup="Render.filterServicos(this.value)" style="padding:1rem; border-radius:8px; border:1px solid var(--border); font-size: 1rem;">
+</div>
+</div>
+<div id="servicos-list" class="data-grid"></div>
+</section>
+<section id="view-produtos" class="view">
+<button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('produto')">+ Registrar Produto</button>
+<div id="produtos-list" class="data-grid"></div>
+</section>
+<section id="view-mensagens" class="view">
+<button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('mensagem')">+ Criar Template</button>
+<div id="mensagens-list" class="data-grid"></div>
+</section>
+<section id="view-funcionarios" class="view">
+<button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('funcionario')">+ Registrar Colaborador</button>
+<div id="funcionarios-list" class="data-grid"></div>
+</section>
+<section id="view-despesas" class="view">
+<div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center; flex-wrap:wrap; gap:10px;">
+<h2>Custos da Quinzena Atual</h2>
+<button class="btn-primary desktop-only" style="width:auto; padding:0.6rem 1.2rem" onclick="Modals.open('despesa')">+ Lançar Despesa Manual</button>
+</div>
+<p style="color:var(--muted); font-size:0.9rem; margin-bottom:1.5rem"><i class="ph ph-info"></i> Registros de quinzenas anteriores foram arquivados em <b>Relatórios & Arquivos</b>.</p>
+<canvas id="chart-despesas" style="width:100%; max-height:250px; margin-bottom:2rem"></canvas>
+<div id="despesas-list" class="data-list"></div>
+</section>
+<section id="view-comissao" class="view">
+<div style="margin-bottom:15px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
+<label style="font-size:0.9rem; font-weight:bold">Visualizar Quinzena:</label>
+<select id="filter-comissao-quinzena" class="quinzena-select" onchange="Render.comissao()" style="padding:0.5rem; border-radius:8px; border:1px solid var(--border); flex:1"></select>
+</div>
+<div id="comissao-dashboard-tour"></div>
+</section>
 
-    <div id="splash-screen" style="position: fixed; inset: 0; background: var(--primary); z-index: 9999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; transition: opacity 0.5s;">
-        <img src="logoaqc.jpeg" alt="Amor que Cuida" style="width: 140px; height: 140px; border-radius: 50%; object-fit: cover; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); border: 4px solid #fff; animation: pulse 1.5s infinite;">
-        
-        <h1 style="color: white; font-size: 2.8rem; margin-bottom: 0.5rem; text-align:center; font-family: 'Playfair Display', serif;">Espaço Amor Que Cuida</h1>
-        <p style="font-size: 1.2rem; font-weight: 300; letter-spacing: 2px;">by Andressa Vieira</p>
-    </div>
-    <style> @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } } </style>
-
-    <div id="toast-container"></div>
-    <div id="custom-confirm" class="overlay hidden" style="z-index: 999999;">
-        <div class="modal" style="max-width: 400px; text-align: center;">
-            <h3 id="confirm-title" style="margin-bottom: 1rem;">Atenção</h3>
-            <p id="confirm-msg" style="margin-bottom: 2rem; color: var(--muted);"></p>
-            <div style="display: flex; gap: 10px;">
-                <button class="btn-secondary" id="confirm-cancel">Cancelar</button>
-                <button class="btn-primary" id="confirm-ok">Confirmar</button>
-            </div>
+<!-- === ALTERAÇÃO: NOVA ESTRUTURA DO FLUXO DE CAIXA === -->
+<section id="view-resumo-financeiro" class="view">
+    <!-- Card de Status da Quinzena -->
+    <div class="period-status-card">
+        <div class="period-info">
+            <p class="period-label">Período em Aberto</p>
+            <h2 id="current-period-display" class="period-title">Carregando...</h2>
+            <p id="current-period-dates" class="period-dates">--</p>
         </div>
+        <button class="btn-close-period" onclick="Modals.open('fechar_quinzena_resumo')">
+            <i class="ph ph-lock-key"></i> Fechar Quinzena
+        </button>
     </div>
 
-    <div id="tour-overlay" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999998; transition: 0.3s; pointer-events: auto;">
-        <div id="tour-dialog" style="position: absolute; background: var(--surface); padding: 20px; border-radius: 12px; width: 340px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 5px solid var(--primary); transition: all 0.3s ease;">
-            <h3 id="tour-title" style="margin-bottom: 10px; font-size:1.2rem; color:var(--primary-dark)">Título</h3>
-            <p id="tour-desc" style="font-size: 0.95rem; color: var(--muted); margin-bottom: 20px; line-height: 1.4;"></p>
-            <div style="display: flex; justify-content: space-between; align-items: center;">
-                <button class="btn-secondary" style="width: auto; padding: 0.5rem 1rem; font-size:0.8rem" onclick="Tour.skip()">Pular Tour</button>
-                <div id="tour-dots" style="display: flex; gap: 5px;"></div>
-                <button class="btn-primary" id="tour-next-btn" style="width: auto; padding: 0.5rem 1rem; font-size:0.8rem" onclick="Tour.next()">Próximo <i class="ph ph-arrow-right"></i></button>
-            </div>
-        </div>
-    </div>
-
-    <div id="auth-layer" class="auth-layer active">
-        <section id="login-screen" class="screen active">
-            <div class="login-card">
-                <i class="ph ph-lock-key text-primary" style="font-size: 2.5rem; margin-bottom: 1rem;"></i>
-                <h2>Acesso ao Sistema</h2>
-                <form id="login-form">
-                    <div class="input-group"><label>Usuário</label><input type="text" id="username" required></div>
-                    <div class="input-group"><label>Senha</label><input type="password" id="password" required></div>
-                    <button type="submit" class="btn-primary" id="btn-login">Entrar</button>
-                </form>
-            </div>
-        </section>
-    </div>
-
-    <div id="system-layout" class="hidden">
-        <aside class="sidebar" id="main-sidebar">
-            <div class="sidebar-brand">
-                <img src="logoaqc.jpeg" alt="Logo" style="width: 36px; height: 36px; border-radius: 50%; object-fit: cover; margin-right: 10px; border: 2px solid var(--primary);">
-                <span id="brand-name">Amor que Cuida</span>
-                <button class="close-sidebar mobile-only" onclick="Nav.closeMenu()"><i class="ph ph-x"></i></button>
-            </div>
-            <nav class="sidebar-nav content-scroll">
-                <div class="nav-section">MINHA CONTA</div>
-                <a href="#" class="nav-link" data-view="perfil"><i class="ph ph-user-circle"></i> Meu Perfil</a>
-
-                <div class="nav-section">ATENDIMENTO</div>
-                <a href="#" class="nav-link active" data-view="agenda"><i class="ph ph-calendar"></i> Agenda</a>
-                <a href="#" class="nav-link" data-view="comandas"><i class="ph ph-receipt"></i> Comandas</a>
-                <a href="#" class="nav-link" data-view="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
-                <a href="#" class="nav-link" data-view="clientes"><i class="ph ph-users"></i> Clientes</a>
-                
-                <div class="nav-section owner-only">GESTÃO DE ESTOQUE</div>
-                <a href="#" class="nav-link owner-only" data-view="servicos"><i class="ph ph-sparkle"></i> Catálogo de Serviços</a>
-                <a href="#" class="nav-link owner-only" data-view="produtos"><i class="ph ph-package"></i> Controle de Produtos</a>
-                
-                <div class="nav-section owner-only">GESTÃO FINANCEIRA</div>
-                <a href="#" class="nav-link owner-only" data-view="despesas"><i class="ph ph-trend-down"></i> Controle de Despesas</a>
-                <a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Comissionamento</a>
-                <a href="#" class="nav-link owner-only" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Fluxo de Caixa</a>
-                <a href="#" class="nav-link owner-only" data-view="relatorios"><i class="ph ph-folder-open"></i> Relatórios & Arquivos</a>
-                
-                <div class="nav-section owner-only">INTELIGÊNCIA & ADMIN</div>
-                <a href="#" class="nav-link owner-only" data-view="performance"><i class="ph ph-chart-line-up"></i> Painel de Performance</a>
-                <a href="#" class="nav-link owner-only" data-view="mensagens"><i class="ph ph-chat-circle-text"></i> Mensagens Prontas</a>
-                <a href="#" class="nav-link owner-only" data-view="funcionarios"><i class="ph ph-identification-badge"></i> Equipe / Colaboradores</a>
-                
-                <div class="spacer" style="margin-top: 2rem;"></div>
-                <a href="#" class="nav-link owner-only" data-view="configuracoes"><i class="ph ph-gear"></i> Configurações</a>
-                <a href="#" class="nav-link logout" onclick="Auth.logout()"><i class="ph ph-sign-out"></i> Sair</a>
-            </nav>
-        </aside>
-
-        <div id="mobile-overlay" class="overlay hidden" onclick="Nav.closeMenu()"></div>
-
-        <main class="main-content">
-            <header class="top-bar">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <button class="mobile-only" style="background:none; border:none; font-size:1.5rem; color:var(--primary)" onclick="Nav.toggleMenu()"><i class="ph ph-list"></i></button>
-                    <h1 id="page-title">Agenda</h1>
-                </div>
-                <div style="display: flex; align-items: center; gap: 15px;">
-                    <button class="btn-secondary desktop-only" style="padding: 0.5rem; width: auto; border-radius: 50%;" onclick="Tour.start()" title="Ver Tutorial da Tela"><i class="ph ph-question"></i></button>
-                    <div class="user-pill" style="cursor:pointer" onclick="Nav.showView('perfil')"><span id="header-user">Usuário</span><div class="avatar" id="header-avatar">US</div></div>
-                </div>
-            </header>
-
-            <div class="views-container">
-                
-                <section id="view-perfil" class="view">
-                    <div class="card" style="text-align:center; max-width: 450px; margin: 1rem auto; padding: 2rem;">
-                        <div id="perfil-foto-preview" style="width:130px; height:130px; border-radius:50%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-size:3rem; font-weight:bold; margin:0 auto 1.5rem auto; border: 4px solid var(--primary-light)">US</div>
-                        <h3 id="perfil-nome" style="font-size:1.6rem; margin-bottom:5px;">Nome do Usuário</h3>
-                        <p id="perfil-role" style="color:var(--primary); margin-bottom:25px; text-transform:uppercase; font-size:0.85rem; font-weight:bold; letter-spacing:1px;">Função</p>
-                        
-                        <input type="file" id="perfil-foto-input" accept="image/*" style="display:none" onchange="Actions.previewAndSaveAvatar(event)">
-                        
-                        <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap">
-                            <button class="btn-primary" style="width:auto; padding:0.8rem 1.5rem" onclick="document.getElementById('perfil-foto-input').click()"><i class="ph ph-camera"></i> Alterar / Nova Foto</button>
-                            <button class="btn-secondary" style="width:auto; padding:0.8rem 1.5rem; color:#d32f2f" onclick="Actions.deleteAvatar()"><i class="ph ph-trash"></i> Remover</button>
-                        </div>
-                    </div>
-                </section>
-
-                <section id="view-agenda" class="view active">
-                    <div style="display:flex; justify-content:space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
-                        <h2 id="day-view-title" class="hidden" style="color: var(--primary-dark); font-size: 1.3rem;">...</h2>
-                        <div style="display: flex; gap: 10px; margin-left: auto;">
-                            <button id="btn-novo-agendamento-tour" class="btn-primary desktop-only" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem;" onclick="Modals.open('agendamento')"><i class="ph ph-plus"></i> Novo Agendamento</button>
-                            <button class="btn-secondary desktop-only" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem; border: 1px solid #d32f2f; color: #d32f2f;" onclick="Modals.open('bloquear_agenda')"><i class="ph ph-prohibit"></i> Bloquear</button>
-                            <button class="btn-secondary hidden" id="btn-voltar-mes" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem;" onclick="Render.showMonthView()"><i class="ph ph-arrow-left"></i> Voltar ao Mês</button>
-                        </div>
-                    </div>
-
-                    <div id="agenda-month-view" class="ios-calendar">
-                        <div class="cal-header">
-                            <button onclick="Render.changeMonth(-1)"><i class="ph ph-caret-left"></i></button>
-                            <h3 id="cal-month-year" style="text-transform: capitalize;">...</h3>
-                            <button onclick="Render.changeMonth(1)"><i class="ph ph-caret-right"></i></button>
-                        </div>
-                        <div class="cal-grid" id="cal-grid"></div>
-                        <div class="cal-legend">
-                            <div><span class="dot livre"></span> Livre</div>
-                            <div><span class="dot agendado"></span> Agendado</div>
-                            <div><span class="dot bloqueado"></span> Bloqueado</div>
-                        </div>
-                    </div>
-
-                    <div id="agenda-day-view" class="hidden">
-                        <div class="ios-calendar" style="margin-bottom: 10px; padding: 0.5rem 0;">
-                            <div class="cal-days" id="cal-days-row" style="padding-bottom: 0;"></div>
-                        </div>
-                        <div id="agenda-list"></div>
-                    </div>
-                </section>
-                
-                <section id="view-cobrancas" class="view">
-                    <div style="display:flex; gap:10px; margin-bottom:20px; border-bottom: 2px solid var(--border); padding-bottom: 10px;">
-                        <button class="btn-secondary active-tab" id="tab-pendentes-tour" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px;" onclick="Render.cobrancas('pendentes')">Em Aberto / Pendentes</button>
-                        <button class="btn-secondary" id="tab-pagos" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px; background: transparent; border: 1px solid transparent;" onclick="Render.cobrancas('pagos')">Histórico de Pagos</button>
-                    </div>
-                    <div id="cobrancas-list" class="data-grid"></div>
-                </section>
-                
-                <!-- ABA COMANDAS MODIFICADA -->
-                <section id="view-comandas" class="view">
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:20px; flex-wrap:wrap">
-                        <button id="btn-nova-comanda-tour" class="btn-primary desktop-only" style="width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('comanda')">+ Gerar Nova Comanda</button>
-                        
-                        <div style="display:flex; align-items:center; flex:1; min-width:200px; justify-content:center; gap:5px;">
-                            <!-- Navegador de Data -->
-                            <div style="display:flex; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden;">
-                                <button class="btn-secondary" style="border-radius:0; width:45px; padding:0.8rem; background:#f9f9f9;" onclick="Actions.changeComandaDate(-1)" title="Dia Anterior"><i class="ph ph-caret-left"></i></button>
-                                <input type="date" id="filter-comanda-data" onchange="Render.comandas(null, this.value)" style="border:none; padding:0.8rem; font-size:1rem; background:transparent; font-weight:bold; color:var(--text); text-align:center; min-width: 140px;">
-                                <button class="btn-secondary" style="border-radius:0; width:45px; padding:0.8rem; background:#f9f9f9;" onclick="Actions.changeComandaDate(1)" title="Próximo Dia"><i class="ph ph-caret-right"></i></button>
-                            </div>
-                        </div>
-
-                        <button class="btn-primary mobile-only" style="width:100%; padding: 0.8rem 1.5rem; margin-top:10px;" onclick="Modals.open('comanda')">+ Nova Comanda</button>
-                    </div>
-                    
-                    <div style="display:flex; gap:10px; margin-bottom:20px; border-bottom: 2px solid var(--border); padding-bottom: 10px;">
-                        <button class="btn-secondary active-tab" id="tab-comandas-abertas" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px; border:none;" onclick="Render.comandas('aberta')">Comandas Abertas</button>
-                        <button class="btn-secondary" id="tab-comandas-fechadas" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px; background: transparent; border: 1px solid transparent;" onclick="Render.comandas('fechada')">Comandas Fechadas</button>
-                    </div>
-
-                    <div id="comandas-list" class="data-grid"></div>
-                </section>
-                
-                <section id="view-clientes" class="view">
-                    <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:20px; flex-wrap:wrap">
-                        <button class="btn-primary desktop-only" style="width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('cliente')">+ Cadastrar Cliente</button>
-                        <div class="input-group" style="margin:0; flex:1; min-width:250px;">
-                            <input type="text" id="search-cliente" placeholder="🔍 Buscar cliente por nome ou telefone..." onkeyup="Render.filterClientes(this.value)" style="padding:0.8rem; border-radius:8px; border: 1px solid var(--border);">
-                        </div>
-                        <button class="btn-primary mobile-only" style="width:100%; padding: 0.8rem 1.5rem; margin-top:10px;" onclick="Modals.open('cliente')">+ Cadastrar Cliente</button>
-                    </div>
-                    <div id="clientes-list" class="data-grid"></div>
-                </section>
-
-                <section id="view-observacoes" class="view">
-                    <div class="header-actions" style="display:flex; gap:15px; margin-bottom:2rem; align-items:center;">
-                        <button class="btn-secondary" onclick="Nav.showView('clientes')" style="width: auto; padding:0.5rem 1rem"><i class="ph ph-arrow-left"></i> Voltar</button>
-                        <h2 id="observacao-title">Histórico de Observações</h2>
-                        <input type="hidden" id="current-observacao-client-id">
-                    </div>
-                    <button class="btn-primary" onclick="Modals.open('nova_observacao', document.getElementById('current-observacao-client-id').value)" style="margin-bottom: 1.5rem; width:auto; padding:0.8rem 1.5rem">+ Nova Observação</button>
-                    <div id="observacao-history-list" class="data-list"></div>
-                </section>
-
-                <section id="view-perfil-cliente" class="view">
-                    <div class="header-actions" style="display:flex; gap:15px; margin-bottom:2rem; align-items:center;">
-                        <button class="btn-secondary" onclick="Nav.showView('clientes')" style="width: auto; padding:0.5rem 1rem"><i class="ph ph-arrow-left"></i> Voltar</button>
-                        <h2 id="perfil-cliente-title">Perfil do Cliente</h2>
-                        <input type="hidden" id="current-perfil-client-id">
-                    </div>
-                    <div id="perfil-debitos-destaque" style="margin-bottom: 1.5rem;"></div>
-                    <div id="perfil-observacao-destaque" style="margin-bottom: 1.5rem;"></div>
-                    <div id="perfil-info" style="margin-bottom: 2rem;"></div>
-                    <h3 style="margin-bottom: 15px;">Histórico de Visitas no Salão</h3>
-                    <div id="perfil-visitas-list" class="data-list"></div>
-                </section>
-
-                <section id="view-servicos" class="view">
-                    <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('servico')">+ Cadastrar Serviço</button>
-                    <div class="card" style="margin-bottom:20px; padding: 10px;">
-                        <div class="input-group" style="margin:0;">
-                            <input type="text" id="search-servico" placeholder="🔍 Buscar serviço por nome..." onkeyup="Render.filterServicos(this.value)" style="padding:1rem; border-radius:8px; border:1px solid var(--border); font-size: 1rem;">
-                        </div>
-                    </div>
-                    <div id="servicos-list" class="data-grid"></div>
-                </section>
-                
-                <section id="view-produtos" class="view">
-                    <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('produto')">+ Registrar Produto</button>
-                    <div id="produtos-list" class="data-grid"></div>
-                </section>
-                
-                <section id="view-mensagens" class="view">
-                    <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('mensagem')">+ Criar Template</button>
-                    <div id="mensagens-list" class="data-grid"></div>
-                </section>
-
-                <section id="view-funcionarios" class="view">
-                    <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('funcionario')">+ Registrar Colaborador</button>
-                    <div id="funcionarios-list" class="data-grid"></div>
-                </section>
-                
-                <section id="view-despesas" class="view">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center; flex-wrap:wrap; gap:10px;">
-                        <h2>Custos da Quinzena Atual</h2>
-                        <button class="btn-primary desktop-only" style="width:auto; padding:0.6rem 1.2rem" onclick="Modals.open('despesa')">+ Lançar Despesa Manual</button>
-                    </div>
-                    <p style="color:var(--muted); font-size:0.9rem; margin-bottom:1.5rem"><i class="ph ph-info"></i> Registros de quinzenas anteriores foram arquivados em <b>Relatórios & Arquivos</b>.</p>
-                    <canvas id="chart-despesas" style="width:100%; max-height:250px; margin-bottom:2rem"></canvas>
-                    <div id="despesas-list" class="data-list"></div>
-                </section>
-
-                <section id="view-comissao" class="view">
-                    <div style="margin-bottom:15px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
-                        <label style="font-size:0.9rem; font-weight:bold">Visualizar Quinzena:</label>
-                        <select id="filter-comissao-quinzena" class="quinzena-select" onchange="Render.comissao()" style="padding:0.5rem; border-radius:8px; border:1px solid var(--border); flex:1"></select>
-                    </div>
-                    <div id="comissao-dashboard-tour"></div>
-                </section>
-                
-                <section id="view-resumo-financeiro" class="view">
-                    <div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center; flex-wrap:wrap; gap:10px;">
-                        <h2>Caixa da Quinzena Atual</h2>
-                    </div>
-                    <p style="color:var(--muted); font-size:0.9rem; margin-bottom:1.5rem"><i class="ph ph-info"></i> Comandas faturadas registram os custos. A entrada (Receita) só é contabilizada quando o cliente realiza o pagamento na aba Cobranças.</p>
-                    
-                    <div id="resumo-cards" class="data-grid" style="margin-bottom:1.5rem"></div>
-                    <h3 style="margin-bottom: 10px; color: var(--primary-dark);">Receitas por Forma de Pagamento</h3>
-                    <div id="resumo-pagamentos-cards" class="data-grid" style="margin-bottom:2rem"></div>
-
-                    <div class="card" id="extrato-caixa-tour" style="margin-bottom:1rem">
-                        <h3 style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:10px">Extrato Detalhado</h3>
-                        <div id="extrato-list" class="data-list"></div>
-                    </div>
-                </section>
-
-                <section id="view-relatorios" class="view">
-                    <div style="background:var(--surface); padding:20px; border-radius:12px; margin-bottom:20px; border:1px solid var(--border); box-shadow:var(--shadow);">
-                        <h3 style="margin-bottom:15px;"><i class="ph ph-folder-open"></i> Gerenciador de Arquivos</h3>
-                        <div style="display:flex; gap:10px; align-items:center;">
-                            <select id="filter-relatorios" class="quinzena-select" onchange="Render.relatorios()" style="padding:1rem; border-radius:8px; border:1px solid var(--border); flex:1; font-size:1.1rem; font-weight:bold;"></select>
-                        </div>
-                    </div>
-                    <div class="card" style="margin-bottom: 20px;">
-                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--border); padding-bottom:10px; margin-bottom:15px;">
-                            <h3 style="color:#d32f2f"><i class="ph ph-trend-down"></i> Relatório de Despesas</h3>
-                            <button class="btn-secondary" style="width:auto; padding:0.5rem 1rem; color:#d32f2f; border:1px solid #d32f2f;" onclick="Actions.exportPDF('despesas', document.getElementById('filter-relatorios').value)"><i class="ph ph-file-pdf"></i> Baixar PDF</button>
-                        </div>
-                        <div id="relatorio-despesas-conteudo"></div>
-                    </div>
-                    <div class="card">
-                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--border); padding-bottom:10px; margin-bottom:15px;">
-                            <h3 style="color:#2e7d32"><i class="ph ph-bank"></i> Relatório de Fluxo de Caixa</h3>
-                            <button class="btn-secondary" style="width:auto; padding:0.5rem 1rem; color:#2e7d32; border:1px solid #2e7d32;" onclick="Actions.exportPDF('fluxo', document.getElementById('filter-relatorios').value)"><i class="ph ph-file-pdf"></i> Baixar PDF</button>
-                        </div>
-                        <div id="relatorio-fluxo-conteudo"></div>
-                    </div>
-                </section>
-                
-                <section id="view-performance" class="view">
-                    <div id="perf-kpis" class="data-grid" style="margin-bottom:1.5rem"></div>
-                    <div class="card" style="margin-bottom:1.5rem">
-                        <h3 style="margin-bottom:10px">Top 5 Serviços Realizados</h3>
-                        <canvas id="chart-performance" style="width:100%; max-height:250px;"></canvas>
-                    </div>
-                    <div id="performance-ranking" class="data-grid"></div>
-                </section>
-                
-                <section id="view-configuracoes" class="view">
-                    <div class="card">
-                        <form onsubmit="Actions.saveSettings(event)">
-                            <div class="input-group"><label>Nome do Estúdio</label><input type="text" id="cfg-name" required></div>
-                            <div class="input-group"><label>Número Oficial para WhatsApp (Apenas Números com DDD)</label><input type="text" id="cfg-phone" placeholder="Ex: 558699999999" required></div>
-                            <button class="btn-primary" type="submit">Salvar Configurações</button>
-                        </form>
-                    </div>
-                </section>
-            </div>
-        </main>
-
-        <nav class="bottom-nav">
-            <a href="#" class="b-item active" data-view="agenda"><i class="ph ph-calendar"></i><span>Agenda</span></a>
-            <a href="#" class="b-item" data-view="comandas"><i class="ph ph-receipt"></i><span>Comandas</span></a>
-            <div class="fab-wrapper"><button class="fab-button" onclick="UI.handleFabClick()"><i class="ph ph-plus"></i></button></div>
-            <a href="#" class="b-item" data-view="clientes"><i class="ph ph-users"></i><span>Clientes</span></a>
-            <a href="#" class="b-item" onclick="Nav.toggleMenu()"><i class="ph ph-list"></i><span>Menu</span></a>
-        </nav>
-    </div>
-
-    <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
+    <p style="color:var(--muted); font-size:0.9rem; margin-bottom:1.5rem"><i class="ph ph-info"></i> Comandas faturadas registram os custos. A entrada (Receita) só é contabilizada quando o cliente realiza o pagamento na aba Cobranças.</p>
     
-    <script src="script.js?v=14"></script>
+    <div id="resumo-cards" class="data-grid" style="margin-bottom:1.5rem"></div>
+    
+    <h3 style="margin-bottom: 10px; color: var(--primary-dark);">Receitas por Forma de Pagamento</h3>
+    <div id="resumo-pagamentos-cards" class="data-grid" style="margin-bottom:2rem"></div>
+    
+    <div class="card" id="extrato-caixa-tour" style="margin-bottom:1rem">
+        <h3 style="border-bottom:1px solid var(--border); padding-bottom:10px; margin-bottom:10px">Extrato Detalhado do Período Atual</h3>
+        <div id="extrato-list" class="data-list"></div>
+    </div>
+</section>
+<!-- === FIM DA ALTERAÇÃO === -->
+
+<section id="view-relatorios" class="view">
+<div style="background:var(--surface); padding:20px; border-radius:12px; margin-bottom:20px; border:1px solid var(--border); box-shadow:var(--shadow);">
+<h3 style="margin-bottom:15px;"><i class="ph ph-folder-open"></i> Gerenciador de Arquivos</h3>
+<div style="display:flex; gap:10px; align-items:center;">
+<select id="filter-relatorios" class="quinzena-select" onchange="Render.relatorios()" style="padding:1rem; border-radius:8px; border:1px solid var(--border); flex:1; font-size:1.1rem; font-weight:bold;"></select>
+</div>
+</div>
+<div class="card" style="margin-bottom: 20px;">
+<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--border); padding-bottom:10px; margin-bottom:15px;">
+<h3 style="color:#d32f2f"><i class="ph ph-trend-down"></i> Relatório de Despesas</h3>
+<button class="btn-secondary" style="width:auto; padding:0.5rem 1rem; color:#d32f2f; border:1px solid #d32f2f;" onclick="Actions.exportPDF('despesas', document.getElementById('filter-relatorios').value)"><i class="ph ph-file-pdf"></i> Baixar PDF</button>
+</div>
+<div id="relatorio-despesas-conteudo"></div>
+</div>
+<div class="card">
+<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid var(--border); padding-bottom:10px; margin-bottom:15px;">
+<h3 style="color:#2e7d32"><i class="ph ph-bank"></i> Relatório de Fluxo de Caixa</h3>
+<button class="btn-secondary" style="width:auto; padding:0.5rem 1rem; color:#2e7d32; border:1px solid #2e7d32;" onclick="Actions.exportPDF('fluxo', document.getElementById('filter-relatorios').value)"><i class="ph ph-file-pdf"></i> Baixar PDF</button>
+</div>
+<div id="relatorio-fluxo-conteudo"></div>
+</div>
+</section>
+<section id="view-performance" class="view">
+<div id="perf-kpis" class="data-grid" style="margin-bottom:1.5rem"></div>
+<div class="card" style="margin-bottom:1.5rem">
+<h3 style="margin-bottom:10px">Top 5 Serviços Realizados</h3>
+<canvas id="chart-performance" style="width:100%; max-height:250px;"></canvas>
+</div>
+<div id="performance-ranking" class="data-grid"></div>
+</section>
+<section id="view-configuracoes" class="view">
+<div class="card">
+<form onsubmit="Actions.saveSettings(event)">
+<div class="input-group"><label>Nome do Estúdio</label><input type="text" id="cfg-name" required></div>
+<div class="input-group"><label>Número Oficial para WhatsApp (Apenas Números com DDD)</label><input type="text" id="cfg-phone" placeholder="Ex: 558699999999" required></div>
+<button class="btn-primary" type="submit">Salvar Configurações</button>
+</form>
+</div>
+</section>
+</div>
+</main>
+<nav class="bottom-nav">
+<a href="#" class="b-item active" data-view="agenda"><i class="ph ph-calendar"></i><span>Agenda</span></a>
+<a href="#" class="b-item" data-view="comandas"><i class="ph ph-receipt"></i><span>Comandas</span></a>
+<div class="fab-wrapper"><button class="fab-button" onclick="UI.handleFabClick()"><i class="ph ph-plus"></i></button></div>
+<a href="#" class="b-item" data-view="clientes"><i class="ph ph-users"></i><span>Clientes</span></a>
+<a href="#" class="b-item" onclick="Nav.toggleMenu()"><i class="ph ph-list"></i><span>Menu</span></a>
+</nav>
+</div>
+<div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
+<script src="script.js?v=16"></script>
 </body>
 </html>

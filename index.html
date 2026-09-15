@@ -15,7 +15,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=15">
+    <link rel="stylesheet" href="style.css?v=16">
 </head>
 <body>
 
@@ -174,13 +174,11 @@
                     <div id="cobrancas-list" class="data-grid"></div>
                 </section>
                 
-                <!-- ABA COMANDAS MODIFICADA -->
                 <section id="view-comandas" class="view">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:20px; flex-wrap:wrap">
                         <button id="btn-nova-comanda-tour" class="btn-primary desktop-only" style="width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('comanda')">+ Gerar Nova Comanda</button>
                         
                         <div style="display:flex; align-items:center; flex:1; min-width:200px; justify-content:center; gap:5px;">
-                            <!-- Navegador de Data -->
                             <div style="display:flex; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden;">
                                 <button class="btn-secondary" style="border-radius:0; width:45px; padding:0.8rem; background:#f9f9f9;" onclick="Actions.changeComandaDate(-1)" title="Dia Anterior"><i class="ph ph-caret-left"></i></button>
                                 <input type="date" id="filter-comanda-data" onchange="Render.comandas(null, this.value)" style="border:none; padding:0.8rem; font-size:1rem; background:transparent; font-weight:bold; color:var(--text); text-align:center; min-width: 140px;">
@@ -349,6 +347,6 @@
 
     <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
     
-    <script src="script.js?v=15"></script>
+    <script src="script.js?v=16"></script>
 </body>
 </html>

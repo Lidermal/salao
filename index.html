@@ -173,7 +173,7 @@
 <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:20px; flex-wrap:wrap">
 <button class="btn-primary desktop-only" style="width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('cliente')">+ Cadastrar Cliente</button>
 <div class="input-group" style="margin:0; flex:1; min-width:250px;">
-<input type="text" id="search-cliente" placeholder="🔍 Buscar cliente por nome ou telefone..." onkeyup="Render.filterClientes(this.value)" style="padding:0.8rem; border-radius:8px; border: 1px solid var(--border);">
+<input type="text" id="search-cliente" placeholder=" Buscar cliente por nome ou telefone..." onkeyup="Render.filterClientes(this.value)" style="padding:0.8rem; border-radius:8px; border: 1px solid var(--border);">
 </div>
 <button class="btn-primary mobile-only" style="width:100%; padding: 0.8rem 1.5rem; margin-top:10px;" onclick="Modals.open('cliente')">+ Cadastrar Cliente</button>
 </div>
@@ -270,6 +270,7 @@
 <div style="background:var(--surface); padding:20px; border-radius:12px; margin-bottom:20px; border:1px solid var(--border); box-shadow:var(--shadow);">
 <h3 style="margin-bottom:15px;"><i class="ph ph-folder-open"></i> Gerenciador de Arquivos</h3>
 <div style="display:flex; gap:10px; align-items:center;">
+<!-- Select com classe quinzena-select para estilização melhorada -->
 <select id="filter-relatorios" class="quinzena-select" onchange="Render.relatorios()" style="padding:1rem; border-radius:8px; border:1px solid var(--border); flex:1; font-size:1.1rem; font-weight:bold;"></select>
 </div>
 </div>
@@ -316,6 +317,6 @@
 </nav>
 </div>
 <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
-<script src="script.js?v=16"></script>
+<script src="script.js?v=17"></script>
 </body>
 </html>

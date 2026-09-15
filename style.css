@@ -201,7 +201,7 @@ body:not(.is-owner) .owner-only { display: none !important; }
     border-radius: 12px;
     padding: 15px;
     text-align: center;
-    border-left: 4px solid var(--primary);
+    border-left: 4px solid #ccc;
 }
 .period-summary-card.in { border-color: #2e7d32; }
 .period-summary-card.out { border-color: #d32f2f; }

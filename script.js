@@ -1,4 +1,4 @@
-/** * SISTEMA ESTÚDIO AMOR QUE CUIDA */
+/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - V17 (CORREÇÃO RELATÓRIOS E VISUAL) */
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const DB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
 const db = window.supabase.createClient(DB_URL, DB_KEY, {
@@ -31,6 +31,7 @@ const U = {
         let curr = new Date(); let m = String(curr.getMonth() + 1).padStart(2, '0'); let y = curr.getFullYear();
         let q = curr.getDate() <= 15 ? 'Q1' : 'Q2'; return `${y}-${m}-${q}`;
     },
+    // Gera opções visuais melhoradas
     generateQuinzenasOptions() {
         let html = ''; let curr = new Date();
         for(let i=0; i<8; i++) {
@@ -38,7 +39,9 @@ const U = {
             let m = String(d.getMonth() + 1).padStart(2, '0'); let y = d.getFullYear();
             let mName = d.toLocaleString('pt-BR', {month:'long'}); let q = (i % 2 === 0) ? 'Q2' : 'Q1';
             if(i === 0 && curr.getDate() <= 15) continue;
-            html += `<option value="${y}-${m}-${q}">${q === 'Q1' ? '1ª' : '2ª'} Quinzena (${mName}/${y})</option>`;
+            // Visual melhorado com emoji
+            const icon = q === 'Q1' ? '1️⃣' : '2️⃣';
+            html += `<option value="${y}-${m}-${q}">${icon} ${q === 'Q1' ? '1ª' : '2ª'} Quinzena (${mName}/${y})</option>`;
         }
         return html;
     },
@@ -75,7 +78,10 @@ const U = {
     }
 };
 
-const CustomSelect = {
+// ... (Mantenha CustomSelect, UI, Tour, Auth, Nav IGUAIS ao seu arquivo original) ...
+// Copie e cole aqui todo o bloco do CustomSelect até o final do Nav do seu arquivo original.
+
+const CustomSelect = { /* ... COPIAR DO ORIGINAL ... */ 
     render(id, placeholder, optionsHtml, onChangeGlobalName = '', initialValue = '') {
         return `
         <div class="aqc-custom-select" id="wrapper-${id}" onclick="event.stopPropagation()">
@@ -143,7 +149,7 @@ const UI = {
     }
 };
 
-const Tour = {
+const Tour = { /* ... COPIAR DO ORIGINAL ... */ 
     allSteps: [
         { role: 'all', view: 'agenda', target: '#btn-novo-agendamento-tour', mobileTarget: '.fab-button', title: '1. Agenda Inteligente', text: 'Aqui você visualiza e gerencia horários. Clique aqui para agendar um cliente, gerar um encaixe ou bloquear a agenda.' },
         { role: 'all', view: 'comandas', target: '#btn-nova-comanda-tour', mobileTarget: '.fab-button', title: '2. Abertura de Comandas', text: 'O cliente chegou? Abra uma comanda, adicione os serviços/produtos e vincule o profissional que realizou o atendimento.' },
@@ -603,22 +609,27 @@ const Render = {
         if(dashContainer) dashContainer.innerHTML = finalHtml;
     },
     
-    // === ALTERAÇÃO: NOVA RENDERIZAÇÃO DO FLUXO DE CAIXA ===
+    // === CORREÇÃO FLUXO DE CAIXA (FILTRA APÓS ÚLTIMO FECHAMENTO) ===
     async 'resumo-financeiro'() {
-        // Renderizar Header de Status
         const currentQ = U.getCurrentQuinzenaValue();
         const range = U.getQuinzenaDates(currentQ);
+        
+        // Busca o último fechamento para saber de onde começar a mostrar
+        const { data: lastClosed } = await db.from('financial_periods')
+            .select('end_date')
+            .order('end_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+            
+        // Se houver fechamento, começa depois dele. Senão, começa no início da quinzena atual.
+        const startDate = lastClosed ? lastClosed.end_date : range.start;
+        
         const periodDisplay = document.getElementById('current-period-display');
         const periodDates = document.getElementById('current-period-dates');
         
-        if(periodDisplay) {
-            periodDisplay.textContent = currentQ.split('-')[2] === 'Q1' ? '1ª Quinzena' : '2ª Quinzena';
-        }
-        if(periodDates) {
-            periodDates.textContent = `${U.date(range.start).slice(0,10)} até ${U.date(range.end).slice(0,10)}`;
-        }
+        if(periodDisplay) periodDisplay.textContent = currentQ.split('-')[2] === 'Q1' ? '1ª Quinzena' : '2ª Quinzena';
+        if(periodDates) periodDates.textContent = `${U.date(startDate).slice(0,10)} até ${U.date(range.end).slice(0,10)}`;
 
-        // Botão de Receita Manual
         const rc = document.getElementById('resumo-cards');
         if(rc && !document.getElementById('btn-add-receita-wrapper')) {
             let w = document.createElement('div'); w.id = 'btn-add-receita-wrapper';
@@ -627,8 +638,8 @@ const Render = {
             rc.parentNode.insertBefore(w, rc);
         }
 
-        // Busca de Dados
-        const { data: desp } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
+        // Busca dados APÓS a data de corte
+        const { data: desp } = await db.from('despesas').select('*').gt('date', startDate).lte('date', range.end);
         const { extrato, totalIn, totalOut } = U.buildExtrato(desp);
         const lucro = totalIn - totalOut;
 
@@ -648,8 +659,8 @@ const Render = {
         document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações na quinzena atual.</p>' :
         extrato.map(i => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;"><div style="flex:1"><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Saída'} - ${i.category}</b><p style="margin-top:5px; font-weight:600; font-size:1.1rem">${U.formatDesc(i.desc)}</p><span style="font-size:0.8rem; color:var(--muted); display:inline-block; margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(i.date)}</span></div><div style="text-align:right"><span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.3rem; display:block">${i.type==='in'?'+':'-'} ${U.money(i.val)}</span><span style="font-size:0.85rem; color:var(--muted); font-weight:bold">Caixa: ${U.money(i.saldo)}</span></div></div>`).join('');
     },
-    // === FIM DA ALTERAÇÃO ===
 
+    // === CORREÇÃO RELATÓRIOS (BUSCA ARQUIVADOS E DADOS REAIS) ===
     async relatorios() {
         const relContainer = document.getElementById('relatorio-despesas-conteudo');
         if(relContainer) {
@@ -664,17 +675,25 @@ const Render = {
             }
             const btnClear = document.getElementById('btn-clear-rel'); const infoDiv = document.getElementById('rel-filter-info'); const defaultSel = document.getElementById('filter-relatorios');
             
-            // Carregar opções incluindo períodos arquivados
+            // Carrega opções visuais melhoradas + arquivados
             if(defaultSel && !App.filters.relatorios) {
                 let optsHtml = U.generateQuinzenasOptions();
-                const { data: archived } = await db.from('financial_periods').select('period_label, start_date, end_date').order('end_date', {ascending: false});
+                
+                // Busca períodos fechados
+                const { data: archived } = await db.from('financial_periods')
+                    .select('period_label, start_date, end_date')
+                    .order('end_date', { ascending: false });
+                    
                 if(archived && archived.length > 0) {
-                    optsHtml += `<optgroup label="📁 Arquivados">`;
+                    optsHtml += `<optgroup label="📁 PERÍODOS ARQUIVADOS">`;
                     archived.forEach(p => {
+                        // Evita duplicidade se já estiver na lista gerada
                         if(!optsHtml.includes(`value="${p.period_label}"`)) {
                             const [y, m, q] = p.period_label.split('-');
-                            const label = `${q === 'Q1' ? '1ª' : '2ª'} Quinzena (${m}/${y}) - FECHADO`;
-                            optsHtml += `<option value="${p.period_label}">${label}</option>`;
+                            const icon = q === 'Q1' ? '1️⃣' : '2️⃣';
+                            const label = `${icon} ${q === 'Q1' ? '1ª' : '2ª'} Quinzena (${m}/${y}) - FECHADO`;
+                            // O value será o ID do período arquivado para buscarmos as datas corretas
+                            optsHtml += `<option value="ARCH_${p.id}">${label}</option>`;
                         }
                     });
                     optsHtml += `</optgroup>`;
@@ -690,48 +709,60 @@ const Render = {
                 btnClear.classList.add('hidden'); infoDiv.innerHTML = ''; if(defaultSel) defaultSel.style.display = 'block';
             }
         }
+        
         let desp = [];
+        let isArchivedView = false;
+
         if (App.filters.relatorios) {
             let f = App.filters.relatorios;
             let query = db.from('despesas').select('*').gte('date', f.start + 'T00:00:00Z').lte('date', f.end + 'T23:59:59Z');
             if (f.tipo === 'Custos Fixos') query = query.eq('category', 'Custos Fixos');
             else if (f.tipo === 'Comissões') query = query.eq('category', 'Comissões');
             else if (f.tipo === 'Receitas') query = query.in('category', App.inflowCategories);
-            const { data } = await query.order('date', {ascending: false});
+            const { data } = await query.order('date', { ascending: false });
             desp = data || [];
             if (f.tipo === 'Comissões' && f.prof_name) { desp = desp.filter(d => d.description.includes(`Comissão ${f.prof_name}:`)); }
         } else {
             const qFilter = document.getElementById('filter-relatorios').value;
-            // Verifica se é um período arquivado
-            const { data: archivedPeriod } = await db.from('financial_periods').select('*').eq('period_label', qFilter).maybeSingle();
-            if(archivedPeriod) {
-                // Se for arquivado, busca na tabela de despesas original seria complexo sem foreign key
-                // Para simplificar, mostramos mensagem ou buscamos se ainda existirem dados (caso não tenha sido deletado)
-                // Mas como a lógica nova deleta, precisamos avisar ou buscar de outro lugar.
-                // Por enquanto, mantemos a busca normal que retornará vazio se já foi fechado e deletado.
-                // O ideal futuro é ter uma tabela de 'financial_entries' separada.
-                // Como paliativo, vamos assumir que o usuário quer ver o resumo salvo.
-                // Mas como o pedido era mover dados, a tabela despesas estará vazia para esse periodo.
-                // Vamos deixar a query normal. Se estiver vazio, o usuario sabe que foi arquivado.
-                // MELHORIA: Poderiamos salvar o JSON do extrato na financial_periods.
-            }
             
-            const range = U.getQuinzenaDates(qFilter);
-            const { data } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end).order('date', {ascending: false});
-            desp = data || [];
+            // Verifica se é um período arquivado (ID começa com ARCH_)
+            if(qFilter.startsWith('ARCH_')) {
+                isArchivedView = true;
+                const archId = qFilter.replace('ARCH_', '');
+                const { data: archData } = await db.from('financial_periods').select('*').eq('id', archId).single();
+                
+                if(archData) {
+                    // Busca os dados reais na tabela despesas usando as datas salvas no arquivamento
+                    // Isso garante que vemos o que aconteceu de verdade naquele período
+                    const { data } = await db.from('despesas').select('*')
+                        .gte('date', archData.start_date)
+                        .lte('date', archData.end_date)
+                        .order('date', { ascending: false });
+                    desp = data || [];
+                }
+            } else {
+                // Período normal (quinzena atual ou passada não arquivada)
+                const range = U.getQuinzenaDates(qFilter);
+                const { data } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end).order('date', { ascending: false });
+                desp = data || [];
+            }
         }
+
         const { extrato, totalIn, totalOut } = U.buildExtrato(desp);
         let isReceitaFilter = App.filters.relatorios?.tipo === 'Receitas';
         let targetList = isReceitaFilter ? desp.filter(d => App.inflowCategories.includes(d.category)) : desp.filter(d => !App.inflowCategories.includes(d.category));
+        
         let htmlDesp = '';
         if(targetList.length === 0) {
             let msgText = isReceitaFilter ? 'Nenhuma entrada/receita encontrada nesse período.' : 'Sem gastos registrados para este filtro.';
+            if(isArchivedView && desp.length === 0) msgText = "Este período foi arquivado, mas não havia lançamentos financeiros registrados nele.";
             htmlDesp = `<p style="color:var(--muted); text-align:center;">${msgText}</p>`;
         } else {
             htmlDesp = targetList.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${U.formatDesc(d.description)}</b><br><span style="font-size:0.8rem; color:#888"><i class="ph ph-clock"></i> ${U.date(d.date)}</span></div><div style="color:${isReceitaFilter ? '#2e7d32' : '#d32f2f'}; font-weight:bold">${isReceitaFilter ? '+' : '-'}${U.money(d.amount)}</div></div>`).join('');
         }
         if(relContainer) relContainer.innerHTML = htmlDesp;
         window.currentDespesasData = targetList; window.currentRelatorioTipo = isReceitaFilter ? 'Receitas' : 'Despesas';
+        
         let htmlFluxo = '';
         if(extrato.length === 0) { htmlFluxo = '<p style="color:var(--muted); text-align:center;">Nenhuma movimentação para este filtro.</p>'; }
         else {
@@ -777,10 +808,13 @@ const Modals = {
         const cont = document.getElementById('modal-container');
         let html = `<div class="modal"><button class="modal-close" onclick="Modals.close()"><i class="ph ph-x"></i></button>`;
         
-        // === NOVOS MODAIS DE FECHAMENTO ===
         if (type === 'fechar_quinzena_resumo') {
             const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue());
-            const { data: desp } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
+            // Busca dados considerando o último fechamento para o resumo ser preciso
+            const { data: lastClosed } = await db.from('financial_periods').select('end_date').order('end_date', { ascending: false }).limit(1).maybeSingle();
+            const startDate = lastClosed ? lastClosed.end_date : range.start;
+            
+            const { data: desp } = await db.from('despesas').select('*').gt('date', startDate).lte('date', range.end);
             const { totalIn, totalOut } = U.buildExtrato(desp);
             const lucro = totalIn - totalOut;
             
@@ -806,7 +840,7 @@ const Modals = {
                 </div>
                 
                 <div style="background:#fff3e0; padding:12px; border-radius:8px; margin-bottom:20px; font-size:0.9rem; color:#e65100;">
-                    <i class="ph ph-warning"></i> Ao confirmar, você escolherá a data de corte. Todos os lançamentos até essa data serão arquivados permanentemente nesta tela.
+                    <i class="ph ph-warning"></i> Ao confirmar, você escolherá a data de corte. Os dados serão mantidos no histórico, mas sairão da tela atual.
                 </div>
                 
                 <button class="btn-primary" style="padding:1.2rem;" onclick="Modals.open('fechar_quinzena_data')">Continuar para Escolher Data</button>
@@ -834,8 +868,6 @@ const Modals = {
                 </form>
             `;
         }
-        // === FIM NOVOS MODAIS ===
-        
         else if(type === 'detalhes_agendamento') {
             const { data: a, error } = await db.from('appointments').select('*, clients(name, phone), services(name, price, duration), users!user_id(name)').eq('id', param1).single();
             if(error || !a) return UI.toast('Erro ao carregar detalhes.', 'error');
@@ -1108,7 +1140,7 @@ const Modals = {
 };
 
 const Actions = {
-    // === NOVA AÇÃO DE FECHAMENTO ===
+    // === CORREÇÃO FECHAMENTO (NÃO DELETA DADOS, APENAS MARCA) ===
     async closeQuinzena(e) {
         e.preventDefault();
         const btn = e.target.querySelector('button[type="submit"]');
@@ -1121,12 +1153,17 @@ const Actions = {
             
             const currentQVal = U.getCurrentQuinzenaValue();
             const range = U.getQuinzenaDates(currentQVal);
+            
+            // Busca o último fechamento para calcular o início correto deste resumo
+            const { data: lastClosed } = await db.from('financial_periods').select('end_date').order('end_date', { ascending: false }).limit(1).maybeSingle();
+            const startDate = lastClosed ? lastClosed.end_date : range.start;
+            
             const endDateFull = `${endDateStr}T23:59:59`;
             
-            // 1. Buscar tudo que será arquivado
+            // 1. Buscar tudo que será arquivado (APENAS PARA CÁLCULO, NÃO DELETA)
             const { data: toArchive, error: fetchErr } = await db.from('despesas')
                 .select('*')
-                .gte('date', range.start)
+                .gt('date', startDate) // Começa depois do último fechamento
                 .lte('date', endDateFull);
                 
             if(fetchErr) throw fetchErr;
@@ -1138,20 +1175,15 @@ const Actions = {
                     if(App.inflowCategories.includes(d.category)) totalIn += val;
                     else totalOut += val;
                 });
-            } else {
-                UI.confirm('Não há movimentações neste período. Deseja mesmo fechar e zerar?', async () => {
-                    await this.finalizeClose(currentQVal, range.start, endDateFull, 0, 0, 0);
-                });
-                btn.disabled = false; btn.innerHTML = originalText;
-                return;
             }
             
             const netProfit = totalIn - totalOut;
             
             // 2. Inserir registro mestre na tabela de períodos
+            // Isso serve como "marcador" de onde parou o período anterior
             const { error: insertPeriodErr } = await db.from('financial_periods').insert({
                 period_label: currentQVal,
-                start_date: range.start,
+                start_date: startDate,
                 end_date: endDateFull,
                 total_in: totalIn,
                 total_out: totalOut,
@@ -1161,12 +1193,8 @@ const Actions = {
             
             if(insertPeriodErr) throw insertPeriodErr;
             
-            // 3. Deletar da tabela ativa (despesas)
-            if(toArchive && toArchive.length > 0) {
-                const idsToDelete = toArchive.map(d => d.id);
-                const { error: deleteErr } = await db.from('despesas').delete().in('id', idsToDelete);
-                if(deleteErr) throw deleteErr;
-            }
+            // 3. NÃO DELETAMOS MAIS OS DADOS DA TABELA DESPESAS
+            // Eles permanecem lá para serem consultados nos relatórios históricos
             
             Modals.close();
             UI.toast('Quinzena fechada e arquivada com sucesso!', 'success');
@@ -1181,17 +1209,6 @@ const Actions = {
         }
     },
     
-    async finalizeClose(label, start, end, inV, outV, netV) {
-        await db.from('financial_periods').insert({
-            period_label: label, start_date: start, end_date: end,
-            total_in: inV, total_out: outV, net_profit: netV, closed_by: App.user.id
-        });
-        Modals.close();
-        UI.toast('Período encerrado!');
-        Render['resumo-financeiro']();
-    },
-    // === FIM NOVA AÇÃO ===
-
     changeComandaDate(dir) {
         const dateInput = document.getElementById('filter-comanda-data');
         if(!dateInput || !dateInput.value) return;

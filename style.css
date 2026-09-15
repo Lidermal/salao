@@ -33,64 +33,14 @@ h1, h2, h3 { font-family: 'Playfair Display', serif; color: var(--primary-dark);
 .data-list { display: flex; flex-direction: column; gap: 1rem; } .data-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem; }
 .card { background: var(--surface); padding: 1.5rem; border-radius: var(--radius); border: 1px solid var(--border); box-shadow: var(--shadow); position: relative; }
 .wpp-btn { position: absolute; top: 1.5rem; right: 1.5rem; width: 45px; height: 45px; border-radius: 50%; background: #25D366; color: white; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; }
-
-/* === ESTILOS DO CARD DE STATUS E SELECTS MELHORADOS === */
-.period-status-card {
-    background: linear-gradient(135deg, var(--primary), var(--primary-dark));
-    color: white;
-    padding: 1.5rem;
-    margin-bottom: 1.5rem;
-    border-radius: var(--radius);
-    border: none;
-    box-shadow: var(--shadow-fab);
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 15px;
-}
+.period-status-card { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); color: white; padding: 1.5rem; margin-bottom: 1.5rem; border-radius: var(--radius); border: none; box-shadow: var(--shadow-fab); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; }
 .period-label { font-size: 0.85rem; opacity: 0.9; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px; }
 .period-title { color: white !important; font-size: 1.5rem; margin: 0; }
 .period-dates { font-size: 0.9rem; opacity: 0.8; margin-top: 5px; }
-.btn-close-period {
-    background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4);
-    width: auto; padding: 0.8rem 1.5rem; border-radius: 12px; font-weight: 700; cursor: pointer;
-    display: flex; align-items: center; gap: 8px; transition: 0.2s;
-}
+.btn-close-period { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.4); width: auto; padding: 0.8rem 1.5rem; border-radius: 12px; font-weight: 700; cursor: pointer; display: flex; align-items: center; gap: 8px; transition: 0.2s; }
 .btn-close-period:hover { background: rgba(255,255,255,0.3); }
-
-/* Melhoria visual dos Selects Nativos (Quinzenas) */
-select.quinzena-select {
-    appearance: none;
-    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B76E79' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
-    background-repeat: no-repeat;
-    background-position: right 1rem center;
-    background-size: 1.2em;
-    padding-right: 2.5rem;
-    font-weight: 600;
-    color: var(--primary-dark);
-    border: 2px solid var(--primary-light);
-}
-select.quinzena-select:focus {
-    border-color: var(--primary);
-    outline: none;
-    box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.2);
-}
-/* Estilo para as opções dentro do select (funciona em alguns navegadores) */
-select.quinzena-select option {
-    padding: 10px;
-    font-size: 1rem;
-    color: var(--text);
-}
-select.quinzena-select optgroup {
-    font-weight: bold;
-    color: var(--muted);
-    background: #f9f9f9;
-    font-style: normal;
-}
-/* === FIM DOS ESTILOS === */
-
-/* CALENDÁRIO */
+select.quinzena-select { appearance: none; background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23B76E79' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e"); background-repeat: no-repeat; background-position: right 1rem center; background-size: 1.2em; padding-right: 2.5rem; font-weight: 600; color: var(--primary-dark); border: 2px solid var(--primary-light); }
+select.quinzena-select:focus { border-color: var(--primary); outline: none; box-shadow: 0 0 0 3px rgba(183, 110, 121, 0.2); }
 .ios-calendar { background: var(--surface); padding: 0.5rem 1rem; border-radius: var(--radius); margin-bottom: 1rem; box-shadow: var(--shadow); border: 1px solid var(--border); }
 .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.8rem; color: var(--primary-dark); }
 .cal-header button { background: var(--primary-light); border: none; width: 35px; height: 35px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: var(--primary); cursor: pointer; }
@@ -111,7 +61,6 @@ select.quinzena-select optgroup {
 .dot.livre { background: #4caf50; }
 .cal-legend { display: flex; justify-content: center; gap: 15px; margin-top: 10px; font-size: 0.8rem; color: var(--muted); }
 .cal-legend div { display: flex; align-items: center; gap: 5px; }
-/* TIMELINE AGENDA */
 .timeline-wrapper { background: var(--surface); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; display: flex; flex-direction: column; box-shadow: var(--shadow); }
 .timeline-header { display: flex; background: #f9f9f9; border-bottom: 1px solid var(--border); }
 .time-col { width: 55px; flex-shrink: 0; background: #fafafa; border-right: 1px solid var(--border); padding-top: 10px; }
@@ -137,7 +86,6 @@ select.quinzena-select optgroup {
 .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 100000; display: flex; justify-content: center; align-items: center; padding: 1rem; }
 .modal { background: var(--surface); padding: 2rem; border-radius: var(--radius); width: 100%; max-width: 500px; max-height: 90vh; overflow-y: auto; box-shadow: var(--shadow); position: relative; }
 .modal-close { position: absolute; top: 1.5rem; right: 1.5rem; background: var(--bg); border: none; width: 35px; height: 35px; border-radius: 50%; font-size: 1.2rem; cursor: pointer; z-index:10;}
-/* FIX DO TOUR (SEM FUNDO BRANCO E CLICÁVEL) */
 .tour-highlight { position: relative !important; z-index: 9999999 !important; box-shadow: 0 0 0 6px rgba(183, 110, 121, 0.4) !important; border-radius: inherit; transition: all 0.3s ease; }
 #tour-overlay { pointer-events: none; }
 #tour-dialog { pointer-events: auto; }

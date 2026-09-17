@@ -18,7 +18,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=18">
+    <link rel="stylesheet" href="style.css?v=19">
 </head>
 <body>
     <div id="splash-screen" style="position: fixed; inset: 0; background: var(--primary); z-index: 9999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; transition: opacity 0.5s;">
@@ -76,8 +76,10 @@
                 <div class="nav-section">ATENDIMENTO</div>
                 <a href="#" class="nav-link active" data-view="agenda"><i class="ph ph-calendar"></i> Agenda</a>
                 
-                <!-- ALTERAÇÃO: Adicionado role-restricted -->
-                <a href="#" class="nav-link role-restricted" data-view="comandas"><i class="ph ph-receipt"></i> Comandas</a>
+                <!-- Comandas visível para todos -->
+                <a href="#" class="nav-link" data-view="comandas"><i class="ph ph-receipt"></i> Comandas</a>
+                
+                <!-- Restrito: Cobranças e Clientes -->
                 <a href="#" class="nav-link role-restricted" data-view="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
                 <a href="#" class="nav-link role-restricted" data-view="clientes"><i class="ph ph-users"></i> Clientes</a>
                 
@@ -87,7 +89,10 @@
                 
                 <div class="nav-section owner-only">GESTÃO FINANCEIRA</div>
                 <a href="#" class="nav-link owner-only" data-view="despesas"><i class="ph ph-trend-down"></i> Controle de Despesas</a>
-                <a href="#" class="nav-link role-restricted" data-view="comissao"><i class="ph ph-money"></i> Comissionamento</a>
+                
+                <!-- Comissionamento visível para todos -->
+                <a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Comissionamento</a>
+                
                 <a href="#" class="nav-link owner-only" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Fluxo de Caixa</a>
                 <a href="#" class="nav-link owner-only" data-view="relatorios"><i class="ph ph-folder-open"></i> Relatórios & Arquivos</a>
                 
@@ -322,7 +327,7 @@
         <!-- ALTERAÇÃO: Adicionado role-restricted nos itens do menu inferior -->
         <nav class="bottom-nav">
             <a href="#" class="b-item active" data-view="agenda"><i class="ph ph-calendar"></i><span>Agenda</span></a>
-            <a href="#" class="b-item role-restricted" data-view="comandas"><i class="ph ph-receipt"></i><span>Comandas</span></a>
+            <a href="#" class="b-item" data-view="comandas"><i class="ph ph-receipt"></i><span>Comandas</span></a>
             <div class="fab-wrapper"><button class="fab-button" onclick="UI.handleFabClick()"><i class="ph ph-plus"></i></button></div>
             <a href="#" class="b-item role-restricted" data-view="clientes"><i class="ph ph-users"></i><span>Clientes</span></a>
             <a href="#" class="b-item" onclick="Nav.toggleMenu()"><i class="ph ph-list"></i><span>Menu</span></a>
@@ -330,6 +335,6 @@
     </div>
     <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
     
-    <script src="script.js?v=18"></script>
+    <script src="script.js?v=19"></script>
 </body>
 </html>

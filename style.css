@@ -116,7 +116,7 @@ h1, h2, h3 { font-family: 'Playfair Display', serif; color: var(--primary-dark);
 /* ============================================ */
 body:not(.is-owner) .owner-only { display: none !important; }
 
-/* Oculta Clientes, Cobranças e Comandas para Colaboradores/Freelancers */
+/* Oculta Clientes, Cobranças e outros itens restritos para Colaboradores/Freelancers */
 body:not(.is-owner) .role-restricted { display: none !important; }
 
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes slideInRight { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } } @keyframes fadeOut { to { opacity: 0; transform: translateY(-10px); } }

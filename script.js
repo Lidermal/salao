@@ -684,7 +684,21 @@ const Render = {
                 return; 
             }
 
-            const isDesktop = window.innerWidth > 900; const pixelsPerMin = isDesktop ? 1 : 1.3; const slotHeight = isDesktop ? 60 : 78; const horaInicio = 7; const horaFim = 21;
+            const isDesktop = window.innerWidth > 900; const pixelsPerMin = isDesktop ? 1 : 1.3; const slotHeight = isDesktop ? 60 : 78;
+            
+            // LÓGICA DE HORÁRIO INICIAL DINÂMICO
+            let horaInicio = 7; 
+            const horaFim = 21;
+            
+            if (agData && agData.length > 0) {
+                let minHour = 23;
+                agData.forEach(a => {
+                    const h = parseInt((a.time||'00:00').split(':')[0], 10);
+                    if (h < minHour) minHour = h;
+                });
+                horaInicio = minHour; // O horário de início agora é baseado no evento mais cedo 
+            }
+
             let html = `<div class="timeline-wrapper" style="overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border: 1px solid var(--border); border-radius: 8px;"><div class="timeline-header" style="display: flex; min-width: max-content; border-bottom: 1px solid var(--border);"><div class="time-col" style="position: sticky; left: 0; z-index: 20; background: var(--surface); border:none; min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);"></div>`;
             usersData.forEach(u => { 
                 let bgImage = (App.avatars && App.avatars[u.id]) ? `background-image: url(${App.avatars[u.id]}); background-size: cover; background-position: center; color: transparent;` : ''; let init = bgImage ? '' : u.name.substring(0,2).toUpperCase();

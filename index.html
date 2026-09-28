@@ -311,27 +311,25 @@
                 <section id="view-configuracoes" class="view">
                     <div class="card">
                         <form onsubmit="Actions.saveSettings(event)">
-                            <div class="input-group">
-                                <label>Nome do Estúdio</label>
-                                <input type="text" id="cfg-name" required>
-                            </div>
-                            <div class="input-group">
-                                <label>Número Oficial para WhatsApp (Apenas Números com DDD)</label>
-                                <input type="text" id="cfg-phone" placeholder="Ex: 558699999999" required>
-                            </div>
+                            <div class="input-group"><label>Nome do Estúdio</label><input type="text" id="cfg-name" required></div>
+                            <div class="input-group"><label>Número Oficial para WhatsApp (Apenas Números com DDD)</label><input type="text" id="cfg-phone" placeholder="Ex: 558699999999" required></div>
                             
-                            <!-- CAIXA DE MANUTENÇÃO (Oculta por padrão com display:none) -->
-                            <div id="box-manutencao" class="input-group" style="display: none; background:#fff3e0; padding:15px; border-radius:12px; border:1px solid #ffb74d; margin: 20px 0;">
-                                <label style="margin:0; color:#e65100; cursor:pointer; display: flex; align-items: center; gap: 10px;">
-                                    <input type="checkbox" id="cfg-manutencao" style="width: 20px; height: 20px; cursor: pointer;">
-                                    <strong style="font-size: 1.1rem;">Ativar Modo Manutenção</strong>
-                                </label>
-                                <p style="font-size: 0.85rem; color: #d84315; margin-top: 8px;">
-                                    <i class="ph ph-warning-circle"></i> Ao ativar, todos os usuários serão desconectados e enviados para a tela de manutenção. Apenas o login <b>admin.teste</b> continuará com acesso.
-                                </p>
+                            <!-- ÁREA EXCLUSIVA ADMIN.TESTE -->
+                            <div id="admin-maintenance-area" class="hidden" style="margin-top: 2rem; padding-top: 2rem; border-top: 2px dashed var(--border);">
+                                <h3 style="color: #d32f2f; margin-bottom: 1rem;"><i class="ph ph-wrench"></i> Zona de Perigo (Admin Master)</h3>
+                                <div class="input-group" style="background: #fff3e0; padding: 15px; border-radius: 12px; border: 1px solid #ffb74d;">
+                                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                        <input type="checkbox" id="cfg-maintenance" onchange="Actions.toggleMaintenance(this.checked)" style="width: 20px; height: 20px;">
+                                        <span style="font-weight: bold; color: #e65100;">Ativar Modo Manutenção</span>
+                                    </label>
+                                    <p style="font-size: 0.8rem; color: #666; margin-top: 8px; margin-left: 30px;">
+                                        Ao ativar, todos os usuários (exceto você) serão redirecionados para a tela de manutenção.
+                                    </p>
+                                </div>
                             </div>
+                            <!-- FIM ÁREA EXCLUSIVA -->
 
-                            <button class="btn-primary" type="submit">Salvar Configurações</button>
+                            <button class="btn-primary" type="submit" style="margin-top: 1.5rem;">Salvar Configurações</button>
                         </form>
                     </div>
                 </section>

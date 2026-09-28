@@ -1,13 +1,10 @@
 /** * SISTEMA ESTÚDIO AMOR QUE CUIDA
- */
-
+*/
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const DB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
-
 const db = window.supabase.createClient(DB_URL, DB_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
 });
-
 const App = { 
     user: null, 
     role: 'colaborador', 
@@ -21,7 +18,6 @@ const App = {
     filters: { relatorios: null, comissoes: null },
     comandasState: { status: 'aberta', date: new Date().toISOString().split('T')[0] } 
 };
-
 const U = {
     money: v => new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'}).format(v||0),
     iso: d => { const tzOffset = d.getTimezoneOffset() * 60000; return (new Date(d.getTime() - tzOffset)).toISOString().split('T')[0]; },
@@ -32,7 +28,6 @@ const U = {
         if(d.length === 10) dateObj = new Date(d + 'T12:00:00'); 
         return dateObj.toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
     },
-
     fillTemplate(text, vars) {
         let out = text || '';
         Object.keys(vars || {}).forEach(k => {
@@ -71,11 +66,9 @@ const U = {
         if (q === 'Q1') return { start: `${y}-${m}-01T00:00:00Z`, end: `${y}-${m}-15T23:59:59Z` };
         return { start: `${y}-${m}-16T00:00:00Z`, end: `${y}-${m}-${lastDay}T23:59:59Z` };
     },
-
     buildExtrato(desp) {
         let extrato = [];
         let totalIn = 0, totalOut = 0;
-
         (desp || []).forEach(d => {
             const isIncome = App.inflowCategories.includes(d.category);
             const valNum = Number(d.amount) || 0;
@@ -83,7 +76,6 @@ const U = {
             if(isIncome) totalIn += valNum; else totalOut += valNum;
             extrato.push(item);
         });
-
         extrato.sort((a, b) => a.date - b.date);
         let saldoAtual = 0;
         extrato = extrato.map(item => {
@@ -93,7 +85,6 @@ const U = {
         extrato.reverse();
         return { extrato, totalIn, totalOut };
     },
-
     formatDesc: (text) => {
         if(text.includes('| Cliente:')) {
             const parts = text.split('| Cliente:');
@@ -101,7 +92,6 @@ const U = {
         }
         return text;
     },
-
     initFilters() {
         const opts = this.generateQuinzenasOptions();
         ['filter-comissao-quinzena', 'filter-relatorios'].forEach(id => {
@@ -110,7 +100,6 @@ const U = {
         });
     }
 };
-
 const CustomSelect = {
     render(id, placeholder, optionsHtml, onChangeGlobalName = '', initialValue = '') {
         return `
@@ -134,18 +123,15 @@ const CustomSelect = {
         const menu = document.getElementById(`menu-${id}`);
         const wrapper = document.getElementById(`wrapper-${id}`);
         const isOpening = menu.style.display === 'none' || menu.style.display === '';
-
         document.querySelectorAll('.aqc-select-menu').forEach(el => el.style.display = 'none');
         document.querySelectorAll('.aqc-custom-select').forEach(el => {
             el.style.zIndex = '1';
             if(el.parentElement) el.parentElement.style.zIndex = '';
         });
-
         if (isOpening) {
             menu.style.display = 'flex';
             wrapper.style.zIndex = '999999';
             if(wrapper.parentElement) { wrapper.parentElement.style.position = 'relative'; wrapper.parentElement.style.zIndex = '999999'; }
-
             const rect = wrapper.getBoundingClientRect();
             const spaceBelow = window.innerHeight - rect.bottom;
             
@@ -185,11 +171,9 @@ const CustomSelect = {
         });
     }
 };
-
 document.addEventListener('click', CustomSelect.closeAll);
 window.handleNewClient = function(val) { const div = document.getElementById('fa-new-cli-div'); if(div) div.style.display = val === 'NEW' ? 'block' : 'none'; };
 window.handleNewClientComanda = function(val) { const div = document.getElementById('fcom-new-cli-div'); if(div) div.style.display = val === 'NEW' ? 'block' : 'none'; };
-
 const UI = {
     toast(msg, type='success') {
         const cont = document.getElementById('toast-container');
@@ -212,7 +196,6 @@ const UI = {
         else this.toast('Utilize os botões na tela para cadastros rápidos.', 'error');
     }
 };
-
 const Tour = {
     allSteps: [
         { role: 'all', view: 'agenda', target: '#btn-novo-agendamento-tour', mobileTarget: '.fab-button', title: '1. Agenda Inteligente', text: 'Aqui você visualiza e gerencia horários. Clique aqui para agendar um cliente, gerar um encaixe ou bloquear a agenda.' },
@@ -282,7 +265,6 @@ const Tour = {
         document.getElementById('tour-dialog').style.transform = 'none'; localStorage.setItem('aqc_tour_done', 'true');
     }
 };
-
 const Auth = {
     init() { document.getElementById('login-form').onsubmit = e => { e.preventDefault(); this.login(); }; },
     async login() {
@@ -303,9 +285,22 @@ const Auth = {
         try { const { data: avData } = await db.from('user_avatars').select('*'); if(avData) { avData.forEach(av => { App.avatars[av.user_id] = av.avatar_base64; }); } } catch (e) { console.log('Tabela user_avatars ignorada.'); }
     },
     async success() {
-        document.getElementById('auth-layer').classList.add('hidden'); document.getElementById('system-layout').classList.remove('hidden'); document.body.classList.toggle('is-owner', App.role === 'owner');
+        // --- VERIFICAÇÃO DE MODO MANUTENÇÃO ---
         const { data: set } = await db.from('settings').select('*').single();
-        if(set) { App.settings = set; document.getElementById('brand-name').textContent = set.studio_name; }
+        if(set) { 
+            App.settings = set; 
+            document.getElementById('brand-name').textContent = set.studio_name; 
+            
+            // Se manutenção estiver ativa E o usuário NÃO for admin.teste
+            if(set.maintenance_mode === true && App.user.username !== 'admin.teste') {
+                window.location.href = 'manutencao.html';
+                return; // Para a execução do resto do script
+            }
+        }
+        // --- FIM DA VERIFICAÇÃO ---
+
+        document.getElementById('auth-layer').classList.add('hidden'); document.getElementById('system-layout').classList.remove('hidden'); document.body.classList.toggle('is-owner', App.role === 'owner');
+        
         App.avatars = {}; await this.fetchAllAvatars(); this.updateHeaderAvatar();
         U.initFilters(); Nav.init(); Render.showMonthView(); 
         
@@ -322,7 +317,6 @@ const Auth = {
     },
     logout() { UI.confirm('Deseja realmente sair da sua conta?', () => { window.location.reload(true); }); }
 };
-
 const Nav = {
     init() {
         document.querySelectorAll('.nav-link, .b-item').forEach(link => {
@@ -356,7 +350,6 @@ const Nav = {
     toggleMenu() { document.getElementById('main-sidebar').classList.toggle('open'); document.getElementById('mobile-overlay').classList.toggle('hidden'); },
     closeMenu() { document.getElementById('main-sidebar').classList.remove('open'); document.getElementById('mobile-overlay').classList.add('hidden'); }
 };
-
 const Render = {
     showMonthView() {
         document.getElementById('agenda-day-view').classList.add('hidden'); document.getElementById('agenda-month-view').classList.remove('hidden');
@@ -364,7 +357,6 @@ const Render = {
         this.buildMonthCalendar();
     },
     changeMonth(dir) { App.calendarMonth.setMonth(App.calendarMonth.getMonth() + dir); this.buildMonthCalendar(); },
-
     async buildMonthCalendar() {
         const year = App.calendarMonth.getFullYear(); const month = App.calendarMonth.getMonth();
         document.getElementById('cal-month-year').textContent = App.calendarMonth.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
@@ -377,7 +369,6 @@ const Render = {
             if(App.role !== 'owner') query = query.eq('user_id', App.user.id);
             const { data } = await query; if(data) monthApps = data;
         } catch(e) {}
-
         const grid = document.getElementById('cal-grid'); let html = ''; const weekDays = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
         weekDays.forEach(d => { html += `<div class="cal-grid-header">${d}</div>`; });
         for (let i = 0; i < firstDay.getDay(); i++) { html += `<div class="cal-day empty"></div>`; }
@@ -392,14 +383,12 @@ const Render = {
         }
         grid.innerHTML = html;
     },
-
     selectDate(iso) { 
         App.currentDate = new Date(iso+'T12:00:00'); 
         document.getElementById('agenda-month-view').classList.add('hidden'); document.getElementById('agenda-day-view').classList.remove('hidden');
         document.getElementById('btn-voltar-mes').classList.remove('hidden'); document.getElementById('day-view-title').classList.remove('hidden');
         this.agendaDay(); 
     },
-
     async agendaDay() {
         this.buildWeekStrip(); 
         try {
@@ -407,11 +396,9 @@ const Render = {
             let query = db.from('appointments').select('*, clients(name, phone), services(name, duration), users!user_id(name)').eq('date', dateStr).neq('status', 'cancelado').order('time', {ascending: true});
             if (App.role !== 'owner') query = query.eq('user_id', App.user.id);
             const { data: agData, error: errAg } = await query; if(errAg) throw errAg;
-
             let uQuery = db.from('users').select('id, name, schedule, phone').neq('username', 'admin.teste').eq('active', true).neq('is_deleted', true).order('name');
             if(App.role !== 'owner') uQuery = uQuery.eq('id', App.user.id);
             let { data: usersData } = await uQuery;
-
             if(usersData) {
                 const currentDayOfWeek = App.currentDate.getDay();
                 usersData.forEach(u => {
@@ -420,13 +407,11 @@ const Render = {
                     u.isOffDay = dayConf ? dayConf.active === false : false;
                 });
             }
-
             const cont = document.getElementById('agenda-list');
             if(!usersData || usersData.length === 0) { 
                 cont.innerHTML = `<div class="card" style="text-align:center; padding:4rem 1rem"><i class="ph ph-calendar-x" style="font-size:3rem; color:var(--muted); margin-bottom:10px;"></i><p style="color:var(--muted); font-size:1.1rem">Nenhum profissional cadastrado.</p></div>`; 
                 return; 
             }
-
             const isDesktop = window.innerWidth > 900; const pixelsPerMin = isDesktop ? 1 : 1.3; const slotHeight = isDesktop ? 60 : 78; const horaInicio = 7; const horaFim = 21;
             let html = `<div class="timeline-wrapper" style="overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border: 1px solid var(--border); border-radius: 8px;"><div class="timeline-header" style="display: flex; min-width: max-content; border-bottom: 1px solid var(--border);"><div class="time-col" style="position: sticky; left: 0; z-index: 20; background: var(--surface); border:none; min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);"></div>`;
             usersData.forEach(u => { 
@@ -461,7 +446,6 @@ const Render = {
             }); html += `</div></div></div>`; cont.innerHTML = html;
         } catch (e) { UI.toast(`Erro na agenda: ${e.message}`, 'error'); }
     },
-
     buildWeekStrip() {
         const d = App.currentDate; let strTitle = d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
         document.getElementById('day-view-title').textContent = strTitle.charAt(0).toUpperCase() + strTitle.slice(1);
@@ -469,7 +453,6 @@ const Render = {
         for(let i=0; i<7; i++) { const cur = new Date(start); cur.setDate(start.getDate() + i); const isoCur = U.iso(cur); const isSel = isoCur === U.iso(App.currentDate) ? 'active' : ''; html += `<div class="cal-day ${isSel}" onclick="Render.selectDate('${isoCur}')"><span>${days[cur.getDay()]}</span><span>${cur.getDate()}</span></div>`; }
         document.getElementById('cal-days-row').innerHTML = html;
     },
-
     async clientes() { const { data } = await db.from('clients').select('*').order('name'); window.allClientes = data || []; this.renderClientesList(window.allClientes); },
     renderClientesList(data) {
         document.getElementById('clientes-list').innerHTML = data.map(c => {
@@ -501,11 +484,9 @@ const Render = {
         const list = document.getElementById('perfil-visitas-list'); if(!comandas || comandas.length === 0) { list.innerHTML = "<p style='color:var(--muted); padding:2rem; text-align:center;'>Nenhum histórico.</p>"; return; }
         list.innerHTML = comandas.map(c => { const itens = (c.items||[]).map(i => i.name).join(', '); return `<div class="card" style="margin-bottom:10px;"><h4 style="color:var(--primary-dark); font-size:1.1rem; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;"><i class="ph ph-calendar"></i> ${U.date(c.created_at)}</h4><p style="margin-bottom:5px;"><b>Ticket Associado:</b> ${c.ticket || 'S/N'}</p><p style="margin-bottom:5px;"><b>Profissional que Abriu:</b> ${c.users?.name || 'Não informado'}</p><p style="margin-bottom:5px;"><b>Serviços/Produtos:</b> ${itens || 'Nenhum detalhe salvo'}</p><p><b>Total Investido:</b> ${U.money(c.total)}</p></div>`; }).join('');
     },
-
     async cobrancas(tab = 'pendentes') {
         const tabPendentes = document.getElementById('tab-pendentes-tour');
         const tabPagos = document.getElementById('tab-pagos');
-
         if (tabPendentes) {
             tabPendentes.classList.toggle('active-tab', tab === 'pendentes');
             tabPendentes.style.background = tab === 'pendentes' ? '#f0f0f0' : 'transparent';
@@ -516,7 +497,6 @@ const Render = {
             tabPagos.style.background = tab === 'pagos' ? '#f0f0f0' : 'transparent';
             tabPagos.style.border = tab === 'pagos' ? 'none' : '1px solid transparent';
         }
-
         let query = db.from('debts').select('*, clients(name)').order('created_at', {ascending: false});
         if(tab === 'pendentes') query = query.gt('remaining_amount', 0); else query = query.eq('remaining_amount', 0);
         const { data: debts, error } = await query; const cont = document.getElementById('cobrancas-list');
@@ -546,7 +526,6 @@ const Render = {
         }
         cont.innerHTML = htmlFinal;
     },
-
     async servicos() { const { data } = await db.from('services').select('*').order('name'); window.allServicos = data || []; this.renderServicosList(window.allServicos); },
     renderServicosList(data) {
         const cont = document.getElementById('servicos-list'); if(!data || data.length === 0) { cont.innerHTML = '<p style="color:var(--muted); padding: 1rem;">Nenhum serviço encontrado.</p>'; return; }
@@ -572,10 +551,8 @@ const Render = {
             const el = document.getElementById('filter-comanda-data');
             if (el && el.value) App.comandasState.date = el.value;
         }
-
         const currentStatus = App.comandasState.status;
         const currentDate = App.comandasState.date;
-
         const tabAbertas = document.getElementById('tab-comandas-abertas');
         const tabFechadas = document.getElementById('tab-comandas-fechadas');
         
@@ -589,15 +566,12 @@ const Render = {
             tabFechadas.style.background = currentStatus === 'fechada' ? '#f0f0f0' : 'transparent';
             tabFechadas.style.border = currentStatus === 'fechada' ? 'none' : '1px solid transparent';
         }
-
         const dateInput = document.getElementById('filter-comanda-data');
         if (dateInput && dateInput.value !== currentDate) {
             dateInput.value = currentDate;
         }
-
         const startOfDay = `${currentDate}T00:00:00`;
         const endOfDay = `${currentDate}T23:59:59`;
-
         try {
             const { data, error } = await db.from('comandas')
                 .select('*, clients(name)')
@@ -605,18 +579,15 @@ const Render = {
                 .gte('created_at', startOfDay)
                 .lte('created_at', endOfDay)
                 .order('created_at', {ascending: false});
-
             const container = document.getElementById('comandas-list');
             
             if (error) throw error;
-
             if (!data || data.length === 0) {
                 const parts = currentDate.split('-');
                 const brDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
                 container.innerHTML = `<div style="text-align:center; grid-column: 1 / -1; padding: 3rem 1rem; border:2px dashed var(--border); border-radius:12px;"><i class="ph ph-receipt" style="font-size: 3rem; color: var(--muted); margin-bottom: 10px;"></i><p style="color:var(--muted); font-size:1.1rem;">Nenhuma comanda <b>${currentStatus}</b> neste dia.<br><br> ${brDate}</p></div>`;
                 return;
             }
-
             container.innerHTML = data.map(c => `
                 <div class="card" style="border-left: 5px solid ${c.status === 'aberta' ? 'var(--primary)' : '#8E8E93'}; position: relative; overflow:hidden;">
                     <div style="display:flex; justify-content:space-between; align-items:flex-start;">
@@ -635,7 +606,6 @@ const Render = {
             document.getElementById('comandas-list').innerHTML = `<p style="color:var(--muted)">Erro ao carregar: ${e.message}</p>`;
         }
     },
-
     async mensagens() {
         const { data } = await db.from('message_templates').select('*');
         document.getElementById('mensagens-list').innerHTML = data.map(m => `<div class="card"><h4 style="color:var(--primary); border-bottom:1px solid #eee; padding-bottom:10px">${m.title}</h4><p style="margin:15px 0; font-style:italic; color:var(--muted)">"${m.content}"</p><div style="display:flex; gap:10px"><button class="btn-secondary" style="flex:1" onclick="Modals.open('edit_mensagem', '${m.id}')"><i class="ph ph-pencil"></i> Editar</button><button class="btn-secondary" style="flex:1; color:#d32f2f; background:#ffebee" onclick="Actions.deleteMensagem('${m.id}')"><i class="ph ph-trash"></i> Excluir</button></div></div>`).join('');
@@ -657,7 +627,6 @@ const Render = {
             despesasOnly.map(d => { let color = '#d32f2f'; if(d.category === 'Comissões') color = '#cd7f32'; else if(d.category === 'Pessoal/Pagamentos') color = '#8e24aa'; else if(d.category === 'Custos Variáveis') color = '#e65100'; return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${color}"><div><h4>${d.description}</h4><p style="font-size:0.8rem; color:var(--muted)">${d.category} • ${U.date(d.date)}</p></div><div class="val" style="color:${color}">-${U.money(d.amount)}</div></div>`; }).join('');
         if(App.charts.despesas) App.charts.despesas.destroy(); App.charts.despesas = new Chart(document.getElementById('chart-despesas'), { type: 'pie', data: { labels: Object.keys(totais), datasets: [{ data: Object.values(totais), backgroundColor: ['#d32f2f', '#cd7f32', '#8e24aa', '#e65100'] }] }});
     },
-
     async comissao() {
         const isOwner = App.role === 'owner';
         
@@ -682,7 +651,6 @@ const Render = {
                 btnClear.classList.add('hidden'); infoDiv.innerHTML = ''; if(defaultSel) defaultSel.style.display = 'block';
             }
         }
-
         let query = db.from('comandas').select('*, clients(name)').order('created_at', {ascending: false});
         
         if (App.filters.comissoes) {
@@ -693,7 +661,6 @@ const Render = {
             const range = U.getQuinzenaDates(qFilter);
             query = query.gte('created_at', range.start).lte('created_at', range.end).eq('status', 'fechada');
         }
-
         const { data } = await query;
         let totalComissao = 0; 
         let rank = {}; 
@@ -709,10 +676,8 @@ const Render = {
             const parts = dateTimeStr.split(/[\s,]+/);
             const dateStr = parts[0]; 
             const timeStr = parts[1] || '00:00'; 
-
             c.items.forEach(i => {
                 let showCard = false;
-
                 if (isOwner) {
                     if (profFilterActive) {
                         if (i.prof_id !== App.filters.comissoes.prof_id) return;
@@ -722,7 +687,6 @@ const Render = {
                     if (i.prof_id !== App.user.id) return;
                     showCard = true;
                 }
-
                 if(i.commission) {
                     const v = (i.price * i.commission) / 100; 
                     
@@ -732,7 +696,6 @@ const Render = {
                             rank[i.prof_id].total += v;
                         }
                     }
-
                     if (showCard) {
                         totalComissao += v;
                         details.push({
@@ -750,13 +713,11 @@ const Render = {
                 }
             });
         });
-
         const groupedDetails = {};
         details.forEach(d => {
             if(!groupedDetails[d.date]) groupedDetails[d.date] = [];
             groupedDetails[d.date].push(d);
         });
-
         let htmlCards = '';
         if (details.length === 0) {
             htmlCards = '<p style="color:var(--muted)">Nenhum registro encontrado para este período.</p>';
@@ -836,7 +797,6 @@ const Render = {
             w.innerHTML = `<button class="btn-primary" style="background:#2e7d32; width:auto;" onclick="Modals.open('nova_receita')"><i class="ph ph-plus-circle"></i> Lançar Receita/Entrada Manual</button>`;
             rc.parentNode.insertBefore(w, rc);
         }
-
         const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); 
         const { data: desp } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
         
@@ -852,7 +812,6 @@ const Render = {
         document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações na quinzena.</p>' :
             extrato.map(i => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;"><div style="flex:1"><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Saída'} - ${i.category}</b><p style="margin-top:5px; font-weight:600; font-size:1.1rem">${U.formatDesc(i.desc)}</p><span style="font-size:0.8rem; color:var(--muted); display:inline-block; margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(i.date)}</span></div><div style="text-align:right"><span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.3rem; display:block">${i.type==='in'?'+':'-'} ${U.money(i.val)}</span><span style="font-size:0.85rem; color:var(--muted); font-weight:bold">Caixa: ${U.money(i.saldo)}</span></div></div>`).join('');
     },
-
     async relatorios() {
         const relContainer = document.getElementById('relatorio-despesas-conteudo');
         if(relContainer) {
@@ -875,7 +834,6 @@ const Render = {
                 btnClear.classList.add('hidden'); infoDiv.innerHTML = ''; if(defaultSel) defaultSel.style.display = 'block';
             }
         }
-
         let desp = [];
         if (App.filters.relatorios) {
             let f = App.filters.relatorios;
@@ -897,14 +855,12 @@ const Render = {
             const { data } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end).order('date', {ascending: false});
             desp = data || [];
         }
-
         const { extrato, totalIn, totalOut } = U.buildExtrato(desp);
         
         let isReceitaFilter = App.filters.relatorios?.tipo === 'Receitas';
         let targetList = isReceitaFilter 
             ? desp.filter(d => App.inflowCategories.includes(d.category)) 
             : desp.filter(d => !App.inflowCategories.includes(d.category));
-
         let htmlDesp = '';
         if(targetList.length === 0) { 
             let msgText = isReceitaFilter ? 'Nenhuma entrada/receita encontrada nesse período.' : 'Sem gastos registrados para este filtro.';
@@ -917,7 +873,6 @@ const Render = {
         
         window.currentDespesasData = targetList;
         window.currentRelatorioTipo = isReceitaFilter ? 'Receitas' : 'Despesas';
-
         let htmlFluxo = '';
         if(extrato.length === 0) { htmlFluxo = '<p style="color:var(--muted); text-align:center;">Nenhuma movimentação para este filtro.</p>'; }
         else {
@@ -928,7 +883,6 @@ const Render = {
         if(fluxoContainer) fluxoContainer.innerHTML = htmlFluxo;
         window.currentFluxoData = extrato; window.currentTotaisFluxo = { receita: totalIn, gasto: totalOut, lucro: totalIn - totalOut };
     },
-
     async performance() {
         const [ {data}, {data:agendas} ] = await Promise.all([ db.from('comandas').select('*, items').eq('status', 'fechada'), db.from('appointments').select('*') ]);
         let rankFunc = {}; let rankServ = {}; let totalFaturamento = 0;
@@ -959,9 +913,19 @@ const Render = {
     configuracoes() {
         document.getElementById('cfg-name').value = App.settings.studio_name || '';
         document.getElementById('cfg-phone').value = App.settings.official_phone || '';
+        
+        // Lógica para mostrar/esconder área do admin.teste
+        const adminArea = document.getElementById('admin-maintenance-area');
+        const checkMaint = document.getElementById('cfg-maintenance');
+        
+        if(App.user.username === 'admin.teste') {
+            adminArea.classList.remove('hidden');
+            checkMaint.checked = App.settings.maintenance_mode === true;
+        } else {
+            adminArea.classList.add('hidden');
+        }
     }
 };
-
 const Modals = {
     async open(type, param1=null, param2=null, param3=null) {
         const cont = document.getElementById('modal-container');
@@ -982,14 +946,12 @@ const Modals = {
                     endStr = parts[0].replace('BLOQUEIO_ATE:', '').trim(); 
                     motivo = parts.slice(1).filter(p => !p.includes('ADMIN_BLOCK')).join(' | ').trim();
                 }
-
                 let removerBtnHtml = '';
                 if (isAdminBlock && App.role !== 'owner') {
                     removerBtnHtml = `<p style="color: #d32f2f; text-align:center; font-weight:bold; margin-top:10px;"><i class="ph ph-lock"></i> Bloqueio Administrativo (Apenas gestor pode remover)</p>`;
                 } else {
                     removerBtnHtml = `<button class="btn-primary" style="background:#d32f2f; padding:1.2rem; width:100%" onclick="Actions.deleteAppointment('${a.id}')"><i class="ph ph-trash"></i> Remover Bloqueio</button>`;
                 }
-
                 html += `<div style="text-align: center; margin-bottom: 20px;"><h3 style="margin: 0; color: #d32f2f;"><i class="ph ph-prohibit"></i> Horário Bloqueado</h3></div>
                 <div style="background: #fafafa; border: 1px solid var(--border); border-radius: 12px; padding: 15px; margin-bottom: 20px;">
                     <p style="margin-bottom:8px"><strong>Data:</strong> ${new Date(a.date + 'T12:00:00').toLocaleDateString('pt-BR')}</p>
@@ -1079,7 +1041,6 @@ const Modals = {
             </div>`).join('');
             
             let delBtnHtml = (App.role === 'owner' && !isFechada) ? `<button class="btn-secondary" style="width:auto; padding:0.5rem 0.8rem; color:#d32f2f; border:1px solid #d32f2f; margin-right: 40px;" onclick="Actions.deleteComanda('${comanda.id}')"><i class="ph ph-trash"></i> Deletar</button>` : '';
-
             html += `<div style="text-align: left; margin-bottom: 20px;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <h3 style="margin: 0; color: var(--primary-dark);">Ticket: <span style="color:var(--primary)">${comanda.ticket || '-'}</span></h3> 
@@ -1170,7 +1131,6 @@ const Modals = {
                     <div class="input-group" style="margin-bottom:10px;"><label>Nome Completo (Novo Cliente)</label><input type="text" id="fa-new-nome" placeholder="Ex: Maria Silva"></div>
                     <div class="input-group" style="margin:0;"><label>WhatsApp com DDD</label><input type="text" id="fa-new-fone" placeholder="Ex: 86999999999"></div>
                 </div>
-
                 <div class="input-group">
                     <label>Serviço</label>
                     ${CustomSelect.render('fa-serv', '-- Buscar Serviço --', servOpts)}
@@ -1315,7 +1275,6 @@ const Modals = {
                     <div class="input-group" style="flex:1; min-width:150px;"><label>Telefone/WhatsApp</label><input type="text" id="ff-fone" value="${f.phone || ''}" placeholder="Ex: 86999999999"></div>
                     <div class="input-group" style="flex:1; min-width:150px;"><label>Data de Nascimento</label><input type="date" id="ff-nasc" value="${f.birth_date || ''}"></div>
                 </div>
-
                 <div class="input-group"><label>Nível de Acesso</label><select id="ff-role" required><option value="colaborador" ${f.role==='colaborador'?'selected':''}>Colaborador</option><option value="owner" ${f.role==='owner'?'selected':''}>Proprietário/Gestor</option></select></div>
                 
                 <div class="input-group" style="background:#f9f9f9; padding:15px; border-radius:12px; border:1px solid #eee;">
@@ -1331,7 +1290,6 @@ const Modals = {
                         <label style="cursor:pointer; background:#fff; padding:6px 12px; border-radius:6px; border:1px solid #ccc; font-size:0.9rem"><input type="checkbox" id="chk-sab" ${sched["6"]?.active !== false ? 'checked' : ''}> Sáb</label>
                     </div>
                 </div>
-
                 ${param1 ? `<div class="input-group" style="background:#f1f8e9; padding:15px; border-radius:12px; border:1px solid #c5e1a5"><label style="margin:0"><input type="checkbox" id="ff-ativo" ${f.active !== false ? 'checked' : ''}> Conta Ativa (Permitir Login no Sistema)</label></div><button type="button" class="btn-secondary" style="margin-bottom:15px; color:var(--primary)" onclick="Actions.resetFuncionarioPassword('${param1}')"><i class="ph ph-key"></i> Resetar Senha para 123456</button>` : ''}
                 <button type="submit" class="btn-primary" style="padding:1.2rem">Salvar Colaborador</button></form>`;
         }
@@ -1398,7 +1356,6 @@ const Modals = {
         }
         
         html += `</div>`; cont.innerHTML = html; cont.classList.remove('hidden');
-
         if(type === 'whatsapp' && window.currentWppVars && window.currentWppVars._kind) {
             const { data: templates } = await db.from('message_templates').select('*');
             const pattern = window.currentWppVars._kind === 'aniversario' ? /anivers/i : /confirma/i;
@@ -1408,7 +1365,6 @@ const Modals = {
     },
     close() { document.getElementById('modal-container').classList.add('hidden'); }
 };
-
 const Actions = {
     changeComandaDate(dir) {
         const dateInput = document.getElementById('filter-comanda-data');
@@ -1421,14 +1377,12 @@ const Actions = {
         dateInput.value = newDate;
         Render.comandas(null, newDate);
     },
-
     consultarDisponibilidade(phone, name) {
         if(!phone || phone === 'undefined') return UI.toast('Profissional não possui telefone cadastrado.', 'error');
         const msg = `Oii ${name}, gostaria da sua disponibilidade para atendimento hoje?`;
         window.open(`https://wa.me/55${phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
         Modals.close();
     },
-
     async liberarDia(userId) {
         UI.confirm('Deseja liberar a agenda deste profissional para o dia de hoje?', async () => {
             const { data: user } = await db.from('users').select('schedule').eq('id', userId).single();
@@ -1445,7 +1399,6 @@ const Actions = {
             }
         });
     },
-
     exportPDF(viewType, quinzenaStr) {
         if(!window.jspdf) return UI.toast('Carregando PDF. Tente novamente em instantes.', 'warning');
         const { jsPDF } = window.jspdf; const doc = new jsPDF();
@@ -1484,7 +1437,6 @@ const Actions = {
         Modals.close(); Render.relatorios();
     },
     clearFilterRelatorios() { App.filters.relatorios = null; Render.relatorios(); },
-
     applyFilterComissoes(e) {
         e.preventDefault(); const profVal = document.getElementById('fcom-prof') ? document.getElementById('fcom-prof').value : '';
         App.filters.comissoes = { start: document.getElementById('fcom-start').value, end: document.getElementById('fcom-end').value, prof_id: profVal ? profVal.split('|')[0] : null, prof_name: profVal ? profVal.split('|')[1] : null };
@@ -1507,7 +1459,6 @@ const Actions = {
         App.filters.comissoes = { start: s, end: e, prof_id: profId, prof_name: profName };
         Render.comissao();
     },
-
     async createReceita(e) {
         e.preventDefault();
         const valorReceita = parseFloat(document.getElementById('fr-val').value) || 0;
@@ -1525,7 +1476,6 @@ const Actions = {
         Render['resumo-financeiro']();
         if (App.view === 'relatorios') { Render.relatorios(); }
     },
-
     async updatePassword(e) {
         e.preventDefault(); const newPass = document.getElementById('new-pass').value;
         if(newPass.length < 3) return UI.toast('Senha muito curta.', 'error');
@@ -1533,7 +1483,6 @@ const Actions = {
         App.user.first_login = false; Modals.close(); UI.toast('Senha salva!');
         if (!localStorage.getItem('aqc_tour_done')) setTimeout(() => { Tour.start(); }, 500);
     },
-
     applyTemplate(templateId) {
         const box = document.getElementById('wpp-msg');
         if(!templateId) { box.value = ''; return; }
@@ -1541,7 +1490,6 @@ const Actions = {
             if(!data) return; box.value = U.fillTemplate(data.content, window.currentWppVars || {});
         });
     },
-
     async sendConfirmacao(appId) {
         const { data: a } = await db.from('appointments').select('*, clients(name, phone), services(name), users!user_id(name)').eq('id', appId).single();
         if(!a.clients?.phone) return UI.toast('Sem telefone cadastrado.', 'error');
@@ -1560,27 +1508,22 @@ const Actions = {
         const btn = e.target.querySelector('button[type="submit"]');
         const originalText = btn.innerHTML;
         btn.innerHTML = 'Salvando...'; btn.disabled = true;
-
         try {
             const idCliente = e.target.getAttribute('data-client-id');
             if (!idCliente || idCliente === 'undefined' || idCliente === 'null') {
                 throw new Error('Erro Crítico: Cliente não identificado. Volte e tente novamente.');
             }
-
             const tecnica = document.getElementById('fo-tecnica').value.trim();
             const obs = document.getElementById('fo-obs').value.trim();
-
             if (!tecnica && !obs) {
                 throw new Error('Preencha ao menos a técnica ou a observação antes de salvar.');
             }
-
             const { error } = await db.from('anamnesis').insert({ 
                 client_id: idCliente, 
                 user_id: App.user.id, 
                 history: tecnica, 
                 notes: obs 
             });
-
             if (error) throw new Error(error.message);
             
             Modals.close(); 
@@ -1601,7 +1544,6 @@ const Actions = {
                 <i class="ph ph-spinner ph-spin" style="font-size: 2.5rem; color: var(--primary);"></i>
                 <p style="color:var(--muted); margin-top:10px;">Carregando histórico do cliente...</p>
             </div>`;
-
         const { data, error } = await db.from('anamnesis')
             .select('*, users!user_id(name)')
             .eq('client_id', id)
@@ -1630,7 +1572,6 @@ const Actions = {
             <div class="card" style="border-left: 4px solid ${isLatest ? 'var(--primary)' : '#b0bec5'}; background: ${isLatest ? '#fffafb' : '#ffffff'}; box-shadow: 0 4px 10px rgba(0,0,0,0.03); position:relative;">
                 
                 ${isLatest ? `<span style="position:absolute; top:-12px; right:20px; background:var(--primary); color:white; font-size:0.7rem; padding:4px 12px; border-radius:20px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.2);">MAIS RECENTE</span>` : ''}
-
                 <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 1px solid #f0f0f0; padding-bottom: 10px; margin-bottom: 12px;">
                     <div>
                         <span style="color: ${isLatest ? 'var(--primary-dark)' : '#546e7a'}; font-size: 0.85rem; font-weight: bold; background: ${isLatest ? 'var(--primary-light)' : '#eceff1'}; padding: 4px 10px; border-radius: 20px;">
@@ -1649,19 +1590,20 @@ const Actions = {
                     ${d.history ? `
                     <div style="background: #f8f9fa; padding: 12px; border-radius: 8px; border-left: 3px solid #6c757d;">
                         <span style="font-size: 0.75rem; color: #6c757d; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 5px;"><i class="ph ph-flask"></i> Técnica Aplicada</span>
-                        <p style="color: #333; line-height: 1.5; font-size: 0.95rem; margin:0;">${d.history.replace(/\n/g, '<br>')}</p>
+                        <p style="color: #333; line-height: 1.5; font-size: 0.95rem; margin:0;">${d.history.replace(/
+/g, '<br>')}</p>
                     </div>` : ''}
                     
                     ${d.notes ? `
                     <div style="background: #fff3e0; padding: 12px; border-radius: 8px; border-left: 3px solid #ff9800;">
                         <span style="font-size: 0.75rem; color: #e65100; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; display: block; margin-bottom: 5px;"><i class="ph ph-warning-circle"></i> Observações / Alertas</span>
-                        <p style="color: #333; line-height: 1.5; font-size: 0.95rem; margin:0;">${d.notes.replace(/\n/g, '<br>')}</p>
+                        <p style="color: #333; line-height: 1.5; font-size: 0.95rem; margin:0;">${d.notes.replace(/
+/g, '<br>')}</p>
                     </div>` : ''}
                 </div>
             </div>`;
         }).join('') + `</div>`;
     },
-
     async saveFuncionario(e, id) {
         e.preventDefault();
         const nomeDisplay = document.getElementById('ff-nome').value.trim();
@@ -1680,7 +1622,6 @@ const Actions = {
             "5": { active: document.getElementById('chk-sex').checked },
             "6": { active: document.getElementById('chk-sab').checked }
         };
-
         const payload = { 
             name: nomeDisplay, 
             role: role, 
@@ -1688,7 +1629,6 @@ const Actions = {
             birth_date: birthDate, 
             schedule: schedule 
         };
-
         if(id) {
             payload.active = document.getElementById('ff-ativo').checked;
             await db.from('users').update(payload).eq('id', id);
@@ -1707,7 +1647,6 @@ const Actions = {
     async resetFuncionarioPassword(id) { await db.from('users').update({ password: '123456', first_login: true }).eq('id', id); Modals.close(); UI.toast('Senha 123456'); Render.funcionarios(); },
     async deleteFuncionario(id) { UI.confirm('Inativar e esconder colaborador permanentemente?', async () => { await db.from('users').update({ is_deleted: true, active: false }).eq('id', id); UI.toast('Conta removida.'); Render.funcionarios(); }); },
     async toggleFuncionarioStatus(id, isActive) { await db.from('users').update({ active: !isActive }).eq('id', id); Render.funcionarios(); },
-
     async createAppointment(e) {
         e.preventDefault(); 
         const btn = e.target.querySelector('button[type="submit"]');
@@ -1728,19 +1667,15 @@ const Actions = {
                 clientId = newCli.id;
                 Render.clientes(); 
             }
-
             const servVal = document.getElementById('fa-serv').value;
             if(!servVal) throw new Error('Selecione o serviço!');
             const [service_id, durStr] = servVal.split('|');
             const dur = parseInt(durStr || 60); 
-
             const encaixe = document.getElementById('fa-encaixe').checked;
             const time = document.getElementById('fa-time').value; 
             const date = document.getElementById('fa-date').value; 
             const user_id = document.getElementById('fa-user').value;
-
             if(!user_id) throw new Error('Selecione o Profissional!');
-
             const { data: over } = await db.from('appointments').select('time, status, notes, services(duration)').eq('date', date).eq('user_id', user_id).neq('status', 'cancelado');
             let conflitoNormal = false;
             let conflitoAdmin = false;
@@ -1766,14 +1701,12 @@ const Actions = {
                     }
                 });
             }
-
             if (conflitoAdmin && App.role !== 'owner') {
                 throw new Error('Horário bloqueado pelo Gestor. O Encaixe não é permitido neste caso.');
             }
             if ((conflitoNormal || conflitoAdmin) && !encaixe) {
                 throw new Error('Horário ocupado! Marque a opção "Forçar Encaixe" se for estritamente necessário.');
             }
-
             const { error: insertErr } = await db.from('appointments').insert({ 
                 client_id: clientId, 
                 service_id: service_id, 
@@ -1809,7 +1742,6 @@ const Actions = {
         const targetUserId = userTargetObj ? userTargetObj.value : App.user.id;
         
         const isAdminBlock = App.role === 'owner' ? ' | ADMIN_BLOCK' : '';
-
         if (start >= end) return UI.toast('Término deve ser maior que início.', 'error');
         
         await db.from('appointments').insert({ 
@@ -1828,31 +1760,24 @@ const Actions = {
     async markAsArrived(id) { await db.from('appointments').update({ status: 'chegou' }).eq('id', id); Render.agendaDay(); Modals.close(); },
     async deleteAppointment(id) { UI.confirm('Remover bloqueio?', async () => { await db.from('appointments').delete().eq('id', id); Modals.close(); Render.agendaDay(); }); },
     async cancelAppointment(id) { UI.confirm('Cancelar agendamento?', async () => { await db.from('appointments').update({ status: 'cancelado' }).eq('id', id); Modals.close(); Render.agendaDay(); }); },
-
     async createComanda(e) {
         e.preventDefault(); 
         const btn = document.getElementById('btn-gera-comanda'); 
         const originalText = btn.innerHTML;
         btn.disabled = true; btn.innerHTML = "Gerando...";
-
         try {
             let clientId = document.getElementById('fcom-cli').value;
-
             if(clientId === 'NEW') {
                 const newNome = document.getElementById('fcom-new-nome').value.trim();
                 const newFone = document.getElementById('fcom-new-fone').value.trim();
                 const newNasc = document.getElementById('fcom-new-nasc').value;
                 if(!newNome) throw new Error('Preencha o nome do novo cliente.');
-
                 const { data: newCli, error: cliErr } = await db.from('clients').insert({ name: newNome, phone: newFone || null, birth_date: newNasc || null }).select().single();
                 if(cliErr || !newCli) throw new Error('Erro ao salvar o cliente novo no banco de dados.');
-
                 clientId = newCli.id;
                 Render.clientes();
             }
-
             if(!clientId) throw new Error('Selecione ou cadastre um cliente.');
-
             const { data } = await db.from('comandas').select('ticket');
             let maxNum = 0; (data || []).forEach(c => { if (c.ticket) { const n = parseInt(c.ticket.split('-')[1], 10); if (n > maxNum) maxNum = n; } });
             const tk = 'TKT-' + String(maxNum + 1).padStart(4, '0');
@@ -1869,28 +1794,23 @@ const Actions = {
     async addComandaItem(id) {
         const val = document.getElementById('add-item-sel').value; 
         const profVal = document.getElementById('add-item-prof').value;
-
         if(!val) return UI.toast('Selecione um serviço ou produto.', 'error');
         if(!profVal) return UI.toast('Selecione o profissional que realizou o serviço!', 'error');
-
         const item = JSON.parse(val); 
         const [prof_id, prof_name] = profVal.split('|');
         item.prof_id = prof_id;
         item.prof_name = prof_name;
-
         if(item.type === 'product') { 
             const { data: p } = await db.from('products').select('stock').eq('id', item.id).single(); 
             if(p.stock <= 0) return UI.toast('Sem estoque.', 'error'); 
             await db.from('products').update({stock: p.stock - 1}).eq('id', item.id); 
         }
-
         const { data: c } = await db.from('comandas').select('items, total').eq('id', id).single();
         const items = c.items || []; items.push(item);
         await db.from('comandas').update({ items, total: c.total + item.price }).eq('id', id);
         
         Modals.close(); setTimeout(() => Modals.open('edit_comanda', id), 100);
     },
-
     async removeComandaItem(id, idx) {
         const { data: c } = await db.from('comandas').select('items, total').eq('id', id).single();
         const items = c.items || []; const item = items[idx];
@@ -1910,14 +1830,12 @@ const Actions = {
         const item = c.items[idx];
         Modals.open('edit_price', id, idx, JSON.stringify(item));
     },
-
     async saveComandaItemPrice(e, id, idx) {
         e.preventDefault();
         const novoValorStr = document.getElementById('edit-price-val').value;
         const novoValor = parseFloat(novoValorStr);
         
         if (isNaN(novoValor) || novoValor < 0) return UI.toast('Valor inválido.', 'error');
-
         const { data: c } = await db.from('comandas').select('items, total').eq('id', id).single();
         const items = c.items || [];
         const item = items[idx];
@@ -1930,7 +1848,6 @@ const Actions = {
         Modals.close(); 
         setTimeout(() => Modals.open('edit_comanda', id), 100);
     },
-
     async closeComanda(comandaId, clientId, total, ticketNum) {
         UI.confirm('Deseja fechar esta comanda? Ela gerará os custos e separará as comissões por profissional automaticamente, enviando para cobrança.', async () => {
             const btn = document.getElementById('btn-fechar-com');
@@ -1951,7 +1868,6 @@ const Actions = {
                     if (item.type === 'service' && item.cost) {
                         totalCustoFixo += (item.price * item.cost) / 100;
                     }
-
                     if (com > 0) {
                         let pName = item.prof_name || 'Profissional Desconhecido';
                         commissionsByProf[pName] = (commissionsByProf[pName] || 0) + com;
@@ -1974,7 +1890,6 @@ const Actions = {
             for (const [pName, val] of Object.entries(commissionsByProf)) {
                 await db.from('despesas').insert({ description: `Comissão ${pName}: Comanda ${ticketNum} | Cliente: ${clientName}`, amount: val, category: 'Comissões', date: dtISO });
             }
-
             Modals.close(); UI.toast('Fechado com sucesso!'); Render.comandas();
         });
     },
@@ -1994,7 +1909,6 @@ const Actions = {
             await db.from('comandas').update({ status: 'aberta' }).eq('id', id); Modals.close(); UI.toast('Reaberta!'); Render.comandas();
         });
     },
-
     async deleteComanda(id) {
         UI.confirm('Tem certeza que deseja deletar permanentemente esta comanda aberta?', async () => {
             try {
@@ -2005,14 +1919,12 @@ const Actions = {
             }
         });
     },
-
     async saveService(e, id) {
         e.preventDefault(); 
         const btn = e.target.querySelector('button[type="submit"]');
         const originalText = btn.innerHTML;
         btn.innerHTML = 'Salvando...';
         btn.disabled = true;
-
         try {
             const aux = document.getElementById('fs-aux').checked;
             const payload = { 
@@ -2031,9 +1943,7 @@ const Actions = {
             } else {
                 response = await db.from('services').insert([payload]); 
             }
-
             if (response.error) throw response.error;
-
             Modals.close(); 
             UI.toast('Serviço salvo com sucesso!'); 
             Render.servicos();
@@ -2076,12 +1986,9 @@ const Actions = {
         Render.produtos(); 
     },
     async updateStock(e, id, curStock) { e.preventDefault(); await db.from('products').update({stock: curStock + parseInt(document.getElementById('fa-qtd').value)}).eq('id', id); Modals.close(); UI.toast('Estoque atualizado!'); Render.produtos(); },
-
     async saveMensagem(e, id) { e.preventDefault(); const payload = { title: document.getElementById('fm-tit').value, content: document.getElementById('fm-txt').value }; if(id) await db.from('message_templates').update(payload).eq('id', id); else await db.from('message_templates').insert(payload); Modals.close(); Render.mensagens(); },
     async deleteMensagem(id) { UI.confirm('Deletar template?', async () => { await db.from('message_templates').delete().eq('id', id); Render.mensagens(); }); },
-
     async createDespesa(e) { e.preventDefault(); await db.from('despesas').insert({ description: document.getElementById('fd-desc').value, amount: document.getElementById('fd-val').value, category: document.getElementById('fd-cat').value, date: new Date().toISOString() }); Modals.close(); UI.toast('Saída manual registrada!'); Render.despesas(); },
-
     async debitDebt(e, id, max, refTicket) { 
         e.preventDefault(); 
         const btn = document.getElementById('btn-pay'); btn.disabled = true; btn.innerHTML = "Processando...";
@@ -2094,7 +2001,6 @@ const Actions = {
         const totalPaid = pix + din + cre + deb;
         if(totalPaid <= 0) { btn.disabled = false; btn.innerHTML = "Confirmar Pagamentos"; return UI.toast('Preencha os valores.', 'error'); }
         if(totalPaid > max) { btn.disabled = false; btn.innerHTML = "Confirmar Pagamentos"; return UI.toast('Valor pago supera a dívida.', 'error'); }
-
         const dtISO = new Date().toISOString();
         
         const { data: currDebt } = await db.from('debts').select('payment_details, comanda_ticket, clients(name)').eq('id', id).single();
@@ -2106,10 +2012,8 @@ const Actions = {
         if(din > 0) await db.from('despesas').insert({ description: descText, amount: din, category: 'Dinheiro', date: dtISO });
         if(cre > 0) await db.from('despesas').insert({ description: descText, amount: cre, category: 'Cartão Crédito', date: dtISO });
         if(deb > 0) await db.from('despesas').insert({ description: descText, amount: deb, category: 'Cartão Débito', date: dtISO });
-
         let pd = currDebt.payment_details || {};
         pd.pix = (pd.pix||0) + pix; pd.dinheiro = (pd.dinheiro||0) + din; pd.credito = (pd.credito||0) + cre; pd.debito = (pd.debito||0) + deb;
-
         const newRem = Math.max(0, max - totalPaid);
         await db.from('debts').update({ remaining_amount: newRem, payment_details: pd }).eq('id', id); 
         Modals.close(); UI.toast('Pagamento lançado no Fluxo!'); Render.cobrancas(newRem === 0 ? 'pagos' : 'pendentes');
@@ -2122,14 +2026,41 @@ const Actions = {
         await db.from('debts').update({ remaining_amount: Math.max(0, max - (max * perc / 100)), payment_details: pd }).eq('id', id); 
         Modals.close(); Render.cobrancas('pendentes');
     },
-
-    async saveSettings(e) { e.preventDefault(); const payload = { studio_name: document.getElementById('cfg-name').value, official_phone: document.getElementById('cfg-phone').value }; if(App.settings.id) await db.from('settings').update(payload).eq('id', App.settings.id); else await db.from('settings').insert(payload); App.settings = {...App.settings, ...payload}; document.getElementById('brand-name').textContent = payload.studio_name; UI.toast('Salvo!'); },
-
+    async saveSettings(e) { 
+        e.preventDefault(); 
+        const payload = { 
+            studio_name: document.getElementById('cfg-name').value, 
+            official_phone: document.getElementById('cfg-phone').value,
+            // Garante que o estado atual do checkbox seja salvo
+            maintenance_mode: document.getElementById('cfg-maintenance').checked 
+        }; 
+        if(App.settings.id) await db.from('settings').update(payload).eq('id', App.settings.id); 
+        else await db.from('settings').insert(payload); 
+        App.settings = {...App.settings, ...payload}; 
+        document.getElementById('brand-name').textContent = payload.studio_name; 
+        UI.toast('Configurações salvas!'); 
+    },
+    async toggleMaintenance(isActive) {
+        if(!isActive) {
+            // Se estiver desmarcando, apenas atualiza a variável local, salva no botão Salvar
+            return; 
+        }
+        
+        // Se estiver marcando (ativando), pede confirmação extra
+        UI.confirm('ATENÇÃO: Isso irá desconectar todos os colaboradores imediatamente. Deseja continuar?', async () => {
+            try {
+                await db.from('settings').update({ maintenance_mode: true }).eq('id', App.settings.id);
+                UI.toast('Modo Manutenção ATIVADO. Recarregue a página.');
+                setTimeout(() => window.location.reload(), 1500);
+            } catch(e) {
+                UI.toast('Erro ao ativar manutenção.', 'error');
+            }
+        });
+    },
     sendWhatsApp(phone) {
         const msg = document.getElementById('wpp-msg').value; if(!msg) return UI.toast('Escreva algo.', 'error');
         Modals.close(); window.open(`https://wa.me/55${phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
     },
-
     previewAndSaveAvatar(event) {
         const file = event.target.files[0];
         if(!file) return;
@@ -2181,7 +2112,6 @@ const Actions = {
         });
     }
 };
-
 /* --- INJETOR DE CSS --- */
 const initCSS = () => {
     if(document.getElementById('aqc-custom-styles')) return;
@@ -2200,7 +2130,6 @@ const initCSS = () => {
     `;
     document.head.appendChild(style);
 };
-
 document.addEventListener('DOMContentLoaded', () => { 
     initCSS();
     setTimeout(() => { const splash = document.getElementById('splash-screen'); if(splash) { splash.style.opacity = '0'; setTimeout(() => splash.remove(), 500); } }, 4000); 

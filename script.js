@@ -1,5 +1,4 @@
-/**
- * SISTEMA ESTÚDIO AMOR QUE CUIDA
+/** * SISTEMA ESTÚDIO AMOR QUE CUIDA
  */
 
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
@@ -9,43 +8,29 @@ const db = window.supabase.createClient(DB_URL, DB_KEY, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false }
 });
 
-const App = {
-    user: null,
-    role: 'colaborador',
-    view: 'agenda',
-    currentDate: new Date(),
+const App = { 
+    user: null, 
+    role: 'colaborador', 
+    view: 'agenda', 
+    currentDate: new Date(), 
     calendarMonth: new Date(),
-    charts: {},
+    charts: {}, 
     settings: {},
-    avatars: {},
+    avatars: {}, 
     inflowCategories: ['Pix', 'Dinheiro', 'Cartão Crédito', 'Cartão Débito'],
     filters: { relatorios: null, comissoes: null },
-    comandasState: { status: 'aberta', date: new Date().toISOString().split('T')[0] },
-    activePeriod: null,
-    periodsList: [],
-    closeCalendar: { month: new Date(), selected: null }
+    comandasState: { status: 'aberta', date: new Date().toISOString().split('T')[0] } 
 };
 
 const U = {
     money: v => new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'}).format(v||0),
     iso: d => { const tzOffset = d.getTimezoneOffset() * 60000; return (new Date(d.getTime() - tzOffset)).toISOString().split('T')[0]; },
-
+    
     date: d => {
         if(!d) return '';
         let dateObj = new Date(d);
-        if(d.length === 10) dateObj = new Date(d + 'T12:00:00');
+        if(d.length === 10) dateObj = new Date(d + 'T12:00:00'); 
         return dateObj.toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
-    },
-
-    dateShort(d) {
-        if(!d) return '';
-        const str = typeof d === 'string' ? d : new Date(d).toISOString();
-        const datePart = str.split('T')[0];
-        if(datePart && datePart.length === 10) {
-            const [y, m, day] = datePart.split('-').map(Number);
-            return new Date(y, m - 1, day).toLocaleDateString('pt-BR');
-        }
-        return new Date(d).toLocaleDateString('pt-BR');
     },
 
     fillTemplate(text, vars) {
@@ -56,7 +41,7 @@ const U = {
         });
         return out;
     },
-
+    
     getCurrentQuinzenaValue() {
         let curr = new Date();
         let m = String(curr.getMonth() + 1).padStart(2, '0');
@@ -64,24 +49,9 @@ const U = {
         let q = curr.getDate() <= 15 ? 'Q1' : 'Q2';
         return `${y}-${m}-${q}`;
     },
-
+    
     generateQuinzenasOptions() {
-        const periods = App.periodsList && App.periodsList.length ? App.periodsList : null;
-
-        if (periods && periods.length) {
-            let html = '';
-            periods.forEach(p => {
-                const isOpen = !p.end_date || !p.closed_at;
-                const status = isOpen ? '🟢 Período Vigente' : '✅ Fechada';
-                const dates = `${this.dateShort(p.start_date)} até ${p.end_date ? this.dateShort(p.end_date) : 'Hoje'}`;
-                const selected = App.activePeriod && p.id === App.activePeriod.id ? 'selected' : '';
-                html += `<option value="${p.id}" ${selected}>${status} • ${dates}</option>`;
-            });
-            return html;
-        }
-
-        let html = '';
-        let curr = new Date();
+        let html = ''; let curr = new Date();
         for(let i=0; i<8; i++) {
             let d = new Date(curr.getFullYear(), curr.getMonth() - Math.floor(i/2), 1);
             let m = String(d.getMonth() + 1).padStart(2, '0');
@@ -93,25 +63,13 @@ const U = {
         }
         return html;
     },
-
+    
     getQuinzenaDates(val) {
         if(!val) return { start: '1970-01-01T00:00:00Z', end: '2099-12-31T23:59:59Z' };
-
-        const found = (App.periodsList || []).find(p => p.id === val || p.period_label === val);
-        if (found) {
-            return { start: found.start_date, end: found.end_date || new Date().toISOString() };
-        }
-
         const [y, m, q] = val.split('-');
         const lastDay = new Date(y, m, 0).getDate();
         if (q === 'Q1') return { start: `${y}-${m}-01T00:00:00Z`, end: `${y}-${m}-15T23:59:59Z` };
         return { start: `${y}-${m}-16T00:00:00Z`, end: `${y}-${m}-${lastDay}T23:59:59Z` };
-    },
-
-    async getActiveRange() {
-        const p = App.activePeriod || await Periods.ensureActivePeriod();
-        if(!p) return this.getQuinzenaDates(this.getCurrentQuinzenaValue());
-        return { start: p.start_date, end: p.end_date || new Date().toISOString() };
     },
 
     buildExtrato(desp) {
@@ -144,226 +102,12 @@ const U = {
         return text;
     },
 
-    async initFilters() {
-        if (!App.periodsList || App.periodsList.length === 0) {
-            try { await Periods.loadPeriods(); } catch(e) {}
-        }
+    initFilters() {
         const opts = this.generateQuinzenasOptions();
         ['filter-comissao-quinzena', 'filter-relatorios'].forEach(id => {
             const el = document.getElementById(id);
-            if(el) {
-                el.innerHTML = opts;
-                const defaultVal = App.activePeriod ? App.activePeriod.id : this.getCurrentQuinzenaValue();
-                el.value = defaultVal;
-            }
+            if(el) { el.innerHTML = opts; el.value = this.getCurrentQuinzenaValue(); }
         });
-    }
-};
-
-const Periods = {
-    async loadPeriods() {
-        try {
-            const { data, error } = await db.from('financial_periods').select('*').order('start_date', { ascending: false });
-            if (error) throw error;
-            App.periodsList = data || [];
-            App.activePeriod = (data || []).find(p => !p.end_date || !p.closed_at) || null;
-            if (!App.activePeriod) await this.ensureActivePeriod();
-        } catch (e) {
-            console.warn('financial_periods não disponível, usando quinzenas fixas.', e.message);
-            App.periodsList = [];
-            App.activePeriod = null;
-        }
-    },
-
-    async ensureActivePeriod() {
-        if (App.activePeriod) return App.activePeriod;
-
-        try {
-            const { data } = await db.from('financial_periods').select('*').is('closed_at', null).order('start_date', { ascending: false }).limit(1).maybeSingle();
-            if (data) {
-                App.activePeriod = data;
-                if(!App.periodsList.some(p => p.id === data.id)) App.periodsList.unshift(data);
-                return data;
-            }
-
-            const label = U.getCurrentQuinzenaValue();
-            const range = U.getQuinzenaDates(label);
-            const payload = {
-                period_label: label,
-                start_date: range.start,
-                end_date: null,
-                total_in: 0,
-                total_out: 0,
-                net_profit: 0,
-                closed_at: null,
-                closed_by: null
-            };
-
-            const { data: created, error } = await db.from('financial_periods').insert(payload).select().single();
-            if (error) throw error;
-
-            App.activePeriod = created;
-            App.periodsList = [created, ...(App.periodsList || []).filter(p => p.id !== created.id)];
-            return created;
-        } catch(e) {
-            console.warn('Não foi possível usar financial_periods.', e.message);
-            return null;
-        }
-    },
-
-    async computePeriodTotals(start, end) {
-        try {
-            const { data } = await db.from('despesas').select('*').gte('date', start).lte('date', end);
-            const { totalIn, totalOut } = U.buildExtrato(data || []);
-
-            let comissoes = 0, custosFixos = 0, custosVariaveis = 0, pessoal = 0;
-            (data || []).forEach(d => {
-                if(App.inflowCategories.includes(d.category)) return;
-                if(d.category === 'Comissões') comissoes += Number(d.amount) || 0;
-                else if(d.category === 'Custos Fixos') custosFixos += Number(d.amount) || 0;
-                else if(d.category === 'Custos Variáveis') custosVariaveis += Number(d.amount) || 0;
-                else if(d.category === 'Pessoal/Pagamentos') pessoal += Number(d.amount) || 0;
-            });
-
-            return {
-                totalIn,
-                totalOut,
-                net: totalIn - totalOut,
-                count: (data || []).length,
-                comissoes,
-                custosFixos,
-                custosVariaveis,
-                pessoal
-            };
-        } catch(e) {
-            return { totalIn:0, totalOut:0, net:0, count:0, comissoes:0, custosFixos:0, custosVariaveis:0, pessoal:0 };
-        }
-    },
-
-    async openSummary() {
-        if(!App.activePeriod) await this.ensureActivePeriod();
-        Modals.open('period_summary');
-    },
-
-    openCloseCalendar() {
-        if(!App.activePeriod) return UI.toast('Nenhum período ativo.', 'error');
-        App.closeCalendar.selected = null;
-        App.closeCalendar.month = new Date();
-        Modals.open('period_close');
-    },
-
-    changeCloseMonth(dir) {
-        if (!App.closeCalendar.month) App.closeCalendar.month = new Date();
-        App.closeCalendar.month = new Date(App.closeCalendar.month);
-        App.closeCalendar.month.setMonth(App.closeCalendar.month.getMonth() + dir);
-        Modals.open('period_close');
-    },
-
-    renderCalendar(monthDate, minDate, maxDate, selectedIso) {
-        const year = monthDate.getFullYear();
-        const month = monthDate.getMonth();
-        const firstWeekDay = new Date(year, month, 1).getDay();
-        const lastDay = new Date(year, month + 1, 0).getDate();
-        const weekDays = ['D','S','T','Q','Q','S','S'];
-
-        let html = `<div class="period-calendar">`;
-        html += `<div class="period-cal-header">
-            <button type="button" onclick="Periods.changeCloseMonth(-1)"><i class="ph ph-caret-left"></i></button>
-            <span>${monthDate.toLocaleString('pt-BR', { month: 'long', year: 'numeric' })}</span>
-            <button type="button" onclick="Periods.changeCloseMonth(1)"><i class="ph ph-caret-right"></i></button>
-        </div>`;
-        html += `<div class="period-cal-grid">`;
-        weekDays.forEach(d => html += `<div class="period-cal-dow">${d}</div>`);
-
-        for(let i=0; i<firstWeekDay; i++) html += `<div class="period-cal-empty"></div>`;
-
-        for(let d=1; d<=lastDay; d++) {
-            const iso = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-            const dayDate = new Date(year, month, d);
-            const disabled = dayDate < minDate || dayDate > maxDate;
-            const selected = iso === selectedIso ? 'period-cal-selected' : '';
-            const click = disabled ? '' : `onclick="App.closeCalendar.selected='${iso}'; Modals.open('period_close')"`;
-            html += `<div class="period-cal-day ${disabled ? 'disabled' : ''} ${selected}" ${click}>${d}</div>`;
-        }
-
-        html += `</div></div>`;
-        return html;
-    },
-
-    confirmClose() {
-        const iso = App.closeCalendar.selected;
-        if (!iso) return UI.toast('Selecione um dia no calendário.', 'error');
-
-        const p = App.activePeriod;
-        if(!p) return UI.toast('Nenhum período ativo.', 'error');
-
-        const start = new Date(p.start_date);
-        const close = new Date(iso + 'T12:00:00');
-        const todayMid = new Date();
-        todayMid.setHours(23, 59, 59, 999);
-
-        if(close < start) return UI.toast('A data não pode ser anterior ao início do período.', 'error');
-        if(close > todayMid) return UI.toast('Não é possível fechar um período no futuro.', 'error');
-
-        const nextISO = this.getNextDayISO(iso);
-
-        UI.confirm(`Fechar o período encerrando no dia ${U.dateShort(iso)}? A nova quinzena começará em ${U.dateShort(nextISO)} com tudo zerado.`, async () => {
-            try {
-                await this.closePeriod(iso);
-            } catch(e) {
-                UI.toast('Erro ao fechar: ' + e.message, 'error');
-            }
-        });
-    },
-
-    getNextDayISO(iso) {
-        const [y, m, d] = iso.split('-').map(Number);
-        return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
-    },
-
-    async closePeriod(closeISO) {
-        const p = App.activePeriod;
-        if (!p) throw new Error('Nenhum período ativo.');
-
-        const endISO = `${closeISO}T23:59:59Z`;
-        const totals = await this.computePeriodTotals(p.start_date, endISO);
-        const dtISO = new Date().toISOString();
-
-        const { error: updErr } = await db.from('financial_periods').update({
-            end_date: endISO,
-            total_in: totals.totalIn,
-            total_out: totals.totalOut,
-            net_profit: totals.net,
-            closed_at: dtISO,
-            closed_by: null
-        }).eq('id', p.id);
-        if (updErr) throw updErr;
-
-        const nextISO = this.getNextDayISO(closeISO);
-        const nextStart = `${nextISO}T00:00:00Z`;
-        const label = `Período a partir de ${U.dateShort(nextStart)}`;
-
-        const { data: next, error: insErr } = await db.from('financial_periods').insert({
-            period_label: label,
-            start_date: nextStart,
-            end_date: null,
-            total_in: 0,
-            total_out: 0,
-            net_profit: 0,
-            closed_at: null,
-            closed_by: null
-        }).select().single();
-        if (insErr) throw insErr;
-
-        await this.loadPeriods();
-        App.closeCalendar = { month: new Date(), selected: null };
-        Modals.close();
-        UI.toast('Período fechado! Nova quinzena iniciada com tudo zerado.');
-
-        if (App.view === 'resumo-financeiro') Render['resumo-financeiro']();
-        if (App.view === 'comissao') Render.comissao();
-        if (App.view === 'relatorios') Render.relatorios();
-        U.initFilters();
     }
 };
 
@@ -483,7 +227,7 @@ const Tour = {
         { role: 'owner', view: 'resumo-financeiro', center: true, title: '10. Fluxo de Caixa Líquido', text: 'O coração financeiro do estúdio. Faturamento menos saídas, lucro líquido real e o extrato exato de toda a movimentação.' },
         { role: 'owner', view: 'performance', center: true, title: '11. Performance e KPIs', text: 'Indicadores do negócio: Ticket Médio, Taxa de Ocupação da agenda e os serviços que mais dão lucro (Curva ABC).' },
         { role: 'owner', view: 'funcionarios', center: true, title: '12. Equipe do Salão', text: 'Cadastre novos colaboradores, defina níveis de acesso (Gestor ou Atendente), resete senhas ou bloqueie usuários antigos.' },
-        { role: 'owner', view: 'relatorios', target: '#filter-relatorios', mobileTarget: '#filter-relatorios', title: '13. Relatórios e PDF', text: 'Selecione o período desejado e gere relatórios em PDF do Fluxo de Caixa ou Despesas para enviar ao contador.' },
+        { role: 'owner', view: 'relatorios', target: '#filter-relatorios', mobileTarget: '#filter-relatorios', title: '13. Relatórios e PDF', text: 'Selecione a quinzena desejada e gere relatórios em PDF do Fluxo de Caixa ou Despesas para enviar ao contador.' },
         { role: 'owner', view: 'configuracoes', target: '#cfg-name', mobileTarget: '#cfg-name', title: '14. Ajustes do Sistema', text: 'Configure o Nome Oficial do estúdio. Isso altera a logo do sistema e a assinatura das mensagens enviadas pelo WhatsApp.' }
     ],
     steps: [], current: 0,
@@ -563,7 +307,6 @@ const Auth = {
         const { data: set } = await db.from('settings').select('*').single();
         if(set) { App.settings = set; document.getElementById('brand-name').textContent = set.studio_name; }
         App.avatars = {}; await this.fetchAllAvatars(); this.updateHeaderAvatar();
-        await Periods.loadPeriods();
         U.initFilters(); Nav.init(); Render.showMonthView(); 
         
         db.channel('custom-all-channel').on('postgres_changes', { event: '*', schema: 'public' }, payload => {
@@ -684,24 +427,10 @@ const Render = {
                 return; 
             }
 
-            const isDesktop = window.innerWidth > 900; const pixelsPerMin = isDesktop ? 1 : 1.3; const slotHeight = isDesktop ? 60 : 78;
-            
-            // LÓGICA DE HORÁRIO INICIAL DINÂMICO
-            let horaInicio = 7; 
-            const horaFim = 21;
-            
-            if (agData && agData.length > 0) {
-                let minHour = 23;
-                agData.forEach(a => {
-                    const h = parseInt((a.time||'00:00').split(':')[0], 10);
-                    if (h < minHour) minHour = h;
-                });
-                horaInicio = minHour; // O horário de início agora é baseado no evento mais cedo 
-            }
-
+            const isDesktop = window.innerWidth > 900; const pixelsPerMin = isDesktop ? 1 : 1.3; const slotHeight = isDesktop ? 60 : 78; const horaInicio = 7; const horaFim = 21;
             let html = `<div class="timeline-wrapper" style="overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border: 1px solid var(--border); border-radius: 8px;"><div class="timeline-header" style="display: flex; min-width: max-content; border-bottom: 1px solid var(--border);"><div class="time-col" style="position: sticky; left: 0; z-index: 20; background: var(--surface); border:none; min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);"></div>`;
             usersData.forEach(u => { 
-                let bgImage = (App.avatars && App.avatars[u.id]) ? `background-image: url('${App.avatars[u.id]}'); background-size: cover; background-position: center; color: transparent;` : ''; let init = bgImage ? '' : u.name.substring(0,2).toUpperCase();
+                let bgImage = (App.avatars && App.avatars[u.id]) ? `background-image: url(${App.avatars[u.id]}); background-size: cover; background-position: center; color: transparent;` : ''; let init = bgImage ? '' : u.name.substring(0,2).toUpperCase();
                 html += `<div class="prof-col-header" style="display:flex; flex-direction:column; align-items:center; gap:5px; padding: 15px 10px; min-width: 140px; flex: 1; border-right: 1px solid var(--border); opacity: ${u.isOffDay ? '0.6' : '1'};"><div style="width: 45px; height: 45px; border-radius: 50%; background-color: ${u.isOffDay ? '#ccc' : 'var(--primary)'}; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight:bold; border: 2px solid ${u.isOffDay ? '#aaa' : 'var(--primary-light)'}; ${bgImage}">${init}</div><span style="font-size:0.95rem; font-weight: bold; margin-bottom:5px; color: ${u.isOffDay ? 'var(--muted)' : 'var(--text)'}; text-align:center">${u.name.split(' ')[0]} ${u.isOffDay ? '<br><span style="font-size:0.7rem; color:var(--primary)">(Folga)</span>' : ''}</span></div>`; 
             });
             html += `</div><div class="timeline-body" style="display: flex; min-width: max-content; position: relative;"><div class="time-col" style="position: sticky; left: 0; z-index: 10; background: var(--surface); min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);">`;
@@ -920,7 +649,7 @@ const Render = {
     },
     
     async despesas() {
-        const range = await U.getActiveRange(); const { data } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
+        const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); const { data } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
         let totais = { 'Custos Fixos': 0, 'Comissões': 0, 'Pessoal/Pagamentos': 0, 'Custos Variáveis': 0 }; let despesasOnly = [];
         data.forEach(d => { if(!App.inflowCategories.includes(d.category)) { despesasOnly.push(d); if(totais[d.category] !== undefined) totais[d.category] += d.amount; else totais['Custos Variáveis'] += d.amount; } });
         despesasOnly.sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -975,6 +704,7 @@ const Render = {
             if(!c.items) return; 
             const clientName = c.clients?.name || 'Cliente';
             
+            // Garantindo formatação de data robusta
             const dateTimeStr = U.date(c.created_at);
             const parts = dateTimeStr.split(/[\s,]+/);
             const dateStr = parts[0]; 
@@ -1107,45 +837,19 @@ const Render = {
             rc.parentNode.insertBefore(w, rc);
         }
 
-        const range = await U.getActiveRange(); 
+        const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); 
         const { data: desp } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
         
         const { extrato, totalIn, totalOut } = U.buildExtrato(desp);
         const lucro = totalIn - totalOut;
-
-        const periodBox = document.getElementById('period-visual');
-        if(periodBox) {
-            const p = App.activePeriod;
-            if(p) {
-                const status = p.end_date ? 'Fechado' : 'Vigente';
-                const dateRange = `${U.dateShort(p.start_date)} até ${p.end_date ? U.dateShort(p.end_date) : 'Hoje'}`;
-                periodBox.innerHTML = `<div class="period-card ${p.end_date ? 'fechada' : 'vigente'}">
-                    <div>
-                        <span class="period-badge">${status}</span>
-                        <div class="period-label">${p.period_label}</div>
-                        <div class="period-dates"><i class="ph ph-calendar"></i> ${dateRange}</div>
-                    </div>
-                    <div class="period-stats">
-                        <div><span>Entradas</span><b style="color:#2e7d32">${U.money(totalIn)}</b></div>
-                        <div><span>Saídas</span><b style="color:#d32f2f">-${U.money(totalOut)}</b></div>
-                        <div><span>Líquido</span><b style="color:${lucro >= 0 ? '#2e7d32' : '#d32f2f'}">${U.money(lucro)}</b></div>
-                    </div>
-                </div>`;
-            } else {
-                periodBox.innerHTML = `<div class="period-card vigente">
-                    <span class="period-badge">Período Padrão</span>
-                    <span class="period-dates">Quinzena automática: ${U.getCurrentQuinzenaValue()}</span>
-                </div>`;
-            }
-        }
-
+        
         rc.innerHTML = `<div class="card" style="border-bottom:4px solid #2e7d32"><h4>Faturamento (Pago)</h4><div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(totalIn)}</div></div><div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custos & Comissões (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(totalOut)}</div></div><div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
         
         let subDash = { 'Pix':0, 'Dinheiro':0, 'Cartão Crédito':0, 'Cartão Débito':0 };
         desp.forEach(d => { if(subDash[d.category] !== undefined) subDash[d.category] += Number(d.amount)||0; }); 
         
         document.getElementById('resumo-pagamentos-cards').innerHTML = `<div class="card" style="text-align:center"><i class="ph ph-qr-code" style="font-size:2rem; color:#00695c"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Pix</p><div class="val" style="font-size:1.2rem; color:#00695c">${U.money(subDash['Pix'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-money" style="font-size:2rem; color:#2e7d32"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Dinheiro</p><div class="val" style="font-size:1.2rem; color:#2e7d32">${U.money(subDash['Dinheiro'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#e65100"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Crédito</p><div class="val" style="font-size:1.2rem; color:#e65100">${U.money(subDash['Cartão Crédito'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#1565c0"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Débito</p><div class="val" style="font-size:1.2rem; color:#1565c0">${U.money(subDash['Cartão Débito'])}</div></div>`;
-        document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações no período.</p>' :
+        document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações na quinzena.</p>' :
             extrato.map(i => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;"><div style="flex:1"><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Saída'} - ${i.category}</b><p style="margin-top:5px; font-weight:600; font-size:1.1rem">${U.formatDesc(i.desc)}</p><span style="font-size:0.8rem; color:var(--muted); display:inline-block; margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(i.date)}</span></div><div style="text-align:right"><span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.3rem; display:block">${i.type==='in'?'+':'-'} ${U.money(i.val)}</span><span style="font-size:0.85rem; color:var(--muted); font-weight:bold">Caixa: ${U.money(i.saldo)}</span></div></div>`).join('');
     },
 
@@ -1692,78 +1396,7 @@ const Modals = {
                 <button type="submit" class="btn-primary" style="padding:1.2rem; background:#2e7d32">Confirmar Entrada</button>
             </form>`;
         }
-        else if (type === 'period_summary') {
-            const p = App.activePeriod || await Periods.ensureActivePeriod();
-            if(!p) return UI.toast('Nenhum período ativo.', 'error');
-
-            const rangeEnd = p.end_date || new Date().toISOString();
-            const totals = await Periods.computePeriodTotals(p.start_date, rangeEnd);
-            const { totalIn, totalOut, net, count, comissoes, custosFixos, custosVariaveis, pessoal } = totals;
-
-            const { data: comandas } = await db.from('comandas').select('*, clients(name)').eq('status', 'fechada').gte('created_at', p.start_date).lte('created_at', rangeEnd);
-            const { data: agendamentos } = await db.from('appointments').select('id').neq('status', 'cancelado').gte('date', p.start_date.slice(0,10)).lte('date', rangeEnd.slice(0,10));
-            const clientes = new Set((comandas || []).map(c => c.client_id));
-
-            const { data: recebimentos } = await db.from('despesas').select('category, amount').in('category', App.inflowCategories).gte('date', p.start_date).lte('date', rangeEnd);
-            const pagamentos = { 'Pix': 0, 'Dinheiro': 0, 'Cartão Crédito': 0, 'Cartão Débito': 0 };
-            (recebimentos || []).forEach(r => { if(pagamentos[r.category] !== undefined) pagamentos[r.category] += Number(r.amount) || 0; });
-
-            html += `<div style="text-align:center; margin-bottom:20px;">
-                <h3 style="margin:0; color:var(--primary-dark)"><i class="ph ph-clipboard-text"></i> Resumo Geral do Período</h3>
-                <p style="color:var(--muted); margin-top:5px;">${p.period_label}</p>
-            </div>
-            <div class="period-summary-grid">
-                <div class="period-summary-card in"><span>Entradas</span><b>${U.money(totalIn)}</b></div>
-                <div class="period-summary-card out"><span>Saídas</span><b>${U.money(totalOut)}</b></div>
-                <div class="period-summary-card ${net >= 0 ? 'net-pos' : 'net-neg'}"><span>Resultado Líquido</span><b>${U.money(net)}</b></div>
-            </div>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:15px; font-size:0.9rem;">
-                <div style="background:#f9f9f9; border-radius:8px; padding:12px;"><p style="color:var(--muted); font-size:0.75rem; text-transform:uppercase;">Comandas Fechadas</p><b>${(comandas || []).length}</b></div>
-                <div style="background:#f9f9f9; border-radius:8px; padding:12px;"><p style="color:var(--muted); font-size:0.75rem; text-transform:uppercase;">Clientes Atendidos</p><b>${clientes.size}</b></div>
-                <div style="background:#f9f9f9; border-radius:8px; padding:12px;"><p style="color:var(--muted); font-size:0.75rem; text-transform:uppercase;">Agendamentos</p><b>${(agendamentos || []).length}</b></div>
-                <div style="background:#f9f9f9; border-radius:8px; padding:12px;"><p style="color:var(--muted); font-size:0.75rem; text-transform:uppercase;">Lançamentos</p><b>${count}</b></div>
-            </div>`;
-
-            html += `<h4 style="margin:20px 0 10px 0; border-top:1px solid var(--border); padding-top:15px;">Custos do Período</h4>
-            <div style="display:flex; flex-direction:column; gap:8px; font-size:0.95rem;">
-                <div style="display:flex; justify-content:space-between;"><span>Comissões dos Profissionais</span><b style="color:#cd7f32">-${U.money(comissoes)}</b></div>
-                <div style="display:flex; justify-content:space-between;"><span>Custos Fixos (Retidos)</span><b style="color:#d32f2f">-${U.money(custosFixos)}</b></div>
-                <div style="display:flex; justify-content:space-between;"><span>Custos Variáveis / Insumos</span><b style="color:#e65100">-${U.money(custosVariaveis)}</b></div>
-                <div style="display:flex; justify-content:space-between;"><span>Pessoal / Pagamentos</span><b style="color:#8e24aa">-${U.money(pessoal)}</b></div>
-            </div>`;
-
-            html += `<h4 style="margin:20px 0 10px 0; border-top:1px solid var(--border); padding-top:15px;">Recebimentos por Forma</h4>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:0.9rem;">
-                <div style="background:#e0f2f1; border-radius:8px; padding:10px;"><span style="display:block; color:#00695c;">Pix</span><b>${U.money(pagamentos['Pix'])}</b></div>
-                <div style="background:#e8f5e9; border-radius:8px; padding:10px;"><span style="display:block; color:#2e7d32;">Dinheiro</span><b>${U.money(pagamentos['Dinheiro'])}</b></div>
-                <div style="background:#fff3e0; border-radius:8px; padding:10px;"><span style="display:block; color:#e65100;">Crédito</span><b>${U.money(pagamentos['Cartão Crédito'])}</b></div>
-                <div style="background:#e3f2fd; border-radius:8px; padding:10px;"><span style="display:block; color:#1565c0;">Débito</span><b>${U.money(pagamentos['Cartão Débito'])}</b></div>
-            </div>`;
-
-            html += `<button class="btn-primary" style="background:#d32f2f; margin-top:20px; padding:1.2rem;" onclick="Periods.openCloseCalendar()"><i class="ph ph-lock-key"></i> Fechar Quinzena / Período</button>`;
-        }
-        else if (type === 'period_close') {
-            const p = App.activePeriod;
-            if(!p) return UI.toast('Nenhum período ativo.', 'error');
-
-            const startDate = new Date(p.start_date);
-            const today = new Date();
-            const month = App.closeCalendar.month || new Date();
-            const selected = App.closeCalendar.selected;
-
-            let closePreview = selected ? `Encerrando em ${U.dateShort(selected)} • Novo período: ${U.dateShort(Periods.getNextDayISO(selected))}` : 'Selecione um dia para fechar.';
-
-            html += `<div style="text-align:center; margin-bottom:20px;">
-                <h3 style="margin:0; color:#d32f2f"><i class="ph ph-calendar-blank"></i> Escolha o Dia do Fechamento</h3>
-                <p style="font-size:0.9rem; color:var(--muted); margin-top:5px;">A nova quinzena iniciará no dia seguinte ao escolhido.</p>
-            </div>`;
-
-            html += Periods.renderCalendar(month, startDate, today, selected);
-
-            html += `<p style="text-align:center; margin-top:15px; font-weight:bold; color:var(--primary-dark);">${closePreview}</p>`;
-            html += `<button class="btn-primary" style="background:#d32f2f; padding:1.2rem; margin-top:10px;" onclick="Periods.confirmClose()"><i class="ph ph-check-circle"></i> Confirmar Fechamento da Quinzena</button>`;
-        }
-
+        
         html += `</div>`; cont.innerHTML = html; cont.classList.remove('hidden');
 
         if(type === 'whatsapp' && window.currentWppVars && window.currentWppVars._kind) {
@@ -1819,10 +1452,6 @@ const Actions = {
         doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor(183, 110, 121);
         doc.text("ESTÚDIO AMOR QUE CUIDA", 105, 20, null, null, "center");
         doc.setFontSize(12); doc.setTextColor(50, 50, 50);
-
-        const selRel = document.getElementById('filter-relatorios');
-        const periodLabel = selRel && selRel.selectedOptions && selRel.selectedOptions[0] ? selRel.selectedOptions[0].textContent : quinzenaStr;
-        const safeLabel = periodLabel.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^\w]+/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '') || 'periodo';
         
         if (viewType === 'despesas') {
             let isReceitas = window.currentRelatorioTipo === 'Receitas';
@@ -1837,7 +1466,7 @@ const Actions = {
             const corTema = isReceitas ? [46, 125, 50] : [183, 110, 121];
             
             doc.autoTable({ startY: 45, head: [['Data/Hora', 'Categoria', 'Descrição', 'Valor (R$)']], body: rows, theme: 'striped', headStyles: { fillColor: corTema } });
-            doc.save(`AQC_${title.replace(/ /g, '_')}_${safeLabel}.pdf`);
+            doc.save(`AQC_${title.replace(/ /g, '_')}_${quinzenaStr}.pdf`);
         } else if (viewType === 'fluxo') {
             doc.text(`Relatório de Fluxo de Caixa`, 105, 30, null, null, "center");
             if(!window.currentFluxoData || window.currentFluxoData.length === 0) return UI.toast('Sem dados.', 'warning');
@@ -1845,7 +1474,7 @@ const Actions = {
             doc.text(`Entradas: ${U.money(r.receita)}   |   Saídas: ${U.money(r.gasto)}   |   Líquido: ${U.money(r.lucro)}`, 105, 45, null, null, "center");
             const rows = window.currentFluxoData.map(d => [ U.date(d.date), d.type === 'in' ? 'Entrada' : 'Saída', d.desc, U.money(d.val), U.money(d.saldo) ]);
             doc.autoTable({ startY: 55, head: [['Data/Hora', 'Tipo', 'Descrição', 'Valor', 'Caixa']], body: rows, theme: 'striped', headStyles: { fillColor: [183, 110, 121] } });
-            doc.save(`AQC_Fluxo_${safeLabel}.pdf`);
+            doc.save(`AQC_Fluxo_${quinzenaStr}.pdf`);
         }
     },
     
@@ -1863,6 +1492,7 @@ const Actions = {
     },
     clearFilterComissoes() { App.filters.comissoes = null; Render.comissao(); },
     
+    // Função acionada ao clicar em um profissional específico do ranking
     filterComissaoByProf(profId, profName) {
         let s, e;
         if(App.filters.comissoes) {

@@ -318,10 +318,22 @@
                         <form onsubmit="Actions.saveSettings(event)">
                             <div class="input-group"><label>Nome do Estúdio</label><input type="text" id="cfg-name" required></div>
                             <div class="input-group"><label>Número Oficial para WhatsApp (Apenas Números com DDD)</label><input type="text" id="cfg-phone" placeholder="Ex: 558699999999" required></div>
+                            
+                            <!-- NOVO BOTÃO DE MANUTENÇÃO -->
+                            <div class="input-group" style="background:#fff3e0; padding:15px; border-radius:12px; border:1px solid #ffb74d; margin: 20px 0;">
+                                <label style="margin:0; color:#e65100; cursor:pointer; display: flex; align-items: center; gap: 10px;">
+                                    <input type="checkbox" id="cfg-manutencao" style="width: 20px; height: 20px; cursor: pointer;">
+                                    <strong style="font-size: 1.1rem;">Ativar Modo Manutenção</strong>
+                                </label>
+                                <p style="font-size: 0.85rem; color: #d84315; margin-top: 8px;">
+                                    <i class="ph ph-warning-circle"></i> Ao ativar, todos os usuários serão desconectados e enviados para a tela de manutenção. Apenas o login <b>admin.teste</b> continuará com acesso.
+                                </p>
+                            </div>
+
                             <button class="btn-primary" type="submit">Salvar Configurações</button>
                         </form>
                     </div>
-                </section>
+                </section>           
             </div>
         </main>
         <!-- ALTERAÇÃO: Adicionado role-restricted nos itens do menu inferior -->

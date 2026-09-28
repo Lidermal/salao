@@ -1,6 +1,3 @@
-<!-- ============================================ -->
-<!--  index.html (COMPLETO - ACESSO RESTRITO)     -->
-<!-- ============================================ -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -63,6 +60,7 @@
             </div>
         </section>
     </div>
+
     <div id="system-layout" class="hidden">
         <aside class="sidebar" id="main-sidebar">
             <div class="sidebar-brand">
@@ -76,10 +74,8 @@
                 <div class="nav-section">ATENDIMENTO</div>
                 <a href="#" class="nav-link active" data-view="agenda"><i class="ph ph-calendar"></i> Agenda</a>
                 
-                <!-- Comandas visível para todos -->
                 <a href="#" class="nav-link" data-view="comandas"><i class="ph ph-receipt"></i> Comandas</a>
                 
-                <!-- Restrito: Cobranças e Clientes -->
                 <a href="#" class="nav-link role-restricted" data-view="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
                 <a href="#" class="nav-link role-restricted" data-view="clientes"><i class="ph ph-users"></i> Clientes</a>
                 
@@ -90,7 +86,6 @@
                 <div class="nav-section owner-only">GESTÃO FINANCEIRA</div>
                 <a href="#" class="nav-link owner-only" data-view="despesas"><i class="ph ph-trend-down"></i> Controle de Despesas</a>
                 
-                <!-- Comissionamento visível para todos -->
                 <a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Comissionamento</a>
                 
                 <a href="#" class="nav-link owner-only" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Fluxo de Caixa</a>
@@ -316,11 +311,17 @@
                 <section id="view-configuracoes" class="view">
                     <div class="card">
                         <form onsubmit="Actions.saveSettings(event)">
-                            <div class="input-group"><label>Nome do Estúdio</label><input type="text" id="cfg-name" required></div>
-                            <div class="input-group"><label>Número Oficial para WhatsApp (Apenas Números com DDD)</label><input type="text" id="cfg-phone" placeholder="Ex: 558699999999" required></div>
+                            <div class="input-group">
+                                <label>Nome do Estúdio</label>
+                                <input type="text" id="cfg-name" required>
+                            </div>
+                            <div class="input-group">
+                                <label>Número Oficial para WhatsApp (Apenas Números com DDD)</label>
+                                <input type="text" id="cfg-phone" placeholder="Ex: 558699999999" required>
+                            </div>
                             
-                            <!-- NOVO BOTÃO DE MANUTENÇÃO -->
-                            <div class="input-group" style="background:#fff3e0; padding:15px; border-radius:12px; border:1px solid #ffb74d; margin: 20px 0;">
+                            <!-- CAIXA DE MANUTENÇÃO (Oculta por padrão com display:none) -->
+                            <div id="box-manutencao" class="input-group" style="display: none; background:#fff3e0; padding:15px; border-radius:12px; border:1px solid #ffb74d; margin: 20px 0;">
                                 <label style="margin:0; color:#e65100; cursor:pointer; display: flex; align-items: center; gap: 10px;">
                                     <input type="checkbox" id="cfg-manutencao" style="width: 20px; height: 20px; cursor: pointer;">
                                     <strong style="font-size: 1.1rem;">Ativar Modo Manutenção</strong>
@@ -333,10 +334,9 @@
                             <button class="btn-primary" type="submit">Salvar Configurações</button>
                         </form>
                     </div>
-                </section>           
+                </section>
             </div>
         </main>
-        <!-- ALTERAÇÃO: Adicionado role-restricted nos itens do menu inferior -->
         <nav class="bottom-nav">
             <a href="#" class="b-item active" data-view="agenda"><i class="ph ph-calendar"></i><span>Agenda</span></a>
             <a href="#" class="b-item" data-view="comandas"><i class="ph ph-receipt"></i><span>Comandas</span></a>
@@ -347,7 +347,6 @@
     </div>
     <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
     
-    <script src="script.js?v=15"></script>
-    <script src="fechamento.js?v=1"></script>
+    <script src="script.js?v=16"></script>
 </body>
 </html>

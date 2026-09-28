@@ -1,3 +1,6 @@
+<!-- ============================================ -->
+<!--  index.html (COMPLETO - ACESSO RESTRITO)     -->
+<!-- ============================================ -->
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -60,7 +63,6 @@
             </div>
         </section>
     </div>
-
     <div id="system-layout" class="hidden">
         <aside class="sidebar" id="main-sidebar">
             <div class="sidebar-brand">
@@ -74,8 +76,10 @@
                 <div class="nav-section">ATENDIMENTO</div>
                 <a href="#" class="nav-link active" data-view="agenda"><i class="ph ph-calendar"></i> Agenda</a>
                 
+                <!-- Comandas visível para todos -->
                 <a href="#" class="nav-link" data-view="comandas"><i class="ph ph-receipt"></i> Comandas</a>
                 
+                <!-- Restrito: Cobranças e Clientes -->
                 <a href="#" class="nav-link role-restricted" data-view="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
                 <a href="#" class="nav-link role-restricted" data-view="clientes"><i class="ph ph-users"></i> Clientes</a>
                 
@@ -86,6 +90,7 @@
                 <div class="nav-section owner-only">GESTÃO FINANCEIRA</div>
                 <a href="#" class="nav-link owner-only" data-view="despesas"><i class="ph ph-trend-down"></i> Controle de Despesas</a>
                 
+                <!-- Comissionamento visível para todos -->
                 <a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Comissionamento</a>
                 
                 <a href="#" class="nav-link owner-only" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Fluxo de Caixa</a>
@@ -308,33 +313,18 @@
                     <div id="performance-ranking" class="data-grid"></div>
                 </section>
                 
-                                <section id="view-configuracoes" class="view">
+                <section id="view-configuracoes" class="view">
                     <div class="card">
                         <form onsubmit="Actions.saveSettings(event)">
                             <div class="input-group"><label>Nome do Estúdio</label><input type="text" id="cfg-name" required></div>
                             <div class="input-group"><label>Número Oficial para WhatsApp (Apenas Números com DDD)</label><input type="text" id="cfg-phone" placeholder="Ex: 558699999999" required></div>
-                            
-                            <!-- ÁREA EXCLUSIVA ADMIN.TESTE -->
-                            <div id="admin-maintenance-area" class="hidden" style="margin-top: 2rem; padding-top: 2rem; border-top: 2px dashed var(--border);">
-                                <h3 style="color: #d32f2f; margin-bottom: 1rem;"><i class="ph ph-wrench"></i> Zona de Perigo (Admin Master)</h3>
-                                <div class="input-group" style="background: #fff3e0; padding: 15px; border-radius: 12px; border: 1px solid #ffb74d;">
-                                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
-                                        <input type="checkbox" id="cfg-maintenance" onchange="Actions.toggleMaintenance(this.checked)" style="width: 20px; height: 20px;">
-                                        <span style="font-weight: bold; color: #e65100;">Ativar Modo Manutenção</span>
-                                    </label>
-                                    <p style="font-size: 0.8rem; color: #666; margin-top: 8px; margin-left: 30px;">
-                                        Ao ativar, todos os usuários (exceto você) serão redirecionados para a tela de manutenção.
-                                    </p>
-                                </div>
-                            </div>
-                            <!-- FIM ÁREA EXCLUSIVA -->
-
-                            <button class="btn-primary" type="submit" style="margin-top: 1.5rem;">Salvar Configurações</button>
+                            <button class="btn-primary" type="submit">Salvar Configurações</button>
                         </form>
                     </div>
                 </section>
             </div>
         </main>
+        <!-- ALTERAÇÃO: Adicionado role-restricted nos itens do menu inferior -->
         <nav class="bottom-nav">
             <a href="#" class="b-item active" data-view="agenda"><i class="ph ph-calendar"></i><span>Agenda</span></a>
             <a href="#" class="b-item" data-view="comandas"><i class="ph ph-receipt"></i><span>Comandas</span></a>
@@ -345,6 +335,6 @@
     </div>
     <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
     
-    <script src="script.js?v=16"></script>
+    <script src="script.js?v=15"></script>
 </body>
 </html>

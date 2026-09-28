@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Manutenção - Amor que Cuida</title>
+    
+    <link rel="icon" type="image/jpeg" href="logoaqc.jpeg">
+    <script src="https://unpkg.com/@phosphor-icons/web"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg: #fdfbf7;
+            --primary-dark: #2c1e16;
+            --primary-light: #d4a373;
+            --muted: #797470;
+        }
+        
+        body {
+            margin: 0;
+            padding: 2rem;
+            background-color: var(--bg);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            font-family: 'Lato', sans-serif;
+            box-sizing: border-box;
+        }
+
+        .logo {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-bottom: 25px;
+            border: 4px solid var(--primary-light);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+            animation: pulse 2s infinite;
+        }
+
+        h1 {
+            color: var(--primary-dark);
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            font-family: 'Playfair Display', serif;
+        }
+
+        p {
+            font-size: 1.1rem;
+            color: var(--muted);
+            max-width: 500px;
+            margin-bottom: 2.5rem;
+            line-height: 1.6;
+        }
+
+        .btn {
+            background-color: var(--primary-dark);
+            color: white;
+            border: none;
+            padding: 1rem 2.5rem;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: 0.3s;
+            width: 100%;
+            max-width: 300px;
+            margin-bottom: 15px;
+        }
+
+        .btn:active { transform: scale(0.98); }
+
+        .btn-outline {
+            background: transparent;
+            color: var(--primary-dark);
+            border: 1px solid var(--primary-dark);
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+    </style>
+</head>
+<body>
+
+    <img src="logoaqc.jpeg" alt="Espaço Amor que Cuida" class="logo">
+    
+    <h1>Sistema em Manutenção</h1>
+    
+    <p>O <b>Espaço Amor que Cuida</b> está passando por melhorias técnicas neste momento para garantir a melhor experiência para nossa equipe. Voltaremos em breve!</p>
+    
+    <!-- Volta para o index.html. Se o sistema ainda estiver em manutenção, o script.js do index vai jogar de volta pra cá instantaneamente -->
+    <a href="index.html" class="btn">
+        <i class="ph ph-arrows-clockwise"></i> Verificar Status
+    </a>
+
+    <!-- Limpa os dados de login locais e manda pro index -->
+    <button onclick="localStorage.clear(); window.location.href='index.html';" class="btn btn-outline">
+        <i class="ph ph-sign-out"></i> Sair da Conta
+    </button>
+
+</body>
+</html>

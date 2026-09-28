@@ -293,13 +293,23 @@ const Auth = {
             
             // Se manutenção estiver ativa E o usuário NÃO for admin.teste
             if(set.maintenance_mode === true && App.user.username !== 'admin.teste') {
+                // Remove splash imediatamente antes de redirecionar
+                const splash = document.getElementById('splash-screen');
+                if(splash) splash.remove();
+                
                 window.location.href = 'manutencao.html';
                 return; // Para a execução do resto do script
             }
         }
         // --- FIM DA VERIFICAÇÃO ---
 
-        document.getElementById('auth-layer').classList.add('hidden'); document.getElementById('system-layout').classList.remove('hidden'); document.body.classList.toggle('is-owner', App.role === 'owner');
+        // Remove splash screen IMEDIATAMENTE após decisão
+        const splash = document.getElementById('splash-screen');
+        if(splash) { splash.style.opacity = '0'; setTimeout(() => splash.remove(), 500); }
+
+        document.getElementById('auth-layer').classList.add('hidden'); 
+        document.getElementById('system-layout').classList.remove('hidden'); 
+        document.body.classList.toggle('is-owner', App.role === 'owner');
         
         App.avatars = {}; await this.fetchAllAvatars(); this.updateHeaderAvatar();
         U.initFilters(); Nav.init(); Render.showMonthView(); 
@@ -2132,6 +2142,7 @@ const initCSS = () => {
 };
 document.addEventListener('DOMContentLoaded', () => { 
     initCSS();
-    setTimeout(() => { const splash = document.getElementById('splash-screen'); if(splash) { splash.style.opacity = '0'; setTimeout(() => splash.remove(), 500); } }, 4000); 
+    // REMOVIDO O TIMER FIXO DE 4 SEGUNDOS DA SPLASH SCREEN
+    // A splash agora some via JS no Auth.success()
     Auth.init(); 
 });

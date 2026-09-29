@@ -1,4 +1,4 @@
-/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO FINAL CORRIGIDA */
+/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO FINAL COM FECHAMENTO INTELIGENTE */
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const DB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
 const db = window.supabase.createClient(DB_URL, DB_KEY, {
@@ -37,6 +37,12 @@ const U = {
         });
         return out;
     },
+    
+    // --- NOVA LÓGICA DE QUINZENA INTELIGENTE ---
+    
+    /**
+     * Retorna o ID da quinzena teórica baseada na data de HOJE (sem considerar cortes manuais ainda)
+     */
     getCurrentQuinzenaValue() {
         let curr = new Date();
         let m = String(curr.getMonth() + 1).padStart(2, '0');
@@ -44,6 +50,69 @@ const U = {
         let q = curr.getDate() <= 15 ? 'Q1' : 'Q2';
         return `${y}-${m}-${q}`;
     },
+
+    /**
+     * Calcula o intervalo REAL vigente considerando fechamentos manuais.
+     * Isso é crucial para saber o que mostrar no Fluxo de Caixa.
+     */
+    async getEffectiveRange() {
+        const now = new Date();
+        const todayStr = this.iso(now);
+        const theoreticalQ = this.getCurrentQuinzenaValue();
+        
+        try {
+            // Busca se a quinzena teórica atual foi fechada manualmente
+            const { data: closure } = await db.from('period_closures')
+                .select('*')
+                .eq('quinzena_id', theoreticalQ)
+                .maybeSingle();
+
+            if (closure && closure.cut_date) {
+                // CASO 1: Foi fechado manualmente antes de hoje?
+                const cutDateObj = new Date(closure.cut_date);
+                const todayObj = new Date(todayStr);
+                
+                if (cutDateObj < todayObj) {
+                    // Sim, fechou dia X e hoje é Y > X.
+                    // Então estamos num "Período Extra" que vai do dia seguinte ao corte até o fim do mês natural.
+                    const nextDay = new Date(cutDateObj);
+                    nextDay.setDate(nextDay.getDate() + 1);
+                    
+                    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                    
+                    return {
+                        start: this.iso(nextDay),
+                        end: this.iso(lastDayOfMonth),
+                        isExtraPeriod: true,
+                        label: `Pós-Fechamento (${theoreticalQ})`,
+                        originalClosure: closure
+                    };
+                } else {
+                    // Fechou hoje ou no futuro? Considera normal até lá.
+                     const range = this.getStandardQuinzenaDates(theoreticalQ);
+                     return { ...range, isClosedManually: true, label: 'FECHADO MANUALMENTE' };
+                }
+            } else {
+                // CASO 2: Não há fechamento manual. Usa a regra padrão (1-15 ou 16-fim).
+                const range = this.getStandardQuinzenaDates(theoreticalQ);
+                return { ...range, isClosedManually: false, label: 'EM ANDAMENTO' };
+            }
+        } catch(e) {
+            console.error("Erro ao calcular vigência:", e);
+            // Fallback seguro
+            const range = this.getStandardQuinzenaDates(theoreticalQ);
+            return { ...range, isClosedManually: false, label: 'ERRO AO CARREGAR STATUS' };
+        }
+    },
+
+    getStandardQuinzenaDates(val) {
+        if(!val) return { start: '1970-01-01', end: '2099-12-31' };
+        const [y, m, q] = val.split('-');
+        const lastDay = new Date(y, parseInt(m), 0).getDate();
+        if (q === 'Q1') return { start: `${y}-${m}-01`, end: `${y}-${m}-15` };
+        return { start: `${y}-${m}-16`, end: `${y}-${m}-${lastDay}` };
+    },
+    
     generateQuinzenasOptions() {
         let html = ''; let curr = new Date();
         for(let i=0; i<8; i++) {
@@ -56,13 +125,6 @@ const U = {
             html += `<option value="${y}-${m}-${q}">${q === 'Q1' ? '1ª' : '2ª'} Quinzena (${mName}/${y})</option>`;
         }
         return html;
-    },
-    getQuinzenaDates(val) {
-        if(!val) return { start: '1970-01-01T00:00:00Z', end: '2099-12-31T23:59:59Z' };
-        const [y, m, q] = val.split('-');
-        const lastDay = new Date(y, m, 0).getDate();
-        if (q === 'Q1') return { start: `${y}-${m}-01T00:00:00Z`, end: `${y}-${m}-15T23:59:59Z` };
-        return { start: `${y}-${m}-16T00:00:00Z`, end: `${y}-${m}-${lastDay}T23:59:59Z` };
     },
     buildExtrato(desp) {
         let extrato = [];
@@ -99,13 +161,11 @@ const U = {
     }
 };
 
-// UI & LOADING GLOBAL (CORRIGIDO)
+// UI & LOADING GLOBAL
 const UI = {
     showLoading(msg = 'Processando...') {
         try {
             let loader = document.getElementById('global-loading');
-            
-            // Se não existir, cria do zero
             if (!loader) {
                 loader = document.createElement('div');
                 loader.id = 'global-loading';
@@ -117,26 +177,14 @@ const UI = {
                 `;
                 document.body.appendChild(loader);
             } else {
-                // Se já existir, apenas atualiza o texto de forma segura
                 const textEl = loader.querySelector('.loading-text');
-                if (textEl) {
-                    textEl.textContent = msg;
-                } else {
-                    // Fallback caso a estrutura interna tenha sido perdida
-                    loader.innerHTML = `
-                        <div class="spinner" style="width: 40px; height: 40px; border: 4px solid #f7e9eb; border-top: 4px solid #B76E79; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div>
-                        <div class="loading-text" style="font-weight: bold; color: #9a5a63; font-size: 1.1rem;">${msg}</div>
-                    `;
-                }
+                if (textEl) textEl.textContent = msg;
+                else loader.innerHTML = `<div class="spinner" style="width: 40px; height: 40px; border: 4px solid #f7e9eb; border-top: 4px solid #B76E79; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div><div class="loading-text" style="font-weight: bold; color: #9a5a63; font-size: 1.1rem;">${msg}</div>`;
             }
-            
-            // Força a exibição
             loader.style.display = 'flex';
             loader.style.opacity = '1';
             loader.style.pointerEvents = 'auto';
-        } catch (e) {
-            console.error("Erro no showLoading:", e);
-        }
+        } catch (e) { console.error("Erro no showLoading:", e); }
     },
     hideLoading() {
         try {
@@ -144,14 +192,9 @@ const UI = {
             if (loader) {
                 loader.style.opacity = '0';
                 loader.style.pointerEvents = 'none';
-                // Opcional: remover do DOM após transição para limpar memória
-                setTimeout(() => {
-                    if(loader.style.opacity === '0') loader.style.display = 'none';
-                }, 200);
+                setTimeout(() => { if(loader.style.opacity === '0') loader.style.display = 'none'; }, 200);
             }
-        } catch (e) {
-            console.error("Erro no hideLoading:", e);
-        }
+        } catch (e) { console.error("Erro no hideLoading:", e); }
     },
     toast(msg, type='success') {
         const cont = document.getElementById('toast-container');
@@ -164,13 +207,10 @@ const UI = {
         const msgEl = document.getElementById('confirm-msg');
         const modal = document.getElementById('custom-confirm');
         if(!msgEl || !modal) return;
-        
-        msgEl.textContent = msg;
+        msgEl.innerHTML = msg; // Usamos innerHTML para permitir negrito/tamanho pequeno
         modal.classList.remove('hidden');
-        
         const btnCancel = document.getElementById('confirm-cancel');
         const btnOk = document.getElementById('confirm-ok');
-        
         if(btnCancel) btnCancel.onclick = () => modal.classList.add('hidden');
         if(btnOk) btnOk.onclick = () => { modal.classList.add('hidden'); if(onConfirm) onConfirm(); };
     },
@@ -208,7 +248,6 @@ const CustomSelect = {
         const menu = document.getElementById(`menu-${id}`);
         const wrapper = document.getElementById(`wrapper-${id}`);
         if(!menu || !wrapper) return;
-
         const isOpening = menu.style.display === 'none' || menu.style.display === '';
         document.querySelectorAll('.aqc-select-menu').forEach(el => el.style.display = 'none');
         document.querySelectorAll('.aqc-custom-select').forEach(el => {
@@ -246,7 +285,6 @@ const CustomSelect = {
         const input = document.getElementById(id);
         const menu = document.getElementById(`menu-${id}`);
         const wrapper = document.getElementById(`wrapper-${id}`);
-
         if(label) label.innerText = text;
         if(input) {
             if(val.includes('%7B')) val = decodeURIComponent(val);
@@ -273,20 +311,20 @@ window.handleNewClientComanda = function(val) { const div = document.getElementB
 // TOUR
 const Tour = {
     allSteps: [
-        { role: 'all', view: 'agenda', target: '#btn-novo-agendamento-tour', mobileTarget: '.fab-button', title: '1. Agenda Inteligente', text: 'Aqui você visualiza e gerencia horários. Clique aqui para agendar um cliente, gerar um encaixe ou bloquear a agenda.' },
-        { role: 'all', view: 'comandas', target: '#btn-nova-comanda-tour', mobileTarget: '.fab-button', title: '2. Abertura de Comandas', text: 'O cliente chegou? Abra uma comanda, adicione os serviços/produtos e vincule o profissional que realizou o atendimento.' },
-        { role: 'all', view: 'cobrancas', target: '#tab-pendentes-tour', mobileTarget: '#tab-pendentes-tour', title: '3. Cobranças e Recebimentos', text: 'Comandas fechadas geram faturas. Aqui você dá baixa no pagamento misturando Pix, Cartão, Dinheiro e aplicando descontos.' },
-        { role: 'all', view: 'clientes', center: true, title: '4. Gestão de Clientes', text: 'Veja o histórico de visitas, crie Registros de Observações personalizadas e mande mensagens no WhatsApp.' },
-        { role: 'owner', view: 'servicos', center: true, title: '5. Catálogo de Serviços', text: 'Cadastre serviços definindo a duração na agenda, preço, custo fixo retido pelo salão e a comissão padrão do profissional.' },
-        { role: 'owner', view: 'produtos', center: true, title: '6. Estoque de Produtos', text: 'Controle produtos para venda. O sistema alerta quando o estoque está baixo e calcula a comissão por venda automaticamente.' },
-        { role: 'all', view: 'comissao', center: true, title: '7. Fechamento de Comissões', text: 'Painel automático. Profissionais vêem apenas seus próprios ganhos na quinzena. O gestor visualiza o Ranking geral do salão.' },
-        { role: 'owner', view: 'mensagens', center: true, title: '8. Mensagens Automáticas', text: 'Crie templates para o WhatsApp com variáveis como {cliente}, {data}, {hora}. Ótimo para lembretes e confirmações.' },
-        { role: 'owner', view: 'despesas', center: true, title: '9. Gestão de Despesas', text: 'Os custos das comandas vêm pra cá automaticamente. Lembre-se de lançar manualmente gastos como aluguel, luz e vales.' },
-        { role: 'owner', view: 'resumo-financeiro', center: true, title: '10. Fluxo de Caixa Líquido', text: 'O coração financeiro do estúdio. Faturamento menos saídas, lucro líquido real e o extrato exato de toda a movimentação.' },
-        { role: 'owner', view: 'performance', center: true, title: '11. Performance e KPIs', text: 'Indicadores do negócio: Ticket Médio, Taxa de Ocupação da agenda e os serviços que mais dão lucro (Curva ABC).' },
-        { role: 'owner', view: 'funcionarios', center: true, title: '12. Equipe do Salão', text: 'Cadastre novos colaboradores, defina níveis de acesso (Gestor ou Atendente), resete senhas ou bloqueie usuários antigos.' },
-        { role: 'owner', view: 'relatorios', target: '#filter-relatorios', mobileTarget: '#filter-relatorios', title: '13. Relatórios e PDF', text: 'Selecione a quinzena desejada e gere relatórios em PDF do Fluxo de Caixa ou Despesas para enviar ao contador.' },
-        { role: 'owner', view: 'configuracoes', target: '#cfg-name', mobileTarget: '#cfg-name', title: '14. Ajustes do Sistema', text: 'Configure o Nome Oficial do estúdio. Isso altera a logo do sistema e a assinatura das mensagens enviadas pelo WhatsApp.' }
+        { role: 'all', view: 'agenda', target: '#btn-novo-agendamento-tour', mobileTarget: '.fab-button', title: '1. Agenda Inteligente', text: 'Aqui você visualiza e gerencia horários.' },
+        { role: 'all', view: 'comandas', target: '#btn-nova-comanda-tour', mobileTarget: '.fab-button', title: '2. Abertura de Comandas', text: 'O cliente chegou? Abra uma comanda.' },
+        { role: 'all', view: 'cobrancas', target: '#tab-pendentes-tour', mobileTarget: '#tab-pendentes-tour', title: '3. Cobranças', text: 'Dê baixa nos pagamentos pendentes.' },
+        { role: 'all', view: 'clientes', center: true, title: '4. Gestão de Clientes', text: 'Histórico e observações personalizadas.' },
+        { role: 'owner', view: 'servicos', center: true, title: '5. Serviços', text: 'Cadastre serviços e preços.' },
+        { role: 'owner', view: 'produtos', center: true, title: '6. Produtos', text: 'Controle estoque e vendas.' },
+        { role: 'all', view: 'comissao', center: true, title: '7. Comissões', text: 'Ranking e ganhos dos profissionais.' },
+        { role: 'owner', view: 'mensagens', center: true, title: '8. Mensagens', text: 'Templates automáticos de WhatsApp.' },
+        { role: 'owner', view: 'despesas', center: true, title: '9. Despesas', text: 'Lance custos fixos e variáveis.' },
+        { role: 'owner', view: 'resumo-financeiro', center: true, title: '10. Fluxo de Caixa', text: 'Lucro líquido real e extrato detalhado.' },
+        { role: 'owner', view: 'performance', center: true, title: '11. Performance', text: 'KPIs e indicadores do negócio.' },
+        { role: 'owner', view: 'funcionarios', center: true, title: '12. Equipe', text: 'Gerencie acessos e senhas.' },
+        { role: 'owner', view: 'relatorios', target: '#filter-relatorios', mobileTarget: '#filter-relatorios', title: '13. Relatórios', text: 'Gere PDFs para contador.' },
+        { role: 'owner', view: 'configuracoes', target: '#cfg-name', mobileTarget: '#cfg-name', title: '14. Configurações', text: 'Nome do estúdio e ajustes gerais.' }
     ],
     steps: [], current: 0,
     start() {
@@ -361,148 +399,127 @@ const Tour = {
     }
 };
 
-// PERIODS MODULE (ATUALIZADO COM TRATAMENTO DE ERRO E REABERTURA)
+// PERIODS MODULE (COMPLETO E CORRIGIDO)
 const Periods = {
-    async getManualClosureInfo() {
-        const currentQ = U.getCurrentQuinzenaValue();
-        try {
-            const { data, error } = await db.from('period_closures').select('*').eq('quinzena_id', currentQ).maybeSingle();
-            
-            // Se der erro de tabela inexistente (42P01) ou similar, ignora silenciosamente e assume modo automático
-            if (error && (error.code === '42P01' || error.message.includes('relation'))) {
-                console.warn("Tabela period_closures não encontrada. Modo automático ativado.");
-                return null; 
-            }
-            if (error) throw error; // Outros erros reais
-            
-            return data;
-        } catch (e) {
-            console.error("Erro crítico ao verificar fechamento:", e);
-            return null;
-        }
-    },
-
     async renderCurrentPeriodVisual() {
         const container = document.getElementById('period-visual');
         if(!container) return;
         
-        const currentQ = U.getCurrentQuinzenaValue();
-        const closure = await this.getManualClosureInfo();
+        const effectiveData = await U.getEffectiveRange();
         
-        let range = U.getQuinzenaDates(currentQ);
-        let statusClass = 'vigente';
-        let statusText = 'EM ANDAMENTO (Automático)';
-        let badgeColor = 'var(--primary)';
+        let statusText = '';
+        let badgeColor = '';
         let actionBtn = '';
+        let datesDisplay = '';
 
-        if (closure) {
-            statusClass = 'fechada';
-            statusText = 'FECHADO MANUALMENTE';
-            badgeColor = '#2e7d32';
-            // BOTÃO DE REABRIR SE ESTIVER FECHADO
-            actionBtn = `<button class="btn-secondary" style="margin-top:10px; font-size:0.8rem; padding:5px 10px; background:#ffebee; color:#d32f2f; border:1px solid #d32f2f;" onclick="Periods.reopenQuinzena('${currentQ}')"><i class="ph ph-arrow-u-turn-left"></i> Reabrir / Desfazer Fechamento</button>`;
+        if (effectiveData.isClosedManually) {
+            statusText = 'QUINZENA ENCERRADA';
+            badgeColor = '#d32f2f';
+            datesDisplay = `Cortado em: ${new Date(effectiveData.originalClosure?.cut_date || effectiveData.end).toLocaleDateString('pt-BR')}`;
+            actionBtn = `<button class="btn-secondary" style="margin-top:10px; font-size:0.8rem; padding:5px 10px; background:#ffebee; color:#d32f2f; border:1px solid #d32f2f;" onclick="Periods.reopenLast()"><i class="ph ph-arrow-u-turn-left"></i> Reabrir / Desfazer</button>`;
+        } else if (effectiveData.isExtraPeriod) {
+             statusText = 'PERÍODO EXTRA (PÓS-CORTE)';
+             badgeColor = '#e65100';
+             datesDisplay = `De ${new Date(effectiveData.start).toLocaleDateString('pt-BR')} até ${new Date(effectiveData.end).toLocaleDateString('pt-BR')}`;
+             actionBtn = `<button class="btn-primary" style="width:auto; margin-top:10px; padding:5px 15px; font-size:0.8rem;" onclick="Modals.open('period_summary')"><i class="ph ph-lock-key"></i> Fechar Este Ciclo Extra</button>`;
         } else {
-             // OPÇÃO DE FECHAR MANUALMENTE SE NÃO ESTIVER FECHADO
-             actionBtn = `<button class="btn-secondary" style="margin-top:10px; font-size:0.8rem; padding:5px 10px; background:#fff3e0; color:#e65100; border:1px solid #ffb74d;" onclick="Modals.open('period_summary')"><i class="ph ph-lock-key"></i> Fechar Antecipadamente</button>`;
+            statusText = 'EM ANDAMENTO';
+            badgeColor = 'var(--primary)';
+            datesDisplay = `Vigência: ${new Date(effectiveData.start).toLocaleDateString('pt-BR')} até ${new Date(effectiveData.end).toLocaleDateString('pt-BR')}`;
+            actionBtn = `<button class="btn-primary" style="width:auto; margin-top:10px; padding:5px 15px; font-size:0.8rem;" onclick="Modals.open('period_summary')"><i class="ph ph-lock-key"></i> Fechar Antecipadamente</button>`;
         }
 
         container.innerHTML = `
-        <div class="period-card ${statusClass}">
-            <div>
-                <span class="period-badge" style="background:${badgeColor}; color:white">${statusText}</span>
-                <div class="period-label">${currentQ.replace('Q1', '1ª Quinzena').replace('Q2', '2ª Quinzena')}</div>
-                <div class="period-dates">De ${range.start.slice(0,10)} até ${range.end.slice(0,10)}</div>
-                ${actionBtn}
+        <div class="card" style="border-left: 5px solid ${badgeColor}; background:#fff;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <span style="font-weight:bold; color:${badgeColor}; text-transform:uppercase;">${statusText}</span>
+                    <p style="font-size:0.9rem; color:var(--muted); margin-top:5px;">${datesDisplay}</p>
+                </div>
+                <div>${actionBtn}</div>
             </div>
-            ${closure ? `<div style="font-size:0.8rem; color:var(--muted)">Fechado em: ${U.date(closure.closed_at)}</div>` : ''}
-        </div>
-        `;
+        </div>`;
     },
 
     openSummary() {
         Modals.open('period_summary');
     },
 
-    // Executa o fechamento manual COM CONGELAMENTO DE DADOS
     async executeManualClose() {
         const dateInput = document.getElementById('manual-close-date');
         if(!dateInput || !dateInput.value) return UI.toast('Selecione uma data válida.', 'error');
         
         const cutDate = dateInput.value;
-        const currentQ = U.getCurrentQuinzenaValue();
+        const currentQ = U.getCurrentQuinzenaValue(); // Teórica
         
-        // Confirmação avisando que os dados serão congelados
-        UI.confirm(`Tem certeza que deseja fechar a quinzena ${currentQ} na data ${cutDate}?<br><br>⚠️ ATENÇÃO: Os valores atuais do Fluxo de Caixa desta quinzena serão congelados e arquivados. A tela será reiniciada para o próximo período.`, async () => {
+        UI.confirm(`Tem certeza que deseja fechar a quinzena ${currentQ} na data ${cutDate}?<br><small>Os valores atuais serão congelados e arquivados.</small>`, async () => {
             UI.showLoading('Calculando totais e fechando...');
             try {
-                // 1. Calcular os Totais Finais ANTES de fechar
-                const range = U.getQuinzenaDates(currentQ);
-                const { data: desp } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
+                // 1. Calcular Totais ANTES de fechar
+                const effRange = await U.getEffectiveRange();
+                const { data: desp } = await db.from('despesas').select('*').gte('date', effRange.start + 'T00:00:00Z').lte(effRange.end + 'T23:59:59Z');
                 
                 let totalIn = 0;
                 let totalOut = 0;
-                
                 (desp || []).forEach(d => {
                     const isIncome = App.inflowCategories.includes(d.category);
                     const valNum = Number(d.amount) || 0;
                     if(isIncome) totalIn += valNum; else totalOut += valNum;
                 });
-                
                 const lucroLiquido = totalIn - totalOut;
 
-                // 2. Salvar o Fechamento com os Totais Congelados
-                const { error } = await db.from('period_closures').insert({
+                // 2. Salvar na tabela period_closures
+                // Nota: Se já existir um registro para essa quinzena, fazemos UPDATE, senão INSERT
+                const { data: existing } = await db.from('period_closures').select('id').eq('quinzena_id', currentQ).maybeSingle();
+                
+                const payload = {
                     quinzena_id: currentQ,
                     closed_at: new Date().toISOString(),
                     closed_by: App.user.id,
                     cut_date: cutDate,
-                    total_in: totalIn,      // Novo campo
-                    total_out: totalOut,    // Novo campo
-                    net_profit: lucroLiquido // Novo campo
-                });
+                    total_in: totalIn,
+                    total_out: totalOut,
+                    net_profit: lucroLiquido
+                };
 
-                if (error) throw error;
+                if(existing) {
+                    await db.from('period_closures').update(payload).eq('id', existing.id);
+                } else {
+                    await db.from('period_closures').insert(payload);
+                }
                 
-                UI.toast(`Quinzena ${currentQ} fechada! Lucro Líquido Arquivado: ${U.money(lucroLiquido)}`, 'success');
+                UI.toast(`Quinzena ${currentQ} fechada! Lucro Arquivado: ${U.money(lucroLiquido)}`, 'success');
                 Modals.close();
                 
-                // 3. Forçar recarga da tela de Resumo Financeiro
-                // Isso fará com que o Range mude automaticamente para a próxima quinzena vigente
-                // E como não há lançamentos novos nela ainda, ela aparecerá ZERADA/LIMPA
-                if(App.view === 'resumo-financeiro') {
-                    Render['resumo-financeiro']();
-                } else {
-                    // Se estiver em outra tela, avisa para voltar ao financeiro
-                    UI.toast('Volte ao Fluxo de Caixa para ver o novo período iniciado.', 'warning');
-                }
+                // 3. Forçar recarga para zerar a visualização atual
+                Render['resumo-financeiro']();
                 
             } catch(e) {
                 console.error(e);
-                UI.toast('Erro ao fechar quinzena: ' + e.message, 'error');
+                UI.toast('Erro ao fechar: ' + e.message, 'error');
             } finally {
                 UI.hideLoading();
             }
         });
     },
     
-    // NOVA FUNÇÃO PARA DESFAZER O FECHAMENTO
-    async reopenQuinzena(quinzenaId) {
-        UI.confirm(`Deseja realmente reabrir a quinzena ${quinzenaId}? Isso permitirá novas edições automáticas nesse período.`, async () => {
-            UI.showLoading('Reabrindo...');
-            try {
-                const { error } = await db.from('period_closures').delete().eq('quinzena_id', quinzenaId);
-                if (error) throw error;
-                
-                UI.toast('Quinzena reaberta com sucesso! Voltou ao modo automático.');
-                if(App.view === 'resumo-financeiro') Render['resumo-financeiro']();
-            } catch(e) {
-                UI.toast('Erro ao reabrir: ' + e.message, 'error');
-            } finally {
-                UI.hideLoading();
-            }
-        });
+    async reopenLast() {
+         const currentQ = U.getCurrentQuinzenaValue();
+         UI.confirm('Deseja reabrir este período? Os totais voltarão a ser acumulativos.', async () => {
+             UI.showLoading('Reabrindo...');
+             try {
+                 await db.from('period_closures').delete().eq('quinzena_id', currentQ);
+                 UI.toast('Período Reaberto.');
+                 Render['resumo-financeiro']();
+             } catch(e) {
+                 UI.toast('Erro ao reabrir: ' + e.message, 'error');
+             } finally {
+                 UI.hideLoading();
+             }
+         });
     }
 };
+
 // AUTH
 const Auth = {
     init() { 
@@ -672,7 +689,7 @@ const Nav = {
     }
 };
 
-// RENDER MODULES (Resumido para manter o foco na correção, mas mantendo a lógica original)
+// RENDER MODULES
 const Render = {
     showMonthView() {
         const dayView = document.getElementById('agenda-day-view');
@@ -995,7 +1012,7 @@ const Render = {
         }).join('');
     },
     async despesas() {
-        const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue()); const { data } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
+        const range = U.getStandardQuinzenaDates(U.getCurrentQuinzenaValue()); const { data } = await db.from('despesas').select('*').gte('date', range.start + 'T00:00:00Z').lte(range.end + 'T23:59:59Z');
         let totais = { 'Custos Fixos': 0, 'Comissões': 0, 'Pessoal/Pagamentos': 0, 'Custos Variáveis': 0 }; let despesasOnly = [];
         data.forEach(d => { if(!App.inflowCategories.includes(d.category)) { despesasOnly.push(d); if(totais[d.category] !== undefined) totais[d.category] += d.amount; else totais['Custos Variáveis'] += d.amount; } });
         despesasOnly.sort((a,b) => new Date(b.date) - new Date(a.date));
@@ -1037,8 +1054,8 @@ const Render = {
             query = query.gte('created_at', f.start + 'T00:00:00Z').lte('created_at', f.end + 'T23:59:59Z').eq('status', 'fechada');
         } else {
             const qFilter = document.getElementById('filter-comissao-quinzena')?.value || U.getCurrentQuinzenaValue();
-            const range = U.getQuinzenaDates(qFilter);
-            query = query.gte('created_at', range.start).lte('created_at', range.end).eq('status', 'fechada');
+            const range = U.getStandardQuinzenaDates(qFilter);
+            query = query.gte('created_at', range.start + 'T00:00:00Z').lte('created_at', range.end + 'T23:59:59Z').eq('status', 'fechada');
         }
         const { data } = await query;
         let totalComissao = 0;
@@ -1160,7 +1177,9 @@ const Render = {
         if(dashContainer) dashContainer.innerHTML = finalHtml;
     },
     async 'resumo-financeiro'() {
-        await Periods.renderCurrentPeriodVisual();
+        // 1. Renderiza o Card Visual (Status/Botões) usando a nova lógica inteligente
+        await Periods.renderCurrentPeriodVisual(); 
+
         const rc = document.getElementById('resumo-cards');
         if(rc && !document.getElementById('btn-add-receita-wrapper')) {
             let w = document.createElement('div'); w.id = 'btn-add-receita-wrapper';
@@ -1168,17 +1187,29 @@ const Render = {
             w.innerHTML = `<button class="btn-primary" style="background:#2e7d32; width:auto;" onclick="Modals.open('nova_receita')"><i class="ph ph-plus-circle"></i> Lançar Receita/Entrada Manual</button>`;
             rc.parentNode.insertBefore(w, rc);
         }
-        const range = U.getQuinzenaDates(U.getCurrentQuinzenaValue());
-        const { data: desp } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
+
+        // 2. Obtém o Intervalo REAL vigente (considerando cortes manuais)
+        const effRange = await U.getEffectiveRange();
+        
+        // 3. Consulta os dados filtrados por essas novas datas calculadas
+        const { data: desp } = await db.from('despesas')
+            .select('*')
+            .gte('date', effRange.start + 'T00:00:00Z')
+            .lte(effRange.end + 'T23:59:59Z');
+
         const { extrato, totalIn, totalOut } = U.buildExtrato(desp);
         const lucro = totalIn - totalOut;
+        
         if(rc) rc.innerHTML = `<div class="card" style="border-bottom:4px solid #2e7d32"><h4>Faturamento (Pago)</h4><div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(totalIn)}</div></div><div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custos & Comissões (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(totalOut)}</div></div><div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
+        
         let subDash = { 'Pix':0, 'Dinheiro':0, 'Cartão Crédito':0, 'Cartão Débito':0 };
         desp.forEach(d => { if(subDash[d.category] !== undefined) subDash[d.category] += Number(d.amount)||0; });
+        
         const payCards = document.getElementById('resumo-pagamentos-cards');
         if(payCards) payCards.innerHTML = `<div class="card" style="text-align:center"><i class="ph ph-qr-code" style="font-size:2rem; color:#00695c"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Pix</p><div class="val" style="font-size:1.2rem; color:#00695c">${U.money(subDash['Pix'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-money" style="font-size:2rem; color:#2e7d32"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Dinheiro</p><div class="val" style="font-size:1.2rem; color:#2e7d32">${U.money(subDash['Dinheiro'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#e65100"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Crédito</p><div class="val" style="font-size:1.2rem; color:#e65100">${U.money(subDash['Cartão Crédito'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#1565c0"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Débito</p><div class="val" style="font-size:1.2rem; color:#1565c0">${U.money(subDash['Cartão Débito'])}</div></div>`;
+        
         const extratoList = document.getElementById('extrato-list');
-        if(extratoList) extratoList.innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações na quinzena.</p>' :
+        if(extratoList) extratoList.innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações neste período vigente.</p>' :
         extrato.map(i => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;"><div style="flex:1"><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Saída'} - ${i.category}</b><p style="margin-top:5px; font-weight:600; font-size:1.1rem">${U.formatDesc(i.desc)}</p><span style="font-size:0.8rem; color:var(--muted); display:inline-block; margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(i.date)}</span></div><div style="text-align:right"><span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.3rem; display:block">${i.type==='in'?'+':'-'} ${U.money(i.val)}</span><span style="font-size:0.85rem; color:var(--muted); font-weight:bold">Caixa: ${U.money(i.saldo)}</span></div></div>`).join('');
     },
     async relatorios() {
@@ -1216,8 +1247,8 @@ const Render = {
             }
         } else {
             const qFilter = document.getElementById('filter-relatorios')?.value;
-            const range = U.getQuinzenaDates(qFilter);
-            const { data } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end).order('date', {ascending: false});
+            const range = U.getStandardQuinzenaDates(qFilter);
+            const { data } = await db.from('despesas').select('*').gte('date', range.start + 'T00:00:00Z').lte('date', range.end + 'T23:59:59Z').order('date', {ascending: false});
             desp = data || [];
         }
         const { extrato, totalIn, totalOut } = U.buildExtrato(desp);
@@ -1282,7 +1313,7 @@ const Render = {
     }
 };
 
-// MODALS (Mantido igual ao anterior, pois o erro era no Loading/Nav)
+// MODALS
 const Modals = {
     async open(type, param1=null, param2=null, param3=null) {
         const cont = document.getElementById('modal-container');
@@ -1291,12 +1322,12 @@ const Modals = {
         
         if(type === 'period_summary') {
             const currentQ = U.getCurrentQuinzenaValue();
-            const range = U.getQuinzenaDates(currentQ);
+            const range = U.getStandardQuinzenaDates(currentQ);
             let totalFaturado = 0;
             let totalAgendamentos = 0;
             try {
-                const { data: comandas } = await db.from('comandas').select('total, status').gte('created_at', range.start).lte('created_at', range.end);
-                const { data: appointments } = await db.from('appointments').select('id').gte('date', range.start.slice(0,10)).lte('date', range.end.slice(0,10));
+                const { data: comandas } = await db.from('comandas').select('total, status').gte('created_at', range.start + 'T00:00:00Z').lte('created_at', range.end + 'T23:59:59Z');
+                const { data: appointments } = await db.from('appointments').select('id').gte('date', range.start).lte('date', range.end);
                 totalFaturado = (comandas || []).filter(c => c.status === 'fechada').reduce((acc, c) => acc + c.total, 0);
                 totalAgendamentos = (appointments || []).length;
             } catch(e) { console.warn("Erro ao buscar resumo:", e); }
@@ -1312,7 +1343,7 @@ const Modals = {
 
             <div class="date-picker-container" style="margin-top: 20px; padding-top: 20px; border-top: 1px dashed var(--border);">
                 <label style="font-weight: bold; color: var(--primary-dark); display: block; margin-bottom: 10px;"><i class="ph ph-calendar-check"></i> Data de Corte para Fechamento Manual:</label>
-                <input type="date" id="manual-close-date" min="${range.start.slice(0,10)}" max="${range.end.slice(0,10)}" value="${new Date().toISOString().split('T')[0]}" style="width:100%; padding:1rem; border:1px solid var(--border); border-radius:8px; margin-bottom:15px;">
+                <input type="date" id="manual-close-date" min="${range.start}" max="${range.end}" value="${new Date().toISOString().split('T')[0]}" style="width:100%; padding:1rem; border:1px solid var(--border); border-radius:8px; margin-bottom:15px;">
                 
                 <p style="font-size:0.8rem; color:#d32f2f; margin-bottom:15px;">
                     <i class="ph ph-warning"></i> Ao confirmar, esta quinzena será encerrada nesta data e uma nova iniciará imediatamente. O sistema automático não irá sobrescrever este fechamento.
@@ -1324,8 +1355,6 @@ const Modals = {
             </div>
             `;
         }
-        // ... (Restante dos modals originais mantidos para brevidade, assumindo que funcionavam antes do erro de loading) ...
-        // Copiando a estrutura essencial dos outros modals do arquivo original fornecido pelo usuário para garantir integridade
         else if(type === 'detalhes_agendamento') {
              const { data: a, error } = await db.from('appointments').select('*, clients(name, phone), services(name, price, duration), users!user_id(name)').eq('id', param1).single();
              if(error || !a) return UI.toast('Erro ao carregar detalhes.', 'error');
@@ -1736,7 +1765,7 @@ const Modals = {
     }
 };
 
-// ACTIONS (Mantidos iguais ao original funcional, com pequenas proteções null check)
+// ACTIONS
 const Actions = {
     changeComandaDate(dir) {
         const dateInput = document.getElementById('filter-comanda-data');
@@ -1813,9 +1842,9 @@ const Actions = {
             e = App.filters.comissoes.end;
         } else {
             const qFilter = document.getElementById('filter-comissao-quinzena')?.value || U.getCurrentQuinzenaValue();
-            const range = U.getQuinzenaDates(qFilter);
-            s = range.start.slice(0,10);
-            e = range.end.slice(0,10);
+            const range = U.getStandardQuinzenaDates(qFilter);
+            s = range.start;
+            e = range.end;
         }
         App.filters.comissoes = { start: s, end: e, prof_id: profId, prof_name: profName };
         Render.comissao();

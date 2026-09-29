@@ -1,4 +1,4 @@
-/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO ESTÁVEL E OTIMIZADA */
+/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO FINAL CORRIGIDA */
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const DB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
 const db = window.supabase.createClient(DB_URL, DB_KEY, {
@@ -99,41 +99,80 @@ const U = {
     }
 };
 
-// UI & LOADING GLOBAL
+// UI & LOADING GLOBAL (CORRIGIDO)
 const UI = {
     showLoading(msg = 'Processando...') {
-        let loader = document.getElementById('global-loading');
-        if (!loader) {
-            loader = document.createElement('div');
-            loader.id = 'global-loading';
-            loader.style.cssText = "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(2px); z-index: 9999999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.2s; pointer-events: none; opacity: 0;";
-            loader.innerHTML = `<div style="width: 40px; height: 40px; border: 4px solid #f7e9eb; border-top: 4px solid #B76E79; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div><div style="font-weight: bold; color: #9a5a63; font-size: 1.1rem;">${msg}</div><style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>`;
-            document.body.appendChild(loader);
-        } else {
-            loader.querySelector('div:last-child').textContent = msg;
+        try {
+            let loader = document.getElementById('global-loading');
+            
+            // Se não existir, cria do zero
+            if (!loader) {
+                loader = document.createElement('div');
+                loader.id = 'global-loading';
+                loader.style.cssText = "position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255, 255, 255, 0.8); backdrop-filter: blur(2px); z-index: 9999999; display: flex; flex-direction: column; justify-content: center; align-items: center; transition: opacity 0.2s; pointer-events: none; opacity: 0;";
+                loader.innerHTML = `
+                    <div class="spinner" style="width: 40px; height: 40px; border: 4px solid #f7e9eb; border-top: 4px solid #B76E79; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div>
+                    <div class="loading-text" style="font-weight: bold; color: #9a5a63; font-size: 1.1rem;">${msg}</div>
+                    <style>@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }</style>
+                `;
+                document.body.appendChild(loader);
+            } else {
+                // Se já existir, apenas atualiza o texto de forma segura
+                const textEl = loader.querySelector('.loading-text');
+                if (textEl) {
+                    textEl.textContent = msg;
+                } else {
+                    // Fallback caso a estrutura interna tenha sido perdida
+                    loader.innerHTML = `
+                        <div class="spinner" style="width: 40px; height: 40px; border: 4px solid #f7e9eb; border-top: 4px solid #B76E79; border-radius: 50%; animation: spin 1s linear infinite; margin-bottom: 15px;"></div>
+                        <div class="loading-text" style="font-weight: bold; color: #9a5a63; font-size: 1.1rem;">${msg}</div>
+                    `;
+                }
+            }
+            
+            // Força a exibição
+            loader.style.display = 'flex';
+            loader.style.opacity = '1';
+            loader.style.pointerEvents = 'auto';
+        } catch (e) {
+            console.error("Erro no showLoading:", e);
         }
-        loader.classList.add('active');
-        loader.style.opacity = '1';
-        loader.style.pointerEvents = 'auto';
     },
     hideLoading() {
-        const loader = document.getElementById('global-loading');
-        if (loader) {
-            loader.style.opacity = '0';
-            loader.style.pointerEvents = 'none';
+        try {
+            const loader = document.getElementById('global-loading');
+            if (loader) {
+                loader.style.opacity = '0';
+                loader.style.pointerEvents = 'none';
+                // Opcional: remover do DOM após transição para limpar memória
+                setTimeout(() => {
+                    if(loader.style.opacity === '0') loader.style.display = 'none';
+                }, 200);
+            }
+        } catch (e) {
+            console.error("Erro no hideLoading:", e);
         }
     },
     toast(msg, type='success') {
         const cont = document.getElementById('toast-container');
+        if(!cont) return;
         const t = document.createElement('div'); t.className = `toast ${type}`;
         t.innerHTML = `<i class="ph ${type==='success'?'ph-check-circle':'ph-warning-circle'}"></i> ${msg}`;
         cont.appendChild(t); setTimeout(() => t.remove(), 4000);
     },
     confirm(msg, onConfirm) {
-        document.getElementById('confirm-msg').textContent = msg;
-        const modal = document.getElementById('custom-confirm'); modal.classList.remove('hidden');
-        document.getElementById('confirm-cancel').onclick = () => modal.classList.add('hidden');
-        document.getElementById('confirm-ok').onclick = () => { modal.classList.add('hidden'); onConfirm(); };
+        const msgEl = document.getElementById('confirm-msg');
+        const modal = document.getElementById('custom-confirm');
+        if(!msgEl || !modal) return;
+        
+        msgEl.textContent = msg;
+        modal.classList.remove('hidden');
+        
+        const btnCancel = document.getElementById('confirm-cancel');
+        const btnOk = document.getElementById('confirm-ok');
+        
+        if(btnCancel) btnCancel.onclick = () => modal.classList.add('hidden');
+        if(btnOk) btnOk.onclick = () => { modal.classList.add('hidden'); if(onConfirm) onConfirm(); };
     },
     handleFabClick() {
         const v = App.view;
@@ -168,6 +207,8 @@ const CustomSelect = {
     toggle(id) {
         const menu = document.getElementById(`menu-${id}`);
         const wrapper = document.getElementById(`wrapper-${id}`);
+        if(!menu || !wrapper) return;
+
         const isOpening = menu.style.display === 'none' || menu.style.display === '';
         document.querySelectorAll('.aqc-select-menu').forEach(el => el.style.display = 'none');
         document.querySelectorAll('.aqc-custom-select').forEach(el => {
@@ -191,7 +232,9 @@ const CustomSelect = {
     },
     filter(id, term) {
         term = term.toLowerCase();
-        const opts = document.getElementById(`options-${id}`).querySelectorAll('li');
+        const optsContainer = document.getElementById(`options-${id}`);
+        if(!optsContainer) return;
+        const opts = optsContainer.querySelectorAll('li');
         opts.forEach(opt => {
             if (opt.classList.contains('optgroup-label')) return;
             const text = opt.innerText.toLowerCase();
@@ -199,14 +242,22 @@ const CustomSelect = {
         });
     },
     select(id, val, text) {
-        document.getElementById(`label-${id}`).innerText = text;
+        const label = document.getElementById(`label-${id}`);
         const input = document.getElementById(id);
-        if(val.includes('%7B')) val = decodeURIComponent(val);
-        input.value = val;
-        input.dispatchEvent(new Event('change'));
-        document.getElementById(`menu-${id}`).style.display = 'none';
+        const menu = document.getElementById(`menu-${id}`);
         const wrapper = document.getElementById(`wrapper-${id}`);
-        wrapper.style.zIndex = '1'; if(wrapper.parentElement) wrapper.parentElement.style.zIndex = '';
+
+        if(label) label.innerText = text;
+        if(input) {
+            if(val.includes('%7B')) val = decodeURIComponent(val);
+            input.value = val;
+            input.dispatchEvent(new Event('change'));
+        }
+        if(menu) menu.style.display = 'none';
+        if(wrapper) {
+            wrapper.style.zIndex = '1'; 
+            if(wrapper.parentElement) wrapper.parentElement.style.zIndex = '';
+        }
     },
     closeAll() {
         document.querySelectorAll('.aqc-select-menu').forEach(el => el.style.display = 'none');
@@ -241,8 +292,13 @@ const Tour = {
     start() {
         if (App.role === 'owner') { this.steps = [...this.allSteps]; } else { this.steps = this.allSteps.filter(s => s.role === 'all'); }
         this.steps.forEach((s, index) => { s.title = s.title.replace(/^\d+\./, `${index + 1}.`); });
-        this.current = 0; document.getElementById('tour-overlay').classList.remove('hidden');
-        if(window.innerWidth > 900) { document.getElementById('main-sidebar').classList.add('open'); } else { Nav.closeMenu(); }
+        this.current = 0; 
+        const overlay = document.getElementById('tour-overlay');
+        if(overlay) overlay.classList.remove('hidden');
+        if(window.innerWidth > 900) { 
+            const sidebar = document.getElementById('main-sidebar');
+            if(sidebar) sidebar.classList.add('open'); 
+        } else { Nav.closeMenu(); }
         this.showStep();
     },
     showStep() {
@@ -252,9 +308,16 @@ const Tour = {
         document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
         setTimeout(() => {
             const isMobile = window.innerWidth <= 900;
-            document.getElementById('tour-title').textContent = s.title; document.getElementById('tour-desc').textContent = s.text;
-            document.getElementById('tour-dots').innerHTML = this.steps.map((_, i) => `<span style="height:8px; width:8px; border-radius:50%; background:${i===this.current?'var(--primary)':'#ccc'}"></span>`).join('');
-            document.getElementById('tour-next-btn').innerHTML = this.current === this.steps.length - 1 ? 'Concluir <i class="ph ph-check"></i>' : 'Próximo <i class="ph ph-arrow-right"></i>';
+            const titleEl = document.getElementById('tour-title');
+            const descEl = document.getElementById('tour-desc');
+            const dotsEl = document.getElementById('tour-dots');
+            const nextBtn = document.getElementById('tour-next-btn');
+
+            if(titleEl) titleEl.textContent = s.title; 
+            if(descEl) descEl.textContent = s.text;
+            if(dotsEl) dotsEl.innerHTML = this.steps.map((_, i) => `<span style="height:8px; width:8px; border-radius:50%; background:${i===this.current?'var(--primary)':'#ccc'}"></span>`).join('');
+            if(nextBtn) nextBtn.innerHTML = this.current === this.steps.length - 1 ? 'Concluir <i class="ph ph-check"></i>' : 'Próximo <i class="ph ph-arrow-right"></i>';
+            
             if (s.center) return this.centerDialog();
             let targetSelector = isMobile && s.mobileTarget ? s.mobileTarget : s.target;
             let targetEl = document.querySelector(targetSelector);
@@ -267,7 +330,9 @@ const Tour = {
         }, 400);
     },
     positionDialog(targetEl, isMobile) {
-        const dialog = document.getElementById('tour-dialog'); dialog.style.transform = 'none'; dialog.style.bottom = 'auto';
+        const dialog = document.getElementById('tour-dialog'); 
+        if(!dialog) return;
+        dialog.style.transform = 'none'; dialog.style.bottom = 'auto';
         const rect = targetEl.getBoundingClientRect(); let top = rect.bottom + 15; let left = rect.left;
         if (isMobile) {
             dialog.style.width = 'calc(100% - 40px)'; left = 20;
@@ -280,37 +345,35 @@ const Tour = {
         if (top < 20) top = 20; dialog.style.top = `${top}px`; dialog.style.left = `${left}px`;
     },
     centerDialog() {
-        const dialog = document.getElementById('tour-dialog'); dialog.style.top = '50%'; dialog.style.left = '50%'; dialog.style.bottom = 'auto';
+        const dialog = document.getElementById('tour-dialog'); 
+        if(!dialog) return;
+        dialog.style.top = '50%'; dialog.style.left = '50%'; dialog.style.bottom = 'auto';
         dialog.style.transform = 'translate(-50%, -50%)'; dialog.style.width = window.innerWidth <= 900 ? 'calc(100% - 40px)' : '350px';
     },
     next() { this.current++; this.showStep(); },
     skip() {
-        document.getElementById('tour-overlay').classList.add('hidden'); document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
-        document.getElementById('tour-dialog').style.transform = 'none'; localStorage.setItem('aqc_tour_done', 'true');
+        const overlay = document.getElementById('tour-overlay');
+        if(overlay) overlay.classList.add('hidden'); 
+        document.querySelectorAll('.tour-highlight').forEach(el => el.classList.remove('tour-highlight'));
+        const dialog = document.getElementById('tour-dialog');
+        if(dialog) dialog.style.transform = 'none'; 
+        localStorage.setItem('aqc_tour_done', 'true');
     }
 };
 
-// PERIODS MODULE (LÓGICA DE FECHAMENTO MANUAL - À PROVA DE FALHAS)
+// PERIODS MODULE
 const Periods = {
-    // Verifica se há fechamento manual ativo para a quinzena atual
     async getManualClosureInfo() {
         const currentQ = U.getCurrentQuinzenaValue();
         try {
-            // Tenta buscar. Se a tabela não existir, o Supabase retorna erro, que capturamos abaixo.
             const { data, error } = await db.from('period_closures').select('*').eq('quinzena_id', currentQ).maybeSingle();
-            if (error) {
-                // Se for erro de tabela não existente, ignoramos silenciosamente (sistema funciona no modo automático)
-                console.warn("Tabela period_closures não encontrada ou sem acesso. Usando modo automático.");
-                return null;
-            }
+            if (error) return null;
             return data;
         } catch (e) {
             console.error("Erro ao verificar fechamento manual:", e);
             return null;
         }
     },
-
-    // Renderiza o card visual do período na tela de Resumo Financeiro
     async renderCurrentPeriodVisual() {
         const container = document.getElementById('period-visual');
         if(!container) return;
@@ -340,11 +403,9 @@ const Periods = {
         </div>
         `;
     },
-
     openSummary() {
         Modals.open('period_summary');
     },
-
     async executeManualClose() {
         const dateInput = document.getElementById('manual-close-date');
         if(!dateInput || !dateInput.value) return UI.toast('Selecione uma data válida.', 'error');
@@ -355,7 +416,6 @@ const Periods = {
         UI.confirm(`Tem certeza que deseja fechar a quinzena ${currentQ} na data ${cutDate}? Isso iniciará uma nova quinzena imediatamente e impedirá o fechamento automático futuro deste período.`, async () => {
             UI.showLoading('Efetuando fechamento manual...');
             try {
-                // Tenta inserir. Se a tabela não existir, vai cair no catch.
                 const { error } = await db.from('period_closures').insert({
                     quinzena_id: currentQ,
                     closed_at: new Date().toISOString(),
@@ -363,9 +423,7 @@ const Periods = {
                     cut_date: cutDate
                 });
 
-                if (error) {
-                    throw new Error("Não foi possível salvar o fechamento. Verifique se a tabela 'period_closures' foi criada no banco de dados.");
-                }
+                if (error) throw new Error("Não foi possível salvar. Verifique a tabela period_closures.");
                 
                 UI.toast('Quinzena fechada com sucesso!', 'success');
                 Modals.close();
@@ -383,34 +441,64 @@ const Periods = {
 
 // AUTH
 const Auth = {
-    init() { document.getElementById('login-form').onsubmit = e => { e.preventDefault(); this.login(); }; },
+    init() { 
+        const form = document.getElementById('login-form');
+        if(form) form.onsubmit = e => { e.preventDefault(); this.login(); }; 
+    },
     async login() {
-        const u = document.getElementById('username').value.trim(); const p = document.getElementById('password').value;
-        const btn = document.getElementById('btn-login'); btn.textContent = 'Aguarde...';
+        const uInput = document.getElementById('username');
+        const pInput = document.getElementById('password');
+        const btn = document.getElementById('btn-login');
+        
+        if(!uInput || !pInput || !btn) return;
+
+        const u = uInput.value.trim(); 
+        const p = pInput.value;
+        btn.textContent = 'Aguarde...';
+        
         try {
             const { data, error } = await db.from('users').select('*').ilike('username', u).maybeSingle();
-            if (error) throw new Error(`Falha no sistema: ${error.message}`); if (!data) throw new Error("Usuário não encontrado.");
+            if (error) throw new Error(`Falha no sistema: ${error.message}`); 
+            if (!data) throw new Error("Usuário não encontrado.");
             if (data.active === false || data.is_deleted === true) throw new Error("Conta desativada ou excluída. Procure a Administração.");
             if (data.password !== p) throw new Error("Senha incorreta.");
-            App.user = data; App.role = (data.role === 'freelancer' || data.role === 'colaborador') ? 'colaborador' : 'owner';
-            document.getElementById('login-form').reset(); this.success();
+            
+            App.user = data; 
+            App.role = (data.role === 'freelancer' || data.role === 'colaborador') ? 'colaborador' : 'owner';
+            
+            const form = document.getElementById('login-form');
+            if(form) form.reset(); 
+            
+            this.success();
+            
             if(data.first_login || p === '123456') { setTimeout(() => { Modals.open('first_login'); }, 500); }
             else if (!localStorage.getItem('aqc_tour_done')) { setTimeout(() => { Tour.start(); }, 1000); }
-        } catch(e) { UI.toast(e.message, 'error'); btn.textContent = 'Entrar'; }
+        } catch(e) { 
+            UI.toast(e.message, 'error'); 
+            btn.textContent = 'Entrar'; 
+        }
     },
     async fetchAllAvatars() {
-        try { const { data: avData } = await db.from('user_avatars').select('*'); if(avData) { avData.forEach(av => { App.avatars[av.user_id] = av.avatar_base64; }); } } catch (e) { console.log('Tabela user_avatars ignorada.'); }
+        try { 
+            const { data: avData } = await db.from('user_avatars').select('*'); 
+            if(avData) { avData.forEach(av => { App.avatars[av.user_id] = av.avatar_base64; }); } 
+        } catch (e) { console.log('Tabela user_avatars ignorada.'); }
     },
     async success() {
-        // CORREÇÃO CRÍTICA: Forçar a transição da tela IMEDIATAMENTE
-        document.getElementById('auth-layer').classList.add('hidden'); 
-        document.getElementById('system-layout').classList.remove('hidden'); 
+        const authLayer = document.getElementById('auth-layer');
+        const sysLayout = document.getElementById('system-layout');
+        
+        if(authLayer) authLayer.classList.add('hidden'); 
+        if(sysLayout) sysLayout.classList.remove('hidden'); 
         document.body.classList.toggle('is-owner', App.role === 'owner');
         
-        // Carregar configurações de forma segura (não bloqueia a tela se falhar)
         try {
             const { data: set } = await db.from('settings').select('*').single();
-            if(set) { App.settings = set; document.getElementById('brand-name').textContent = set.studio_name; }
+            if(set) { 
+                App.settings = set; 
+                const brand = document.getElementById('brand-name');
+                if(brand) brand.textContent = set.studio_name; 
+            }
         } catch(e) { console.warn('Erro ao carregar settings:', e); }
 
         App.avatars = {}; 
@@ -422,9 +510,23 @@ const Auth = {
         Render.showMonthView();
     },
     updateHeaderAvatar() {
-        document.getElementById('header-user').textContent = App.user.name.split(' ')[0]; const av = document.getElementById('header-avatar');
-        if(App.avatars[App.user.id]) { av.innerHTML = ''; av.style.backgroundImage = `url(${App.avatars[App.user.id]})`; av.style.backgroundSize = 'cover'; av.style.backgroundPosition = 'center'; av.style.color = 'transparent'; }
-        else { av.innerHTML = App.user.name.substring(0,2).toUpperCase(); av.style.backgroundImage = 'none'; av.style.color = 'white'; }
+        const userEl = document.getElementById('header-user');
+        const avEl = document.getElementById('header-avatar');
+        if(!userEl || !avEl) return;
+
+        userEl.textContent = App.user.name.split(' ')[0]; 
+        
+        if(App.avatars[App.user.id]) { 
+            avEl.innerHTML = ''; 
+            avEl.style.backgroundImage = `url(${App.avatars[App.user.id]})`; 
+            avEl.style.backgroundSize = 'cover'; 
+            avEl.style.backgroundPosition = 'center'; 
+            avEl.style.color = 'transparent'; 
+        } else { 
+            avEl.innerHTML = App.user.name.substring(0,2).toUpperCase(); 
+            avEl.style.backgroundImage = 'none'; 
+            avEl.style.color = 'white'; 
+        }
     },
     logout() { UI.confirm('Deseja realmente sair da sua conta?', () => { window.location.reload(true); }); }
 };
@@ -434,30 +536,49 @@ const Nav = {
     init() {
         document.querySelectorAll('.nav-link, .b-item').forEach(link => {
             link.addEventListener('click', e => {
-                const targetView = link.dataset.view; if(!targetView) return;
-                e.preventDefault(); this.showView(targetView); this.closeMenu();
+                const targetView = link.dataset.view; 
+                if(!targetView) return;
+                e.preventDefault(); 
+                this.showView(targetView); 
+                this.closeMenu();
             });
         });
     },
     async showView(id) {
         UI.showLoading('Carregando módulo...');
-        App.view = id;
-        document.querySelectorAll('.view').forEach(v => v.classList.remove('active')); 
-        document.getElementById(`view-${id}`).classList.add('active');
-        document.querySelectorAll('.nav-link, .b-item').forEach(el => el.classList.remove('active')); 
-        document.querySelectorAll(`[data-view="${id}"]`).forEach(el => el.classList.add('active'));
-        
-        const titles = { perfil: 'Meu Perfil', agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', observacoes:'Histórico de Observações', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', relatorios:'Relatórios & Arquivos' };
-        document.getElementById('page-title').textContent = titles[id] || 'Amor que Cuida';
-        
         try {
+            App.view = id;
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active')); 
+            const viewEl = document.getElementById(`view-${id}`);
+            if(viewEl) viewEl.classList.add('active');
+            
+            document.querySelectorAll('.nav-link, .b-item').forEach(el => el.classList.remove('active')); 
+            document.querySelectorAll(`[data-view="${id}"]`).forEach(el => el.classList.add('active'));
+            
+            const titles = { perfil: 'Meu Perfil', agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', observacoes:'Histórico de Observações', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', relatorios:'Relatórios & Arquivos' };
+            const pageTitle = document.getElementById('page-title');
+            if(pageTitle) pageTitle.textContent = titles[id] || 'Amor que Cuida';
+            
             if (id === 'agenda') { Render.showMonthView(); }
             else if (id === 'perfil') {
-                document.getElementById('perfil-nome').textContent = App.user.name; 
-                document.getElementById('perfil-role').textContent = App.role === 'owner' ? 'Gestor / Proprietário' : 'Colaborador';
+                const nomeEl = document.getElementById('perfil-nome');
+                const roleEl = document.getElementById('perfil-role');
                 const preview = document.getElementById('perfil-foto-preview');
-                if(App.avatars[App.user.id]) { preview.innerHTML = ''; preview.style.backgroundImage = `url(${App.avatars[App.user.id]})`; preview.style.backgroundSize = 'cover'; preview.style.backgroundPosition = 'center'; }
-                else { preview.innerHTML = App.user.name.substring(0,2).toUpperCase(); preview.style.backgroundImage = 'none'; }
+                
+                if(nomeEl) nomeEl.textContent = App.user.name; 
+                if(roleEl) roleEl.textContent = App.role === 'owner' ? 'Gestor / Proprietário' : 'Colaborador';
+                
+                if(preview) {
+                    if(App.avatars[App.user.id]) { 
+                        preview.innerHTML = ''; 
+                        preview.style.backgroundImage = `url(${App.avatars[App.user.id]})`; 
+                        preview.style.backgroundSize = 'cover'; 
+                        preview.style.backgroundPosition = 'center'; 
+                    } else { 
+                        preview.innerHTML = App.user.name.substring(0,2).toUpperCase(); 
+                        preview.style.backgroundImage = 'none'; 
+                    }
+                }
             } else {
                 const detailViews = ['observacoes', 'perfil-cliente'];
                 if(Render[id] && !detailViews.includes(id)) {
@@ -467,27 +588,46 @@ const Nav = {
                 }
             }
         } catch(e) {
-            console.error(e);
+            console.error("Erro na navegação:", e);
             UI.toast('Erro ao carregar a tela.', 'error');
         } finally {
             UI.hideLoading();
         }
     },
-    toggleMenu() { document.getElementById('main-sidebar').classList.toggle('open'); document.getElementById('mobile-overlay').classList.toggle('hidden'); },
-    closeMenu() { document.getElementById('main-sidebar').classList.remove('open'); document.getElementById('mobile-overlay').classList.add('hidden'); }
+    toggleMenu() { 
+        const sidebar = document.getElementById('main-sidebar');
+        const overlay = document.getElementById('mobile-overlay');
+        if(sidebar) sidebar.classList.toggle('open'); 
+        if(overlay) overlay.classList.toggle('hidden'); 
+    },
+    closeMenu() { 
+        const sidebar = document.getElementById('main-sidebar');
+        const overlay = document.getElementById('mobile-overlay');
+        if(sidebar) sidebar.classList.remove('open'); 
+        if(overlay) overlay.classList.add('hidden'); 
+    }
 };
 
-// RENDER MODULES (Mantidos iguais ao original funcional, apenas garantindo async/await correto)
+// RENDER MODULES (Resumido para manter o foco na correção, mas mantendo a lógica original)
 const Render = {
     showMonthView() {
-        document.getElementById('agenda-day-view').classList.add('hidden'); document.getElementById('agenda-month-view').classList.remove('hidden');
-        document.getElementById('btn-voltar-mes').classList.add('hidden'); document.getElementById('day-view-title').classList.add('hidden');
+        const dayView = document.getElementById('agenda-day-view');
+        const monthView = document.getElementById('agenda-month-view');
+        const btnVoltar = document.getElementById('btn-voltar-mes');
+        const dayTitle = document.getElementById('day-view-title');
+
+        if(dayView) dayView.classList.add('hidden'); 
+        if(monthView) monthView.classList.remove('hidden');
+        if(btnVoltar) btnVoltar.classList.add('hidden'); 
+        if(dayTitle) dayTitle.classList.add('hidden');
         this.buildMonthCalendar();
     },
     changeMonth(dir) { App.calendarMonth.setMonth(App.calendarMonth.getMonth() + dir); this.buildMonthCalendar(); },
     async buildMonthCalendar() {
         const year = App.calendarMonth.getFullYear(); const month = App.calendarMonth.getMonth();
-        document.getElementById('cal-month-year').textContent = App.calendarMonth.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        const titleEl = document.getElementById('cal-month-year');
+        if(titleEl) titleEl.textContent = App.calendarMonth.toLocaleString('pt-BR', { month: 'long', year: 'numeric' });
+        
         const firstDay = new Date(year, month, 1); const lastDay = new Date(year, month + 1, 0);
         const startDate = U.iso(firstDay); const endDate = U.iso(lastDay);
         let monthApps = [];
@@ -496,7 +636,11 @@ const Render = {
             if(App.role !== 'owner') query = query.eq('user_id', App.user.id);
             const { data } = await query; if(data) monthApps = data;
         } catch(e) {}
-        const grid = document.getElementById('cal-grid'); let html = ''; const weekDays = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
+        
+        const grid = document.getElementById('cal-grid'); 
+        if(!grid) return;
+        
+        let html = ''; const weekDays = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
         weekDays.forEach(d => { html += `<div class="cal-grid-header">${d}</div>`; });
         for (let i = 0; i < firstDay.getDay(); i++) { html += `<div class="cal-day empty"></div>`; }
         for (let i = 1; i <= lastDay.getDate(); i++) {
@@ -512,8 +656,15 @@ const Render = {
     },
     selectDate(iso) {
         App.currentDate = new Date(iso+'T12:00:00');
-        document.getElementById('agenda-month-view').classList.add('hidden'); document.getElementById('agenda-day-view').classList.remove('hidden');
-        document.getElementById('btn-voltar-mes').classList.remove('hidden'); document.getElementById('day-view-title').classList.remove('hidden');
+        const monthView = document.getElementById('agenda-month-view');
+        const dayView = document.getElementById('agenda-day-view');
+        const btnVoltar = document.getElementById('btn-voltar-mes');
+        const dayTitle = document.getElementById('day-view-title');
+
+        if(monthView) monthView.classList.add('hidden'); 
+        if(dayView) dayView.classList.remove('hidden');
+        if(btnVoltar) btnVoltar.classList.remove('hidden'); 
+        if(dayTitle) dayTitle.classList.remove('hidden');
         this.agendaDay();
     },
     async agendaDay() {
@@ -523,9 +674,11 @@ const Render = {
             let query = db.from('appointments').select('*, clients(name, phone), services(name, duration), users!user_id(name)').eq('date', dateStr).neq('status', 'cancelado').order('time', {ascending: true});
             if (App.role !== 'owner') query = query.eq('user_id', App.user.id);
             const { data: agData, error: errAg } = await query; if(errAg) throw errAg;
+            
             let uQuery = db.from('users').select('id, name, schedule, phone').neq('username', 'admin.teste').eq('active', true).neq('is_deleted', true).order('name');
             if(App.role !== 'owner') uQuery = uQuery.eq('id', App.user.id);
             let { data: usersData } = await uQuery;
+            
             if(usersData) {
                 const currentDayOfWeek = App.currentDate.getDay();
                 usersData.forEach(u => {
@@ -534,20 +687,28 @@ const Render = {
                     u.isOffDay = dayConf ? dayConf.active === false : false;
                 });
             }
+            
             const cont = document.getElementById('agenda-list');
+            if(!cont) return;
+
             if(!usersData || usersData.length === 0) {
                 cont.innerHTML = `<div class="card" style="text-align:center; padding:4rem 1rem"><i class="ph ph-calendar-x" style="font-size:3rem; color:var(--muted); margin-bottom:10px;"></i><p style="color:var(--muted); font-size:1.1rem">Nenhum profissional cadastrado.</p></div>`;
                 return;
             }
+            
             const isDesktop = window.innerWidth > 900; const pixelsPerMin = isDesktop ? 1 : 1.3; const slotHeight = isDesktop ? 60 : 78; const horaInicio = 7; const horaFim = 21;
             let html = `<div class="timeline-wrapper" style="overflow-x: auto; -webkit-overflow-scrolling: touch; width: 100%; border: 1px solid var(--border); border-radius: 8px;"><div class="timeline-header" style="display: flex; min-width: max-content; border-bottom: 1px solid var(--border);"><div class="time-col" style="position: sticky; left: 0; z-index: 20; background: var(--surface); border:none; min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);"></div>`;
+            
             usersData.forEach(u => {
-                let bgImage = (App.avatars && App.avatars[u.id]) ? `background-image: url(${App.avatars[u.id]}); background-size: cover; background-position: center; color: transparent;` : ''; let init = bgImage ? '' : u.name.substring(0,2).toUpperCase();
+                let bgImage = (App.avatars && App.avatars[u.id]) ? `background-image: url(${App.avatars[u.id]}); background-size: cover; background-position: center; color: transparent;` : ''; 
+                let init = bgImage ? '' : u.name.substring(0,2).toUpperCase();
                 html += `<div class="prof-col-header" style="display:flex; flex-direction:column; align-items:center; gap:5px; padding: 15px 10px; min-width: 140px; flex: 1; border-right: 1px solid var(--border); opacity: ${u.isOffDay ? '0.6' : '1'};"><div style="width: 45px; height: 45px; border-radius: 50%; background-color: ${u.isOffDay ? '#ccc' : 'var(--primary)'}; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight:bold; border: 2px solid ${u.isOffDay ? '#aaa' : 'var(--primary-light)'}; ${bgImage}">${init}</div><span style="font-size:0.95rem; font-weight: bold; margin-bottom:5px; color: ${u.isOffDay ? 'var(--muted)' : 'var(--text)'}; text-align:center">${u.name.split(' ')[0]} ${u.isOffDay ? '<br><span style="font-size:0.7rem; color:var(--primary)">(Folga)</span>' : ''}</span></div>`;
             });
+            
             html += `</div><div class="timeline-body" style="display: flex; min-width: max-content; position: relative;"><div class="time-col" style="position: sticky; left: 0; z-index: 10; background: var(--surface); min-width: 60px; box-shadow: 2px 0 5px rgba(0,0,0,0.05);">`;
             for(let i=horaInicio; i<=horaFim; i++) { html += `<div class="time-slot" style="height:${slotHeight}px; min-height:${slotHeight}px; display:flex; justify-content:center; padding-top:8px; color:var(--muted); font-size:0.8rem; border-bottom: 1px solid var(--border);"><span>${String(i).padStart(2,'0')}:00</span></div>`; }
             html += `</div><div class="tracks-container" style="display: flex; flex: 1;">`;
+            
             usersData.forEach(u => {
                 let trackBg = u.isOffDay ? 'background-color: rgba(216, 27, 96, 0.08);' : '';
                 html += `<div class="prof-track" style="position: relative; min-width: 140px; flex: 1; border-right: 1px solid var(--border); ${trackBg}">`;
@@ -575,38 +736,59 @@ const Render = {
     },
     buildWeekStrip() {
         const d = App.currentDate; let strTitle = d.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-        document.getElementById('day-view-title').textContent = strTitle.charAt(0).toUpperCase() + strTitle.slice(1);
+        const titleEl = document.getElementById('day-view-title');
+        if(titleEl) titleEl.textContent = strTitle.charAt(0).toUpperCase() + strTitle.slice(1);
+        
         const start = new Date(d); start.setDate(d.getDate() - 3); let html = ''; const days = ['DOM','SEG','TER','QUA','QUI','SEX','SAB'];
         for(let i=0; i<7; i++) { const cur = new Date(start); cur.setDate(start.getDate() + i); const isoCur = U.iso(cur); const isSel = isoCur === U.iso(App.currentDate) ? 'active' : ''; html += `<div class="cal-day ${isSel}" onclick="Render.selectDate('${isoCur}')"><span>${days[cur.getDay()]}</span><span>${cur.getDate()}</span></div>`; }
-        document.getElementById('cal-days-row').innerHTML = html;
+        const row = document.getElementById('cal-days-row');
+        if(row) row.innerHTML = html;
     },
     async clientes() { const { data } = await db.from('clients').select('*').order('name'); window.allClientes = data || []; this.renderClientesList(window.allClientes); },
     renderClientesList(data) {
-        document.getElementById('clientes-list').innerHTML = data.map(c => {
+        const list = document.getElementById('clientes-list');
+        if(!list) return;
+        list.innerHTML = data.map(c => {
             const safeName = c.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
             return `<div class="card cliente-card"><a href="#" class="wpp-btn" onclick="Modals.open('whatsapp', '${c.phone}', '${safeName}', JSON.stringify({cliente:'${safeName}', data_aniversario:'${c.birth_date ? new Date(c.birth_date).toLocaleDateString() : ''}'})); event.stopPropagation()"><i class="ph ph-whatsapp-logo"></i></a><h4 style="color:var(--primary); font-size:1.2rem; margin-bottom:10px">${c.name}</h4><p><i class="ph ph-phone"></i> ${c.phone}</p><p style="font-size:0.8rem; color:var(--muted); margin-top:5px"><i class="ph ph-cake"></i> ${c.birth_date ? new Date(c.birth_date).toLocaleDateString('pt-BR') : 'Não cadastrado'}</p><div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap"><button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Render.perfilCliente('${c.id}', '${safeName}')"><i class="ph ph-user"></i> Perfil</button><button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Render.observacoes('${c.id}', '${safeName}')"><i class="ph ph-file-text"></i> Observações</button><button class="btn-secondary" style="width:100%; border:1px solid #ccc" onclick="Modals.open('edit_cliente', '${c.id}')"><i class="ph ph-pencil"></i> Editar Dados</button></div></div>`;
         }).join('');
     },
     filterClientes(term) { term = term.toLowerCase(); const filtered = (window.allClientes || []).filter(c => c.name.toLowerCase().includes(term) || (c.phone && c.phone.includes(term))); this.renderClientesList(filtered); },
     observacoes(id, name) {
-        document.getElementById('current-observacao-client-id').value = id;
+        const inputId = document.getElementById('current-observacao-client-id');
+        if(inputId) inputId.value = id;
         if (name) {
             window.currentObsClientName = name;
-            document.getElementById('observacao-title').textContent = `Observações de: ${name}`;
+            const title = document.getElementById('observacao-title');
+            if(title) title.textContent = `Observações de: ${name}`;
         } else if (window.currentObsClientName) {
-            document.getElementById('observacao-title').textContent = `Observações de: ${window.currentObsClientName}`;
+            const title = document.getElementById('observacao-title');
+            if(title) title.textContent = `Observações de: ${window.currentObsClientName}`;
         }
         Nav.showView('observacoes');
         Actions.loadObservacoes(id);
     },
     async perfilCliente(id, name) {
-        document.getElementById('current-perfil-client-id').value = id; document.getElementById('perfil-cliente-title').textContent = `Perfil: ${name}`; Nav.showView('perfil-cliente');
+        const inputId = document.getElementById('current-perfil-client-id');
+        if(inputId) inputId.value = id; 
+        const title = document.getElementById('perfil-cliente-title');
+        if(title) title.textContent = `Perfil: ${name}`; 
+        Nav.showView('perfil-cliente');
+        
         const { data: comandas } = await db.from('comandas').select('*, users!comandas_professional_id_fkey(name)').eq('client_id', id).eq('status', 'fechada').order('created_at', {ascending: false});
         const { data: debts } = await db.from('debts').select('*').eq('client_id', id).gt('remaining_amount', 0).maybeSingle();
+        
         const debitosDiv = document.getElementById('perfil-debitos-destaque');
-        if (debts && debts.remaining_amount > 0) { debitosDiv.innerHTML = `<div class="card" style="background:#ffebee; border-left:5px solid #d32f2f; margin-bottom:10px;"><h4 style="color:#d32f2f; margin-bottom:5px;"><i class="ph ph-warning-circle"></i> Atenção: Cliente possui débitos ativos</h4><p style="font-size:1.1rem">Valor Pendente: <b>${U.money(debts.remaining_amount)}</b></p><button class="btn-primary" style="margin-top:10px; background:#d32f2f; width:auto; padding:0.5rem 1rem" onclick="Nav.showView('cobrancas')">Ir para Cobranças</button></div>`; } else { debitosDiv.innerHTML = ''; }
-        document.getElementById('perfil-info').innerHTML = `<div class="card" style="border-left:4px solid var(--primary);"><h4 style="font-size:1.2rem;">Total de Visitas Concluídas: ${comandas.length}</h4></div>`;
-        const list = document.getElementById('perfil-visitas-list'); if(!comandas || comandas.length === 0) { list.innerHTML = "<p style='color:var(--muted); padding:2rem; text-align:center;'>Nenhum histórico.</p>"; return; }
+        if (debts && debts.remaining_amount > 0 && debitosDiv) { 
+            debitosDiv.innerHTML = `<div class="card" style="background:#ffebee; border-left:5px solid #d32f2f; margin-bottom:10px;"><h4 style="color:#d32f2f; margin-bottom:5px;"><i class="ph ph-warning-circle"></i> Atenção: Cliente possui débitos ativos</h4><p style="font-size:1.1rem">Valor Pendente: <b>${U.money(debts.remaining_amount)}</b></p><button class="btn-primary" style="margin-top:10px; background:#d32f2f; width:auto; padding:0.5rem 1rem" onclick="Nav.showView('cobrancas')">Ir para Cobranças</button></div>`; 
+        } else if(debitosDiv) { debitosDiv.innerHTML = ''; }
+        
+        const infoDiv = document.getElementById('perfil-info');
+        if(infoDiv) infoDiv.innerHTML = `<div class="card" style="border-left:4px solid var(--primary);"><h4 style="font-size:1.2rem;">Total de Visitas Concluídas: ${comandas ? comandas.length : 0}</h4></div>`;
+        
+        const list = document.getElementById('perfil-visitas-list'); 
+        if(!list) return;
+        if(!comandas || comandas.length === 0) { list.innerHTML = "<p style='color:var(--muted); padding:2rem; text-align:center;'>Nenhum histórico.</p>"; return; }
         list.innerHTML = comandas.map(c => { const itens = (c.items||[]).map(i => i.name).join(', '); return `<div class="card" style="margin-bottom:10px;"><h4 style="color:var(--primary-dark); font-size:1.1rem; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:10px;"><i class="ph ph-calendar"></i> ${U.date(c.created_at)}</h4><p style="margin-bottom:5px;"><b>Ticket Associado:</b> ${c.ticket || 'S/N'}</p><p style="margin-bottom:5px;"><b>Profissional que Abriu:</b> ${c.users?.name || 'Não informado'}</p><p style="margin-bottom:5px;"><b>Serviços/Produtos:</b> ${itens || 'Nenhum detalhe salvo'}</p><p><b>Total Investido:</b> ${U.money(c.total)}</p></div>`; }).join('');
     },
     async cobrancas(tab = 'pendentes') {
@@ -624,8 +806,12 @@ const Render = {
         }
         let query = db.from('debts').select('*, clients(name)').order('created_at', {ascending: false});
         if(tab === 'pendentes') query = query.gt('remaining_amount', 0); else query = query.eq('remaining_amount', 0);
-        const { data: debts, error } = await query; const cont = document.getElementById('cobrancas-list');
-        if(error) return cont.innerHTML = `<p style='color:#d32f2f'><i class="ph ph-warning-circle"></i> Erro: ${error.message}</p>`; if (!debts || debts.length === 0) return cont.innerHTML = `<p style='color:var(--muted)'>Nenhum registro ${tab === 'pendentes'?'em aberto':'pago'}.</p>`;
+        const { data: debts, error } = await query; 
+        const cont = document.getElementById('cobrancas-list');
+        if(!cont) return;
+        if(error) return cont.innerHTML = `<p style='color:#d32f2f'><i class="ph ph-warning-circle"></i> Erro: ${error.message}</p>`; 
+        if (!debts || debts.length === 0) return cont.innerHTML = `<p style='color:var(--muted)'>Nenhum registro ${tab === 'pendentes'?'em aberto':'pago'}.</p>`;
+        
         let htmlFinal = '';
         for (let d of debts) {
             const fTkt = `FAT-${d.id.substring(0,5).toUpperCase()}`; const ticketsArr = d.comanda_ticket ? d.comanda_ticket.split(', ').map(t => t.trim()) : [];
@@ -653,13 +839,15 @@ const Render = {
     },
     async servicos() { const { data } = await db.from('services').select('*').order('name'); window.allServicos = data || []; this.renderServicosList(window.allServicos); },
     renderServicosList(data) {
-        const cont = document.getElementById('servicos-list'); if(!data || data.length === 0) { cont.innerHTML = '<p style="color:var(--muted); padding: 1rem;">Nenhum serviço encontrado.</p>'; return; }
+        const cont = document.getElementById('servicos-list'); if(!cont) return;
+        if(!data || data.length === 0) { cont.innerHTML = '<p style="color:var(--muted); padding: 1rem;">Nenhum serviço encontrado.</p>'; return; }
         cont.innerHTML = data.map(s => `<div class="card"><div style="display:flex; justify-content:space-between; border-bottom:1px solid #eee; padding-bottom:10px"><h4 style="font-size:1.2rem;">${s.name} <span style="font-size:0.8rem; font-weight:normal; color:#888;">(${s.duration || 60}min)</span></h4><div><button onclick="Modals.open('edit_servico', '${s.id}')" style="background:none; border:none; cursor:pointer; color:var(--primary); font-size:1.2rem; margin-right:5px"><i class="ph ph-pencil"></i></button><button onclick="Actions.deleteService('${s.id}')" style="background:none; border:none; cursor:pointer; color:#d32f2f; font-size:1.2rem"><i class="ph ph-trash"></i></button></div></div><div style="margin:10px 0; color:var(--muted)"><p>Comissão Pro: <b style="color:var(--text)">${s.commission}%</b></p>${s.has_assistant?`<p>Auxiliar: <b style="color:var(--text)">${s.assistant_commission}%</b></p>`:''}<p>Custo Fixo Retido: <b style="color:#d32f2f">${s.cost || 0}%</b></p></div><div class="val" style="font-size:1.5rem">${U.money(s.price)}</div></div>`).join('');
     },
     filterServicos(term) { term = term.toLowerCase(); const filtered = (window.allServicos || []).filter(s => s.name.toLowerCase().includes(term)); this.renderServicosList(filtered); },
     async produtos() {
         const { data } = await db.from('products').select('*').order('name'); window.allProdutos = data || [];
-        document.getElementById('produtos-list').innerHTML = `<div class="card" style="margin-bottom:20px; padding: 10px;"><div class="input-group" style="margin:0;"><input type="text" placeholder="Buscar produto pelo nome..." onkeyup="Render.filterProdutos(this.value)" style="padding:1rem; border-radius:8px; border:1px solid var(--border); font-size: 1rem;"></div></div><div id="produtos-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;"></div>`;
+        const list = document.getElementById('produtos-list');
+        if(list) list.innerHTML = `<div class="card" style="margin-bottom:20px; padding: 10px;"><div class="input-group" style="margin:0;"><input type="text" placeholder="Buscar produto pelo nome..." onkeyup="Render.filterProdutos(this.value)" style="padding:1rem; border-radius:8px; border:1px solid var(--border); font-size: 1rem;"></div></div><div id="produtos-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 15px;"></div>`;
         this.renderProdutosList(window.allProdutos);
     },
     renderProdutosList(data) {
@@ -702,6 +890,7 @@ const Render = {
             .lte('created_at', endOfDay)
             .order('created_at', {ascending: false});
             const container = document.getElementById('comandas-list');
+            if(!container) return;
             if (error) throw error;
             if (!data || data.length === 0) {
                 const parts = currentDate.split('-');
@@ -723,16 +912,21 @@ const Render = {
             <button class="btn-secondary" style="width:100%; padding:0.8rem; background: ${c.status === 'aberta' ? 'var(--primary)' : '#f0f0f0'}; color: ${c.status === 'aberta' ? 'white' : 'var(--text)'}" onclick="Modals.open('edit_comanda', '${c.id}')"><i class="ph ${c.status === 'aberta' ? 'ph-plus-circle' : 'ph-eye'}"></i> ${c.status === 'aberta' ? 'Lançar Itens / Fechar' : 'Visualizar Ticket'}</button>
             </div>`).join('');
         } catch (e) {
-            document.getElementById('comandas-list').innerHTML = `<p style="color:var(--muted)">Erro ao carregar: ${e.message}</p>`;
+            const container = document.getElementById('comandas-list');
+            if(container) container.innerHTML = `<p style="color:var(--muted)">Erro ao carregar: ${e.message}</p>`;
         }
     },
     async mensagens() {
         const { data } = await db.from('message_templates').select('*');
-        document.getElementById('mensagens-list').innerHTML = data.map(m => `<div class="card"><h4 style="color:var(--primary); border-bottom:1px solid #eee; padding-bottom:10px">${m.title}</h4><p style="margin:15px 0; font-style:italic; color:var(--muted)">"${m.content}"</p><div style="display:flex; gap:10px"><button class="btn-secondary" style="flex:1" onclick="Modals.open('edit_mensagem', '${m.id}')"><i class="ph ph-pencil"></i> Editar</button><button class="btn-secondary" style="flex:1; color:#d32f2f; background:#ffebee" onclick="Actions.deleteMensagem('${m.id}')"><i class="ph ph-trash"></i> Excluir</button></div></div>`).join('');
+        const list = document.getElementById('mensagens-list');
+        if(!list) return;
+        list.innerHTML = data.map(m => `<div class="card"><h4 style="color:var(--primary); border-bottom:1px solid #eee; padding-bottom:10px">${m.title}</h4><p style="margin:15px 0; font-style:italic; color:var(--muted)">"${m.content}"</p><div style="display:flex; gap:10px"><button class="btn-secondary" style="flex:1" onclick="Modals.open('edit_mensagem', '${m.id}')"><i class="ph ph-pencil"></i> Editar</button><button class="btn-secondary" style="flex:1; color:#d32f2f; background:#ffebee" onclick="Actions.deleteMensagem('${m.id}')"><i class="ph ph-trash"></i> Excluir</button></div></div>`).join('');
     },
     async funcionarios() {
         const { data } = await db.from('users').select('*').neq('username', 'admin.teste').neq('is_deleted', true).order('name');
-        document.getElementById('funcionarios-list').innerHTML = data.map(u => {
+        const list = document.getElementById('funcionarios-list');
+        if(!list) return;
+        list.innerHTML = data.map(u => {
             const isActive = u.active !== false; return `<div class="card" style="border-left: 4px solid ${isActive ? 'var(--primary)' : '#999'}; opacity: ${isActive ? '1' : '0.6'}"><h4 style="font-size:1.2rem; margin-bottom:5px">${u.name}</h4><p style="font-size:0.9rem; color:var(--muted)"><i class="ph ph-user"></i> Login: <b>${u.username}</b></p><p style="font-size:0.8rem; margin-top:5px; padding:3px 8px; border-radius:10px; display:inline-block; background:${u.role==='owner'?'#ffebee':'#e8f5e9'}; color:${u.role==='owner'?'#d32f2f':'#2e7d32'}">${u.role.toUpperCase()}</p>${!isActive ? `<p style="font-size:0.8rem; color:#d32f2f; margin-top:5px; font-weight:bold">CONTA DESATIVADA</p>` : ''}<div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap"><button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Modals.open('edit_funcionario', '${u.id}')"><i class="ph ph-pencil"></i> Editar Perfil</button><button class="btn-secondary" style="flex:1; min-width:120px; ${isActive ? 'color:#d32f2f;' : 'color:#2e7d32;'}" onclick="Actions.toggleFuncionarioStatus('${u.id}', ${isActive})"><i class="ph ${isActive ? 'ph-prohibit' : 'ph-check-circle'}"></i> ${isActive ? 'Desativar' : 'Ativar'}</button><button class="btn-secondary" style="flex:1; min-width:120px; color:#d32f2f;" onclick="Actions.deleteFuncionario('${u.id}')"><i class="ph ph-trash"></i> Excluir</button></div></div>`;
         }).join('');
     },
@@ -741,9 +935,15 @@ const Render = {
         let totais = { 'Custos Fixos': 0, 'Comissões': 0, 'Pessoal/Pagamentos': 0, 'Custos Variáveis': 0 }; let despesasOnly = [];
         data.forEach(d => { if(!App.inflowCategories.includes(d.category)) { despesasOnly.push(d); if(totais[d.category] !== undefined) totais[d.category] += d.amount; else totais['Custos Variáveis'] += d.amount; } });
         despesasOnly.sort((a,b) => new Date(b.date) - new Date(a.date));
-        document.getElementById('despesas-list').innerHTML = `<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:20px"><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #d32f2f"><p style="font-size:0.8rem">Custos Fixos (Retido)</p><div class="val" style="color:#d32f2f; font-size:1.2rem">-${U.money(totais['Custos Fixos'])}</div></div><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #cd7f32"><p style="font-size:0.8rem">Comissões Autom.</p><div class="val" style="color:#cd7f32; font-size:1.2rem">-${U.money(totais['Comissões'])}</div></div><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #8e24aa"><p style="font-size:0.8rem">Pessoal/Equipe</p><div class="val" style="color:#8e24aa; font-size:1.2rem">-${U.money(totais['Pessoal/Pagamentos'])}</div></div><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #e65100"><p style="font-size:0.8rem">Variáveis/Insumos</p><div class="val" style="color:#e65100; font-size:1.2rem">-${U.money(totais['Custos Variáveis'])}</div></div></div>` +
+        const list = document.getElementById('despesas-list');
+        if(list) list.innerHTML = `<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:20px"><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #d32f2f"><p style="font-size:0.8rem">Custos Fixos (Retido)</p><div class="val" style="color:#d32f2f; font-size:1.2rem">-${U.money(totais['Custos Fixos'])}</div></div><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #cd7f32"><p style="font-size:0.8rem">Comissões Autom.</p><div class="val" style="color:#cd7f32; font-size:1.2rem">-${U.money(totais['Comissões'])}</div></div><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #8e24aa"><p style="font-size:0.8rem">Pessoal/Equipe</p><div class="val" style="color:#8e24aa; font-size:1.2rem">-${U.money(totais['Pessoal/Pagamentos'])}</div></div><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #e65100"><p style="font-size:0.8rem">Variáveis/Insumos</p><div class="val" style="color:#e65100; font-size:1.2rem">-${U.money(totais['Custos Variáveis'])}</div></div></div>` +
         despesasOnly.map(d => { let color = '#d32f2f'; if(d.category === 'Comissões') color = '#cd7f32'; else if(d.category === 'Pessoal/Pagamentos') color = '#8e24aa'; else if(d.category === 'Custos Variáveis') color = '#e65100'; return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${color}"><div><h4>${d.description}</h4><p style="font-size:0.8rem; color:var(--muted)">${d.category} • ${U.date(d.date)}</p></div><div class="val" style="color:${color}">-${U.money(d.amount)}</div></div>`; }).join('');
-        if(App.charts.despesas) App.charts.despesas.destroy(); App.charts.despesas = new Chart(document.getElementById('chart-despesas'), { type: 'pie', data: { labels: Object.keys(totais), datasets: [{ data: Object.values(totais), backgroundColor: ['#d32f2f', '#cd7f32', '#8e24aa', '#e65100'] }] }});
+        
+        const chartCanvas = document.getElementById('chart-despesas');
+        if(chartCanvas) {
+            if(App.charts.despesas) App.charts.despesas.destroy(); 
+            App.charts.despesas = new Chart(chartCanvas, { type: 'pie', data: { labels: Object.keys(totais), datasets: [{ data: Object.values(totais), backgroundColor: ['#d32f2f', '#cd7f32', '#8e24aa', '#e65100'] }] }});
+        }
     },
     async comissao() {
         const isOwner = App.role === 'owner';
@@ -760,11 +960,11 @@ const Render = {
             }
             const btnClear = document.getElementById('btn-clear-com'); const infoDiv = document.getElementById('com-filter-info'); const defaultSel = document.getElementById('filter-comissao-quinzena');
             if(App.filters.comissoes) {
-                btnClear.classList.remove('hidden'); if(defaultSel) defaultSel.style.display = 'none';
+                if(btnClear) btnClear.classList.remove('hidden'); if(defaultSel) defaultSel.style.display = 'none';
                 let f = App.filters.comissoes;
-                infoDiv.innerHTML = `<i class="ph ph-funnel"></i> Filtrando de: ${U.date(f.start + 'T00:00:00').slice(0,10)} até ${U.date(f.end + 'T00:00:00').slice(0,10)} ${f.prof_name ? `| Colaborador(a): ${f.prof_name}` : ''}`;
+                if(infoDiv) infoDiv.innerHTML = `<i class="ph ph-funnel"></i> Filtrando de: ${U.date(f.start + 'T00:00:00').slice(0,10)} até ${U.date(f.end + 'T00:00:00').slice(0,10)} ${f.prof_name ? `| Colaborador(a): ${f.prof_name}` : ''}`;
             } else {
-                btnClear.classList.add('hidden'); infoDiv.innerHTML = ''; if(defaultSel) defaultSel.style.display = 'block';
+                if(btnClear) btnClear.classList.add('hidden'); if(infoDiv) infoDiv.innerHTML = ''; if(defaultSel) defaultSel.style.display = 'block';
             }
         }
         let query = db.from('comandas').select('*, clients(name)').order('created_at', {ascending: false});
@@ -908,11 +1108,13 @@ const Render = {
         const { data: desp } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
         const { extrato, totalIn, totalOut } = U.buildExtrato(desp);
         const lucro = totalIn - totalOut;
-        rc.innerHTML = `<div class="card" style="border-bottom:4px solid #2e7d32"><h4>Faturamento (Pago)</h4><div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(totalIn)}</div></div><div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custos & Comissões (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(totalOut)}</div></div><div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
+        if(rc) rc.innerHTML = `<div class="card" style="border-bottom:4px solid #2e7d32"><h4>Faturamento (Pago)</h4><div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(totalIn)}</div></div><div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custos & Comissões (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(totalOut)}</div></div><div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
         let subDash = { 'Pix':0, 'Dinheiro':0, 'Cartão Crédito':0, 'Cartão Débito':0 };
         desp.forEach(d => { if(subDash[d.category] !== undefined) subDash[d.category] += Number(d.amount)||0; });
-        document.getElementById('resumo-pagamentos-cards').innerHTML = `<div class="card" style="text-align:center"><i class="ph ph-qr-code" style="font-size:2rem; color:#00695c"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Pix</p><div class="val" style="font-size:1.2rem; color:#00695c">${U.money(subDash['Pix'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-money" style="font-size:2rem; color:#2e7d32"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Dinheiro</p><div class="val" style="font-size:1.2rem; color:#2e7d32">${U.money(subDash['Dinheiro'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#e65100"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Crédito</p><div class="val" style="font-size:1.2rem; color:#e65100">${U.money(subDash['Cartão Crédito'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#1565c0"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Débito</p><div class="val" style="font-size:1.2rem; color:#1565c0">${U.money(subDash['Cartão Débito'])}</div></div>`;
-        document.getElementById('extrato-list').innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações na quinzena.</p>' :
+        const payCards = document.getElementById('resumo-pagamentos-cards');
+        if(payCards) payCards.innerHTML = `<div class="card" style="text-align:center"><i class="ph ph-qr-code" style="font-size:2rem; color:#00695c"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Pix</p><div class="val" style="font-size:1.2rem; color:#00695c">${U.money(subDash['Pix'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-money" style="font-size:2rem; color:#2e7d32"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Dinheiro</p><div class="val" style="font-size:1.2rem; color:#2e7d32">${U.money(subDash['Dinheiro'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#e65100"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Crédito</p><div class="val" style="font-size:1.2rem; color:#e65100">${U.money(subDash['Cartão Crédito'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#1565c0"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Débito</p><div class="val" style="font-size:1.2rem; color:#1565c0">${U.money(subDash['Cartão Débito'])}</div></div>`;
+        const extratoList = document.getElementById('extrato-list');
+        if(extratoList) extratoList.innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações na quinzena.</p>' :
         extrato.map(i => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;"><div style="flex:1"><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Saída'} - ${i.category}</b><p style="margin-top:5px; font-weight:600; font-size:1.1rem">${U.formatDesc(i.desc)}</p><span style="font-size:0.8rem; color:var(--muted); display:inline-block; margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(i.date)}</span></div><div style="text-align:right"><span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.3rem; display:block">${i.type==='in'?'+':'-'} ${U.money(i.val)}</span><span style="font-size:0.85rem; color:var(--muted); font-weight:bold">Caixa: ${U.money(i.saldo)}</span></div></div>`).join('');
     },
     async relatorios() {
@@ -929,11 +1131,11 @@ const Render = {
             }
             const btnClear = document.getElementById('btn-clear-rel'); const infoDiv = document.getElementById('rel-filter-info'); const defaultSel = document.getElementById('filter-relatorios');
             if(App.filters.relatorios) {
-                btnClear.classList.remove('hidden'); if(defaultSel) defaultSel.style.display = 'none';
+                if(btnClear) btnClear.classList.remove('hidden'); if(defaultSel) defaultSel.style.display = 'none';
                 let f = App.filters.relatorios;
-                infoDiv.innerHTML = `<i class="ph ph-funnel"></i> Filtrando de: ${U.date(f.start + 'T00:00:00').slice(0,10)} até ${U.date(f.end + 'T00:00:00').slice(0,10)} | Exibindo: ${f.tipo} ${f.prof_name ? `(${f.prof_name})` : ''}`;
+                if(infoDiv) infoDiv.innerHTML = `<i class="ph ph-funnel"></i> Filtrando de: ${U.date(f.start + 'T00:00:00').slice(0,10)} até ${U.date(f.end + 'T00:00:00').slice(0,10)} | Exibindo: ${f.tipo} ${f.prof_name ? `(${f.prof_name})` : ''}`;
             } else {
-                btnClear.classList.add('hidden'); infoDiv.innerHTML = ''; if(defaultSel) defaultSel.style.display = 'block';
+                if(btnClear) btnClear.classList.add('hidden'); if(infoDiv) infoDiv.innerHTML = ''; if(defaultSel) defaultSel.style.display = 'block';
             }
         }
         let desp = [];
@@ -949,7 +1151,7 @@ const Render = {
                 desp = desp.filter(d => d.description.includes(`Comissão ${f.prof_name}:`));
             }
         } else {
-            const qFilter = document.getElementById('filter-relatorios').value;
+            const qFilter = document.getElementById('filter-relatorios')?.value;
             const range = U.getQuinzenaDates(qFilter);
             const { data } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end).order('date', {ascending: false});
             desp = data || [];
@@ -992,34 +1194,40 @@ const Render = {
             }
         });
         const tkMedio = data.length ? totalFaturamento / data.length : 0; const totalAgendas = agendas.length || 1; const ocupacao = Math.min(100, Math.round((data.length / totalAgendas) * 100));
-        document.getElementById('perf-kpis').innerHTML = `
+        const kpis = document.getElementById('perf-kpis');
+        if(kpis) kpis.innerHTML = `
         <div class="card" style="text-align:center; padding:2rem"><p style="font-weight:bold; color:var(--muted); margin-bottom:10px">Ticket Médio (Bruto)</p><div class="val" style="font-size:2rem">${U.money(tkMedio)}</div></div>
         <div class="card" style="text-align:center; padding:2rem"><p style="font-weight:bold; color:var(--muted); margin-bottom:10px">Ocupação</p><div class="val" style="font-size:2rem; color:${ocupacao > 50 ? '#2e7d32' : '#d32f2f'}">${ocupacao}%</div></div>
         <div class="card" style="text-align:center; padding:2rem"><p style="font-weight:bold; color:var(--muted); margin-bottom:10px">Total Concluídos</p><div class="val" style="font-size:2rem; color:var(--text)">${data.length}</div></div>`;
         const sortedFunc = Object.entries(rankFunc).sort((a,b)=>b[1]-a[1]);
-        document.getElementById('performance-ranking').innerHTML = `<h3 style="grid-column: 1 / -1; margin-bottom:10px">Ranking (Bruto Gerado por Profissional)</h3>` +
+        const ranking = document.getElementById('performance-ranking');
+        if(ranking) ranking.innerHTML = `<h3 style="grid-column: 1 / -1; margin-bottom:10px">Ranking (Bruto Gerado por Profissional)</h3>` +
         sortedFunc.map((s,i) => `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid var(--primary)"><div><span style="font-size:0.8rem; font-weight:bold; color:var(--muted)">Posição ${i+1}</span><h4 style="font-size:1.2rem; margin-top:5px">${s[0]}</h4></div><div class="val" style="font-size:1.5rem">${U.money(s[1])}</div></div>`).join('');
         const sortedServ = Object.entries(rankServ).sort((a,b)=>b[1].qtd-a[1].qtd).slice(0, 5);
-        if(App.charts.perf) App.charts.perf.destroy();
-        App.charts.perf = new Chart(document.getElementById('chart-performance'), { type: 'bar', data: { labels: sortedServ.map(s=>s[0]), datasets: [{ label: 'Top Serviços (Volume)', data: sortedServ.map(s=>s[1].qtd), backgroundColor: '#B76E79', borderRadius: 8 }] } });
+        const chartCanvas = document.getElementById('chart-performance');
+        if(chartCanvas) {
+            if(App.charts.perf) App.charts.perf.destroy();
+            App.charts.perf = new Chart(chartCanvas, { type: 'bar', data: { labels: sortedServ.map(s=>s[0]), datasets: [{ label: 'Top Serviços (Volume)', data: sortedServ.map(s=>s[1].qtd), backgroundColor: '#B76E79', borderRadius: 8 }] } });
+        }
     },
     configuracoes() {
-        document.getElementById('cfg-name').value = App.settings.studio_name || '';
-        document.getElementById('cfg-phone').value = App.settings.official_phone || '';
+        const nameInput = document.getElementById('cfg-name');
+        const phoneInput = document.getElementById('cfg-phone');
+        if(nameInput) nameInput.value = App.settings.studio_name || '';
+        if(phoneInput) phoneInput.value = App.settings.official_phone || '';
     }
 };
 
-// MODALS (Mantido igual, apenas garantindo que o period_summary funcione)
+// MODALS (Mantido igual ao anterior, pois o erro era no Loading/Nav)
 const Modals = {
     async open(type, param1=null, param2=null, param3=null) {
         const cont = document.getElementById('modal-container');
+        if(!cont) return;
         let html = `<div class="modal"><button class="modal-close" onclick="Modals.close()"><i class="ph ph-x"></i></button>`;
         
         if(type === 'period_summary') {
             const currentQ = U.getCurrentQuinzenaValue();
             const range = U.getQuinzenaDates(currentQ);
-            
-            // Busca dados para o resumo (com tratamento de erro)
             let totalFaturado = 0;
             let totalAgendamentos = 0;
             try {
@@ -1052,11 +1260,8 @@ const Modals = {
             </div>
             `;
         }
-        // ... (Restante dos modais originais mantidos exatamente como estavam para não quebrar nada) ...
-        // Para economizar espaço, assumo que o restante do código de modals é idêntico ao anterior.
-        // Se precisar do bloco completo de modals, posso regenerar, mas o foco aqui é a correção do crash inicial.
-        
-        // Copiando o restante dos modals do arquivo original fornecido para garantir integridade:
+        // ... (Restante dos modals originais mantidos para brevidade, assumindo que funcionavam antes do erro de loading) ...
+        // Copiando a estrutura essencial dos outros modals do arquivo original fornecido pelo usuário para garantir integridade
         else if(type === 'detalhes_agendamento') {
              const { data: a, error } = await db.from('appointments').select('*, clients(name, phone), services(name, price, duration), users!user_id(name)').eq('id', param1).single();
              if(error || !a) return UI.toast('Erro ao carregar detalhes.', 'error');
@@ -1461,10 +1666,13 @@ const Modals = {
             if(autoT) { const sel = document.getElementById('wpp-template-sel'); if(sel) { sel.value = autoT.id; Actions.applyTemplate(autoT.id); } }
         }
     },
-    close() { document.getElementById('modal-container').classList.add('hidden'); }
+    close() { 
+        const cont = document.getElementById('modal-container');
+        if(cont) cont.classList.add('hidden'); 
+    }
 };
 
-// ACTIONS (Mantidos iguais ao original funcional)
+// ACTIONS (Mantidos iguais ao original funcional, com pequenas proteções null check)
 const Actions = {
     changeComandaDate(dir) {
         const dateInput = document.getElementById('filter-comanda-data');
@@ -1571,7 +1779,7 @@ const Actions = {
     },
     applyTemplate(templateId) {
         const box = document.getElementById('wpp-msg');
-        if(!templateId) { box.value = ''; return; }
+        if(!templateId || !box) { if(box) box.value = ''; return; }
         db.from('message_templates').select('content').eq('id', templateId).single().then(({ data }) => {
             if(!data) return; box.value = U.fillTemplate(data.content, window.currentWppVars || {});
         });
@@ -1620,6 +1828,7 @@ const Actions = {
     },
     async loadObservacoes(id) {
         const div = document.getElementById('observacao-history-list');
+        if(!div) return;
         div.innerHTML = `
         <div style="text-align:center; padding:3rem 1rem;">
         <i class="ph ph-spinner ph-spin" style="font-size: 2.5rem; color: var(--primary);"></i>
@@ -2056,7 +2265,7 @@ const Actions = {
         await db.from('debts').update({ remaining_amount: Math.max(0, max - (max * perc / 100)), payment_details: pd }).eq('id', id);
         Modals.close(); Render.cobrancas('pendentes');
     },
-    async saveSettings(e) { e.preventDefault(); const payload = { studio_name: document.getElementById('cfg-name').value, official_phone: document.getElementById('cfg-phone').value }; if(App.settings.id) await db.from('settings').update(payload).eq('id', App.settings.id); else await db.from('settings').insert(payload); App.settings = {...App.settings, ...payload}; document.getElementById('brand-name').textContent = payload.studio_name; UI.toast('Salvo!'); },
+    async saveSettings(e) { e.preventDefault(); const payload = { studio_name: document.getElementById('cfg-name').value, official_phone: document.getElementById('cfg-phone').value }; if(App.settings.id) await db.from('settings').update(payload).eq('id', App.settings.id); else await db.from('settings').insert(payload); App.settings = {...App.settings, ...payload}; const brand = document.getElementById('brand-name'); if(brand) brand.textContent = payload.studio_name; UI.toast('Salvo!'); },
     sendWhatsApp(phone) {
         const msg = document.getElementById('wpp-msg').value; if(!msg) return UI.toast('Escreva algo.', 'error');
         Modals.close(); window.open(`https://wa.me/55${phone.replace(/\D/g, '')}?text=${encodeURIComponent(msg)}`, '_blank');
@@ -2067,11 +2276,14 @@ const Actions = {
         const reader = new FileReader();
         reader.onload = async (e) => {
             const base64 = e.target.result;
-            document.getElementById('perfil-foto-preview').innerHTML = '';
-            document.getElementById('perfil-foto-preview').style.backgroundImage = `url(${base64})`;
-            document.getElementById('perfil-foto-preview').style.backgroundSize = 'cover';
-            document.getElementById('perfil-foto-preview').style.backgroundPosition = 'center';
-            document.getElementById('perfil-foto-preview').style.color = 'transparent';
+            const preview = document.getElementById('perfil-foto-preview');
+            if(preview) {
+                preview.innerHTML = '';
+                preview.style.backgroundImage = `url(${base64})`;
+                preview.style.backgroundSize = 'cover';
+                preview.style.backgroundPosition = 'center';
+                preview.style.color = 'transparent';
+            }
             try {
                 const {data: existing} = await db.from('user_avatars').select('id').eq('user_id', App.user.id).maybeSingle();
                 if(existing) {
@@ -2129,7 +2341,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initCSS();
     
     // CORREÇÃO DEFINITIVA DA SPLASH SCREEN
-    // Garante que a splash some após 4 segundos, independente de erros de rede
     setTimeout(() => { 
         const splash = document.getElementById('splash-screen'); 
         if(splash) { 

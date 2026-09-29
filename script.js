@@ -1,4 +1,4 @@
-/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO FINAL CORRIGIDA (FLUXO DE CAIXA) */
+/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO FINAL COM CORTE NO DIA ANTERIOR */
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const DB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
 const db = window.supabase.createClient(DB_URL, DB_KEY, {
@@ -38,7 +38,6 @@ const U = {
         return out;
     },
     
-    // Retorna o ID da quinzena teórica (ex: 2023-10-Q2)
     getCurrentQuinzenaValue() {
         let curr = new Date();
         let m = String(curr.getMonth() + 1).padStart(2, '0');
@@ -47,10 +46,17 @@ const U = {
         return `${y}-${m}-${q}`;
     },
 
-    // CORREÇÃO PRINCIPAL: Função robusta para pegar datas
+    /**
+     * LÓGICA ATUALIZADA: 
+     * Se fechou dia 28, a quinzena antiga vai até dia 27.
+     * A nova quinzena começa dia 28.
+     */
     async getEffectiveRange() {
         const now = new Date();
         const todayStr = this.iso(now);
+        
+        // Identifica a quinzena teórica baseada na data de HOJE
+        // Ex: Hoje é 28/09 -> Teoricamente seria Q2-Setembro
         const dayOfMonth = now.getDate();
         const month = String(now.getMonth() + 1).padStart(2, '0');
         const year = now.getFullYear();
@@ -58,56 +64,52 @@ const U = {
         const currentQId = `${year}-${month}-${theoreticalQ}`;
 
         try {
-            // Tenta buscar fechamento manual
+            // Busca se ESTA quinzena teórica foi fechada manualmente
             const { data: closure, error } = await db.from('period_closures')
                 .select('*')
                 .eq('quinzena_id', currentQId)
                 .maybeSingle();
 
-            // Se der erro na tabela ou não achar nada, usa o padrão automático
+            // Se não houver fechamento manual, usa regra padrão automática
             if (error || !closure) {
                 return this.getStandardQuinzenaDates(currentQId);
             }
 
-            // Se achou fechamento manual
+            // SE HOUVER FECHAMENTO MANUAL:
             const cutDateObj = new Date(closure.cut_date);
             const todayObj = new Date(todayStr);
             
-            // Zera horas para comparação justa
+            // Normaliza horas para comparação
             cutDateObj.setHours(0,0,0,0);
             todayObj.setHours(0,0,0,0);
 
-            if (cutDateObj < todayObj) {
-                // Fechou no passado -> Estamos no período "Extra" (do dia seguinte ao corte até fim do mês)
-                const nextDay = new Date(cutDateObj);
-                nextDay.setDate(nextDay.getDate() + 1);
+            if (cutDateObj <= todayObj) {
+                // O corte foi hoje ou antes.
+                // Significa que estamos NA NOVA QUINZENA gerada pelo fechamento.
+                // Início: Data do Corte (hoje ou data passada)
+                // Fim: Final do mês natural atual
+                
                 const lastDayOfMonth = new Date(year, parseInt(month), 0);
 
                 return {
-                    start: this.iso(nextDay),
-                    end: this.iso(lastDayOfMonth),
-                    isExtraPeriod: true,
-                    label: `Pós-Fechamento (${currentQId})`,
+                    start: this.iso(cutDateObj),       // Começa no dia do corte
+                    end: this.iso(lastDayOfMonth),     // Vai até fim do mês
+                    isExtraPeriod: true,               // É um período pós-corte
+                    label: `Nova Quinzena (Iniciada em ${this.iso(cutDateObj)})`,
                     originalClosure: closure
                 };
             } else {
-                // Fechamento é hoje ou futuro -> Usa o range padrão até a data de corte
+                // Fechamento futuro? Usa padrão até lá.
                 const standardRange = this.getStandardQuinzenaDates(currentQId);
-                return {
-                    ...standardRange,
-                    isClosedManually: true,
-                    label: 'FECHADO MANUALMENTE'
-                };
+                return { ...standardRange, isClosedManually: true, label: 'FECHADO MANUALMENTE' };
             }
 
         } catch (e) {
-            console.error("Erro crítico ao calcular vigência, usando fallback:", e);
-            // Fallback absoluto: Quinzena padrão baseada na data de hoje
+            console.error("Erro ao calcular vigência:", e);
             return this.getStandardQuinzenaDates(currentQId);
         }
     },
 
-    // Helper síncrono para datas padrão
     getStandardQuinzenaDates(val) {
         if(!val) return { start: '1970-01-01', end: '2099-12-31' };
         const [y, m, q] = val.split('-');
@@ -313,20 +315,20 @@ window.handleNewClientComanda = function(val) { const div = document.getElementB
 // TOUR
 const Tour = {
     allSteps: [
-        { role: 'all', view: 'agenda', target: '#btn-novo-agendamento-tour', mobileTarget: '.fab-button', title: '1. Agenda Inteligente', text: 'Aqui você visualiza e gerencia horários.' },
-        { role: 'all', view: 'comandas', target: '#btn-nova-comanda-tour', mobileTarget: '.fab-button', title: '2. Abertura de Comandas', text: 'O cliente chegou? Abra uma comanda.' },
-        { role: 'all', view: 'cobrancas', target: '#tab-pendentes-tour', mobileTarget: '#tab-pendentes-tour', title: '3. Cobranças', text: 'Dê baixa nos pagamentos pendentes.' },
-        { role: 'all', view: 'clientes', center: true, title: '4. Gestão de Clientes', text: 'Histórico e observações personalizadas.' },
-        { role: 'owner', view: 'servicos', center: true, title: '5. Serviços', text: 'Cadastre serviços e preços.' },
-        { role: 'owner', view: 'produtos', center: true, title: '6. Produtos', text: 'Controle estoque e vendas.' },
-        { role: 'all', view: 'comissao', center: true, title: '7. Comissões', text: 'Ranking e ganhos dos profissionais.' },
-        { role: 'owner', view: 'mensagens', center: true, title: '8. Mensagens', text: 'Templates automáticos de WhatsApp.' },
-        { role: 'owner', view: 'despesas', center: true, title: '9. Despesas', text: 'Lance custos fixos e variáveis.' },
-        { role: 'owner', view: 'resumo-financeiro', center: true, title: '10. Fluxo de Caixa', text: 'Lucro líquido real e extrato detalhado.' },
-        { role: 'owner', view: 'performance', center: true, title: '11. Performance', text: 'KPIs e indicadores do negócio.' },
-        { role: 'owner', view: 'funcionarios', center: true, title: '12. Equipe', text: 'Gerencie acessos e senhas.' },
-        { role: 'owner', view: 'relatorios', target: '#filter-relatorios', mobileTarget: '#filter-relatorios', title: '13. Relatórios', text: 'Gere PDFs para contador.' },
-        { role: 'owner', view: 'configuracoes', target: '#cfg-name', mobileTarget: '#cfg-name', title: '14. Configurações', text: 'Nome do estúdio e ajustes gerais.' }
+        { role: 'all', view: 'agenda', target: '#btn-novo-agendamento-tour', mobileTarget: '.fab-button', title: '1. Agenda Inteligente', text: 'Gerencie horários e bloqueios.' },
+        { role: 'all', view: 'comandas', target: '#btn-nova-comanda-tour', mobileTarget: '.fab-button', title: '2. Comandas', text: 'Abra tickets e lance itens.' },
+        { role: 'all', view: 'cobrancas', target: '#tab-pendentes-tour', mobileTarget: '#tab-pendentes-tour', title: '3. Cobranças', text: 'Receba pagamentos pendentes.' },
+        { role: 'all', view: 'clientes', center: true, title: '4. Clientes', text: 'Cadastros e histórico.' },
+        { role: 'owner', view: 'servicos', center: true, title: '5. Serviços', text: 'Preços e comissões.' },
+        { role: 'owner', view: 'produtos', center: true, title: '6. Produtos', text: 'Estoque e vendas.' },
+        { role: 'all', view: 'comissao', center: true, title: '7. Comissões', text: 'Ganhos dos profissionais.' },
+        { role: 'owner', view: 'mensagens', center: true, title: '8. Mensagens', text: 'Templates WhatsApp.' },
+        { role: 'owner', view: 'despesas', center: true, title: '9. Despesas', text: 'Custos fixos e variáveis.' },
+        { role: 'owner', view: 'resumo-financeiro', center: true, title: '10. Fluxo de Caixa', text: 'Lucro líquido e extrato.' },
+        { role: 'owner', view: 'performance', center: true, title: '11. Performance', text: 'KPIs e rankings.' },
+        { role: 'owner', view: 'funcionarios', center: true, title: '12. Equipe', text: 'Usuários e acessos.' },
+        { role: 'owner', view: 'relatorios', target: '#filter-relatorios', mobileTarget: '#filter-relatorios', title: '13. Relatórios', text: 'Exportação PDF.' },
+        { role: 'owner', view: 'configuracoes', target: '#cfg-name', mobileTarget: '#cfg-name', title: '14. Configurações', text: 'Dados do estúdio.' }
     ],
     steps: [], current: 0,
     start() {
@@ -401,7 +403,7 @@ const Tour = {
     }
 };
 
-// PERIODS MODULE
+// PERIODS MODULE (ATUALIZADO COM LÓGICA DE CORTE NO DIA ANTERIOR)
 const Periods = {
     async getManualClosureInfo() {
         try {
@@ -411,10 +413,7 @@ const Periods = {
                 .eq('quinzena_id', currentQ)
                 .maybeSingle();
             
-            if (error) {
-                console.warn("Tabela period_closures indisponível. Usando modo automático.");
-                return null;
-            }
+            if (error) return null;
             return data;
         } catch (e) {
             console.error("Erro crítico no Periods:", e);
@@ -434,16 +433,17 @@ const Periods = {
             let actionBtn = '';
             let datesDisplay = '';
 
-            if (effectiveData.isClosedManually) {
+            if (effectiveData.isExtraPeriod) {
+                 // Estamos na NOVA quinzena gerada pelo fechamento manual
+                 statusText = 'NOVA QUINZENA (PÓS-FECHAMENTO)';
+                 badgeColor = '#2e7d32'; // Verde indicando novo ciclo
+                 datesDisplay = `Iniciada em: ${new Date(effectiveData.start).toLocaleDateString('pt-BR')} • Vigente até: ${new Date(effectiveData.end).toLocaleDateString('pt-BR')}`;
+                 actionBtn = `<button class="btn-secondary" style="margin-top:10px; font-size:0.8rem; padding:5px 10px; background:#fff3e0; color:#e65100; border:1px solid #ffb74d;" onclick="Periods.reopenLast()"><i class="ph ph-arrow-u-turn-left"></i> Desfazer Último Fechamento</button>`;
+            } else if (effectiveData.isClosedManually) {
                 statusText = 'QUINZENA ENCERRADA';
                 badgeColor = '#d32f2f';
-                datesDisplay = `Cortado em: ${new Date(effectiveData.originalClosure?.cut_date || effectiveData.end).toLocaleDateString('pt-BR')}`;
+                datesDisplay = `Encerrada em: ${new Date(effectiveData.originalClosure?.cut_date || effectiveData.end).toLocaleDateString('pt-BR')}`;
                 actionBtn = `<button class="btn-secondary" style="margin-top:10px; font-size:0.8rem; padding:5px 10px; background:#ffebee; color:#d32f2f; border:1px solid #d32f2f;" onclick="Periods.reopenLast()"><i class="ph ph-arrow-u-turn-left"></i> Reabrir / Desfazer</button>`;
-            } else if (effectiveData.isExtraPeriod) {
-                 statusText = 'PERÍODO EXTRA (PÓS-CORTE)';
-                 badgeColor = '#e65100';
-                 datesDisplay = `De ${new Date(effectiveData.start).toLocaleDateString('pt-BR')} até ${new Date(effectiveData.end).toLocaleDateString('pt-BR')}`;
-                 actionBtn = `<button class="btn-primary" style="width:auto; margin-top:10px; padding:5px 15px; font-size:0.8rem;" onclick="Modals.open('period_summary')"><i class="ph ph-lock-key"></i> Fechar Este Ciclo Extra</button>`;
             } else {
                 statusText = 'EM ANDAMENTO';
                 badgeColor = 'var(--primary)';
@@ -475,16 +475,29 @@ const Periods = {
         const dateInput = document.getElementById('manual-close-date');
         if(!dateInput || !dateInput.value) return UI.toast('Selecione uma data válida.', 'error');
         
-        const cutDate = dateInput.value;
-        const currentQ = U.getCurrentQuinzenaValue();
+        const cutDate = dateInput.value; // Data escolhida pelo usuário (ex: 28)
+        const currentQ = U.getCurrentQuinzenaValue(); // Quinzena que está sendo fechada
         
-        UI.confirm(`Tem certeza que deseja fechar a quinzena ${currentQ} na data ${cutDate}?<br><small>Os valores atuais serão congelados e arquivados.</small>`, async () => {
+        // Ajuste de mensagem para deixar claro
+        const prevDay = new Date(cutDate);
+        prevDay.setDate(prevDay.getDate() - 1);
+        const prevDayStr = prevDay.toLocaleDateString('pt-BR');
+        
+        UI.confirm(`Confirma o fechamento?<br><small>A quinzena atual será encerrada no dia <b>${prevDayStr}</b>.<br>O dia <b>${new Date(cutDate).toLocaleDateString('pt-BR')}</b> iniciará automaticamente a nova contagem.</small>`, async () => {
             UI.showLoading('Calculando totais e fechando...');
             try {
-                // 1. Calcular Totais ANTES de fechar
-                const effRange = await U.getEffectiveRange();
-                // Adiciona T00:00:00Z e T23:59:59Z para garantir busca correta no Supabase
-                const { data: desp } = await db.from('despesas').select('*').gte('date', effRange.start + 'T00:00:00Z').lte(effRange.end + 'T23:59:59Z');
+                // 1. Calcular Totais DA QUINZENA ANTIGA (até o dia anterior ao corte)
+                const rangeOld = U.getStandardQuinzenaDates(currentQ);
+                
+                // O fim da quinzena antiga é o dia anterior ao corte
+                const endDateOld = new Date(cutDate);
+                endDateOld.setDate(endDateOld.getDate() - 1);
+                const endDateOldStr = U.iso(endDateOld);
+
+                const { data: desp } = await db.from('despesas')
+                    .select('*')
+                    .gte('date', rangeOld.start + 'T00:00:00Z')
+                    .lte('date', endDateOldStr + 'T23:59:59Z');
                 
                 let totalIn = 0;
                 let totalOut = 0;
@@ -496,13 +509,14 @@ const Periods = {
                 const lucroLiquido = totalIn - totalOut;
 
                 // 2. Salvar na tabela period_closures
+                // IMPORTANTE: cut_date salva é a data ESCOLHIDA (início da nova), não o fim da antiga
                 const { data: existing } = await db.from('period_closures').select('id').eq('quinzena_id', currentQ).maybeSingle();
                 
                 const payload = {
                     quinzena_id: currentQ,
                     closed_at: new Date().toISOString(),
                     closed_by: App.user.id,
-                    cut_date: cutDate,
+                    cut_date: cutDate, // Dia 28 (início da nova)
                     total_in: totalIn,
                     total_out: totalOut,
                     net_profit: lucroLiquido
@@ -514,7 +528,7 @@ const Periods = {
                     await db.from('period_closures').insert(payload);
                 }
                 
-                UI.toast(`Quinzena ${currentQ} fechada! Lucro Arquivado: ${U.money(lucroLiquido)}`, 'success');
+                UI.toast(`Quinzena fechada! Nova contagem iniciou em ${new Date(cutDate).toLocaleDateString('pt-BR')}`, 'success');
                 Modals.close();
                 
                 // 3. Forçar recarga
@@ -531,11 +545,11 @@ const Periods = {
     
     async reopenLast() {
          const currentQ = U.getCurrentQuinzenaValue();
-         UI.confirm('Deseja reabrir este período? Os totais voltarão a ser acumulativos.', async () => {
+         UI.confirm('Deseja desfazer o último fechamento? Os valores voltarão a ser acumulados na quinzena original.', async () => {
              UI.showLoading('Reabrindo...');
              try {
                  await db.from('period_closures').delete().eq('quinzena_id', currentQ);
-                 UI.toast('Período Reaberto.');
+                 UI.toast('Fechamento desfeito. Voltou ao modo automático.');
                  Render['resumo-financeiro']();
              } catch(e) {
                  UI.toast('Erro ao reabrir: ' + e.message, 'error');
@@ -1219,7 +1233,7 @@ const Render = {
             rc.parentNode.insertBefore(w, rc);
         }
 
-        // 2. Lógica de Dados Financeiros (CORRIGIDA)
+        // 2. Lógica de Dados Financeiros (CORRIGIDA COM NOVA DATA DE INÍCIO)
         try {
             // Pega o range efetivo (considerando fechamento manual ou automático)
             const effRange = await U.getEffectiveRange();
@@ -1423,7 +1437,7 @@ const Modals = {
                 <input type="date" id="manual-close-date" min="${range.start}" max="${range.end}" value="${new Date().toISOString().split('T')[0]}" style="width:100%; padding:1rem; border:1px solid var(--border); border-radius:8px; margin-bottom:15px;">
                 
                 <p style="font-size:0.8rem; color:#d32f2f; margin-bottom:15px;">
-                    <i class="ph ph-warning"></i> Ao confirmar, esta quinzena será encerrada nesta data e uma nova iniciará imediatamente. O sistema automático não irá sobrescrever este fechamento.
+                    <i class="ph ph-warning"></i> Ao confirmar, esta quinzena será encerrada no dia anterior à data escolhida. A nova quinzena iniciará imediatamente na data selecionada.
                 </p>
                 
                 <button class="btn-primary" style="background:#d32f2f; padding:1.2rem;" onclick="Periods.executeManualClose()">

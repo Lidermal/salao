@@ -1,5 +1,5 @@
 <!-- ============================================ -->
-<!--  index.html (COMPLETO - ACESSO RESTRITO)     -->
+<!--  index.html (OTIMIZADO - FECHAMENTO MANUAL)  -->
 <!-- ============================================ -->
 <!DOCTYPE html>
 <html lang="pt-BR">
@@ -18,16 +18,18 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=19">
+    <link rel="stylesheet" href="style.css?v=20"> <!-- Versão atualizada -->
 </head>
 <body>
+    <!-- SPLASH SCREEN -->
     <div id="splash-screen" style="position: fixed; inset: 0; background: var(--primary); z-index: 9999999; display: flex; flex-direction: column; justify-content: center; align-items: center; color: white; transition: opacity 0.5s;">
         <img src="logoaqc.jpeg" alt="Amor que Cuida" style="width: 140px; height: 140px; border-radius: 50%; object-fit: cover; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2); border: 4px solid #fff; animation: pulse 1.5s infinite;">
-        
         <h1 style="color: white; font-size: 2.8rem; margin-bottom: 0.5rem; text-align:center; font-family: 'Playfair Display', serif;">Espaço Amor Que Cuida</h1>
         <p style="font-size: 1.2rem; font-weight: 300; letter-spacing: 2px;">by Andressa Vieira</p>
     </div>
     <style> @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } } </style>
+
+    <!-- TOAST & CONFIRM -->
     <div id="toast-container"></div>
     <div id="custom-confirm" class="overlay hidden" style="z-index: 999999;">
         <div class="modal" style="max-width: 400px; text-align: center;">
@@ -39,6 +41,8 @@
             </div>
         </div>
     </div>
+
+    <!-- TOUR OVERLAY -->
     <div id="tour-overlay" class="hidden" style="position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 9999998; transition: 0.3s; pointer-events: auto;">
         <div id="tour-dialog" style="position: absolute; background: var(--surface); padding: 20px; border-radius: 12px; width: 340px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border-left: 5px solid var(--primary); transition: all 0.3s ease;">
             <h3 id="tour-title" style="margin-bottom: 10px; font-size:1.2rem; color:var(--primary-dark)">Título</h3>
@@ -50,6 +54,8 @@
             </div>
         </div>
     </div>
+
+    <!-- AUTH LAYER -->
     <div id="auth-layer" class="auth-layer active">
         <section id="login-screen" class="screen active">
             <div class="login-card">
@@ -63,6 +69,8 @@
             </div>
         </section>
     </div>
+
+    <!-- SYSTEM LAYOUT -->
     <div id="system-layout" class="hidden">
         <aside class="sidebar" id="main-sidebar">
             <div class="sidebar-brand">
@@ -75,11 +83,7 @@
                 <a href="#" class="nav-link" data-view="perfil"><i class="ph ph-user-circle"></i> Meu Perfil</a>
                 <div class="nav-section">ATENDIMENTO</div>
                 <a href="#" class="nav-link active" data-view="agenda"><i class="ph ph-calendar"></i> Agenda</a>
-                
-                <!-- Comandas visível para todos -->
                 <a href="#" class="nav-link" data-view="comandas"><i class="ph ph-receipt"></i> Comandas</a>
-                
-                <!-- Restrito: Cobranças e Clientes -->
                 <a href="#" class="nav-link role-restricted" data-view="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
                 <a href="#" class="nav-link role-restricted" data-view="clientes"><i class="ph ph-users"></i> Clientes</a>
                 
@@ -89,10 +93,7 @@
                 
                 <div class="nav-section owner-only">GESTÃO FINANCEIRA</div>
                 <a href="#" class="nav-link owner-only" data-view="despesas"><i class="ph ph-trend-down"></i> Controle de Despesas</a>
-                
-                <!-- Comissionamento visível para todos -->
                 <a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Comissionamento</a>
-                
                 <a href="#" class="nav-link owner-only" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Fluxo de Caixa</a>
                 <a href="#" class="nav-link owner-only" data-view="relatorios"><i class="ph ph-folder-open"></i> Relatórios & Arquivos</a>
                 
@@ -106,7 +107,9 @@
                 <a href="#" class="nav-link logout" onclick="Auth.logout()"><i class="ph ph-sign-out"></i> Sair</a>
             </nav>
         </aside>
+        
         <div id="mobile-overlay" class="overlay hidden" onclick="Nav.closeMenu()"></div>
+        
         <main class="main-content">
             <header class="top-bar">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -118,22 +121,23 @@
                     <div class="user-pill" style="cursor:pointer" onclick="Nav.showView('perfil')"><span id="header-user">Usuário</span><div class="avatar" id="header-avatar">US</div></div>
                 </div>
             </header>
+            
             <div class="views-container">
-                
+                <!-- PERFIL -->
                 <section id="view-perfil" class="view">
                     <div class="card" style="text-align:center; max-width: 450px; margin: 1rem auto; padding: 2rem;">
                         <div id="perfil-foto-preview" style="width:130px; height:130px; border-radius:50%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-size:3rem; font-weight:bold; margin:0 auto 1.5rem auto; border: 4px solid var(--primary-light)">US</div>
                         <h3 id="perfil-nome" style="font-size:1.6rem; margin-bottom:5px;">Nome do Usuário</h3>
                         <p id="perfil-role" style="color:var(--primary); margin-bottom:25px; text-transform:uppercase; font-size:0.85rem; font-weight:bold; letter-spacing:1px;">Função</p>
-                        
                         <input type="file" id="perfil-foto-input" accept="image/*" style="display:none" onchange="Actions.previewAndSaveAvatar(event)">
-                        
                         <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap">
                             <button class="btn-primary" style="width:auto; padding:0.8rem 1.5rem" onclick="document.getElementById('perfil-foto-input').click()"><i class="ph ph-camera"></i> Alterar / Nova Foto</button>
                             <button class="btn-secondary" style="width:auto; padding:0.8rem 1.5rem; color:#d32f2f" onclick="Actions.deleteAvatar()"><i class="ph ph-trash"></i> Remover</button>
                         </div>
                     </div>
                 </section>
+
+                <!-- AGENDA -->
                 <section id="view-agenda" class="view active">
                     <div style="display:flex; justify-content:space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
                         <h2 id="day-view-title" class="hidden" style="color: var(--primary-dark); font-size: 1.3rem;">...</h2>
@@ -164,6 +168,7 @@
                     </div>
                 </section>
                 
+                <!-- COBRANÇAS -->
                 <section id="view-cobrancas" class="view">
                     <div style="display:flex; gap:10px; margin-bottom:20px; border-bottom: 2px solid var(--border); padding-bottom: 10px;">
                         <button class="btn-secondary active-tab" id="tab-pendentes-tour" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px;" onclick="Render.cobrancas('pendentes')">Em Aberto / Pendentes</button>
@@ -172,10 +177,10 @@
                     <div id="cobrancas-list" class="data-grid"></div>
                 </section>
                 
+                <!-- COMANDAS -->
                 <section id="view-comandas" class="view">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:20px; flex-wrap:wrap">
                         <button id="btn-nova-comanda-tour" class="btn-primary desktop-only" style="width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('comanda')">+ Gerar Nova Comanda</button>
-                        
                         <div style="display:flex; align-items:center; flex:1; min-width:200px; justify-content:center; gap:5px;">
                             <div style="display:flex; align-items:center; background:var(--surface); border:1px solid var(--border); border-radius:8px; overflow:hidden;">
                                 <button class="btn-secondary" style="border-radius:0; width:45px; padding:0.8rem; background:#f9f9f9;" onclick="Actions.changeComandaDate(-1)" title="Dia Anterior"><i class="ph ph-caret-left"></i></button>
@@ -185,7 +190,6 @@
                         </div>
                         <button class="btn-primary mobile-only" style="width:100%; padding: 0.8rem 1.5rem; margin-top:10px;" onclick="Modals.open('comanda')">+ Nova Comanda</button>
                     </div>
-                    
                     <div style="display:flex; gap:10px; margin-bottom:20px; border-bottom: 2px solid var(--border); padding-bottom: 10px;">
                         <button class="btn-secondary active-tab" id="tab-comandas-abertas" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px; border:none;" onclick="Render.comandas('aberta')">Comandas Abertas</button>
                         <button class="btn-secondary" id="tab-comandas-fechadas" style="width:auto; padding: 0.6rem 1.2rem; border-radius: 8px; background: transparent; border: 1px solid transparent;" onclick="Render.comandas('fechada')">Comandas Fechadas</button>
@@ -193,6 +197,7 @@
                     <div id="comandas-list" class="data-grid"></div>
                 </section>
                 
+                <!-- CLIENTES -->
                 <section id="view-clientes" class="view">
                     <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:20px; flex-wrap:wrap">
                         <button class="btn-primary desktop-only" style="width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('cliente')">+ Cadastrar Cliente</button>
@@ -203,6 +208,8 @@
                     </div>
                     <div id="clientes-list" class="data-grid"></div>
                 </section>
+
+                <!-- OBSERVAÇÕES -->
                 <section id="view-observacoes" class="view">
                     <div class="header-actions" style="display:flex; gap:15px; margin-bottom:2rem; align-items:center;">
                         <button class="btn-secondary" onclick="Nav.showView('clientes')" style="width: auto; padding:0.5rem 1rem"><i class="ph ph-arrow-left"></i> Voltar</button>
@@ -212,6 +219,8 @@
                     <button class="btn-primary" onclick="Modals.open('nova_observacao', document.getElementById('current-observacao-client-id').value)" style="margin-bottom: 1.5rem; width:auto; padding:0.8rem 1.5rem">+ Nova Observação</button>
                     <div id="observacao-history-list" class="data-list"></div>
                 </section>
+
+                <!-- PERFIL CLIENTE -->
                 <section id="view-perfil-cliente" class="view">
                     <div class="header-actions" style="display:flex; gap:15px; margin-bottom:2rem; align-items:center;">
                         <button class="btn-secondary" onclick="Nav.showView('clientes')" style="width: auto; padding:0.5rem 1rem"><i class="ph ph-arrow-left"></i> Voltar</button>
@@ -219,11 +228,12 @@
                         <input type="hidden" id="current-perfil-client-id">
                     </div>
                     <div id="perfil-debitos-destaque" style="margin-bottom: 1.5rem;"></div>
-                    <div id="perfil-observacao-destaque" style="margin-bottom: 1.5rem;"></div>
                     <div id="perfil-info" style="margin-bottom: 2rem;"></div>
                     <h3 style="margin-bottom: 15px;">Histórico de Visitas no Salão</h3>
                     <div id="perfil-visitas-list" class="data-list"></div>
                 </section>
+
+                <!-- SERVIÇOS -->
                 <section id="view-servicos" class="view">
                     <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('servico')">+ Cadastrar Serviço</button>
                     <div class="card" style="margin-bottom:20px; padding: 10px;">
@@ -234,20 +244,25 @@
                     <div id="servicos-list" class="data-grid"></div>
                 </section>
                 
+                <!-- PRODUTOS -->
                 <section id="view-produtos" class="view">
                     <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('produto')">+ Registrar Produto</button>
                     <div id="produtos-list" class="data-grid"></div>
                 </section>
                 
+                <!-- MENSAGENS -->
                 <section id="view-mensagens" class="view">
                     <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('mensagem')">+ Criar Template</button>
                     <div id="mensagens-list" class="data-grid"></div>
                 </section>
+
+                <!-- FUNCIONÁRIOS -->
                 <section id="view-funcionarios" class="view">
                     <button class="btn-primary desktop-only" style="margin-bottom:20px; width:auto; padding: 0.8rem 1.5rem" onclick="Modals.open('funcionario')">+ Registrar Colaborador</button>
                     <div id="funcionarios-list" class="data-grid"></div>
                 </section>
                 
+                <!-- DESPESAS -->
                 <section id="view-despesas" class="view">
                     <div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center; flex-wrap:wrap; gap:10px;">
                         <h2>Custos do Período Vigente</h2>
@@ -257,6 +272,8 @@
                     <canvas id="chart-despesas" style="width:100%; max-height:250px; margin-bottom:2rem"></canvas>
                     <div id="despesas-list" class="data-list"></div>
                 </section>
+
+                <!-- COMISSÃO -->
                 <section id="view-comissao" class="view">
                     <div style="margin-bottom:15px; display:flex; gap:10px; align-items:center; flex-wrap:wrap">
                         <label style="font-size:0.9rem; font-weight:bold">Visualizar Período:</label>
@@ -265,6 +282,7 @@
                     <div id="comissao-dashboard-tour"></div>
                 </section>
                 
+                <!-- RESUMO FINANCEIRO -->
                 <section id="view-resumo-financeiro" class="view">
                     <div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center; flex-wrap:wrap; gap:10px;">
                         <h2>Caixa do Período Vigente</h2>
@@ -281,6 +299,8 @@
                         <div id="extrato-list" class="data-list"></div>
                     </div>
                 </section>
+
+                <!-- RELATÓRIOS -->
                 <section id="view-relatorios" class="view">
                     <div style="background:var(--surface); padding:20px; border-radius:12px; margin-bottom:20px; border:1px solid var(--border); box-shadow:var(--shadow);">
                         <h3 style="margin-bottom:15px;"><i class="ph ph-folder-open"></i> Gerenciador de Arquivos</h3>
@@ -304,6 +324,7 @@
                     </div>
                 </section>
                 
+                <!-- PERFORMANCE -->
                 <section id="view-performance" class="view">
                     <div id="perf-kpis" class="data-grid" style="margin-bottom:1.5rem"></div>
                     <div class="card" style="margin-bottom:1.5rem">
@@ -313,6 +334,7 @@
                     <div id="performance-ranking" class="data-grid"></div>
                 </section>
                 
+                <!-- CONFIGURAÇÕES -->
                 <section id="view-configuracoes" class="view">
                     <div class="card">
                         <form onsubmit="Actions.saveSettings(event)">
@@ -324,7 +346,7 @@
                 </section>
             </div>
         </main>
-        <!-- ALTERAÇÃO: Adicionado role-restricted nos itens do menu inferior -->
+        
         <nav class="bottom-nav">
             <a href="#" class="b-item active" data-view="agenda"><i class="ph ph-calendar"></i><span>Agenda</span></a>
             <a href="#" class="b-item" data-view="comandas"><i class="ph ph-receipt"></i><span>Comandas</span></a>
@@ -333,8 +355,10 @@
             <a href="#" class="b-item" onclick="Nav.toggleMenu()"><i class="ph ph-list"></i><span>Menu</span></a>
         </nav>
     </div>
+
+    <!-- MODAL CONTAINER (Dinâmico) -->
     <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
     
-    <script src="script.js?v=15"></script>
+    <script src="script.js?v=20"></script>
 </body>
 </html>

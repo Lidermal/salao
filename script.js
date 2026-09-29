@@ -1,4 +1,4 @@
-/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO FINAL ESTÁVEL */
+/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO FINAL COM LÓGICA DE VIRADA DE MÊS */
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const DB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
 const db = window.supabase.createClient(DB_URL, DB_KEY, {
@@ -42,7 +42,6 @@ const U = {
         return out;
     },
     
-    // Retorna ID da quinzena teórica (ex: 2023-09-Q2)
     getCurrentQuinzenaValue() {
         let curr = new Date();
         let m = String(curr.getMonth() + 1).padStart(2, '0');
@@ -51,7 +50,6 @@ const U = {
         return `${y}-${m}-${q}`;
     },
 
-    // Retorna datas padrão (Início e Fim) de uma quinzena teórica
     getStandardQuinzenaDates(val) {
         if(!val) return { start: '1970-01-01', end: '2099-12-31' };
         const [y, m, q] = val.split('-');
@@ -60,55 +58,81 @@ const U = {
         return { start: `${y}-${m}-16`, end: `${y}-${m}-${lastDay}` };
     },
 
-    // LÓGICA INTELIGENTE: Calcula o range real considerando fechamentos manuais
+    /**
+     * LÓGICA ATUALIZADA:
+     * Calcula o range considerando fechamentos manuais e a virada automática de quinzena/mês.
+     */
     async getEffectiveRange() {
         const now = new Date();
         const todayStr = this.iso(now);
         const currentQId = this.getCurrentQuinzenaValue();
 
         try {
-            // Busca se há fechamento manual para esta quinzena
+            // Busca fechamento manual da quinzena atual
             const { data: closure, error } = await db.from('period_closures')
                 .select('*')
                 .eq('quinzena_id', currentQId)
                 .maybeSingle();
 
-            // Se não houver fechamento ou der erro, usa o padrão automático
             if (error || !closure) {
                 return this.getStandardQuinzenaDates(currentQId);
             }
 
             // SE HOUVER FECHAMENTO MANUAL:
-            // O usuário escolheu uma data de corte (cut_date).
-            // Regra: O período antigo vai até o dia ANTERIOR ao corte.
-            // O novo período começa no dia do corte.
-            
             const cutDateObj = new Date(closure.cut_date);
             const todayObj = new Date(todayStr);
             
-            // Normaliza para meia-noite
             cutDateObj.setHours(0,0,0,0);
             todayObj.setHours(0,0,0,0);
 
-            // Se a data de corte já passou ou é hoje, estamos no "Novo Período"
             if (cutDateObj <= todayObj) {
-                // Início: Data do Corte
-                // Fim: Último dia do mês atual (ou fim da quinzena teórica, o que vier primeiro? 
-                // Vamos usar o fim do mês natural para simplificar visualmente, ou o fim da quinzena teórica)
-                // Para manter consistência com o pedido "dia 28 começa 1Q de Outubro", vamos assumir que
-                // o novo período vai do dia do corte até o fim do mês atual.
+                // Estamos no período pós-fechamento.
+                // Precisamos determinar qual é a "Próxima Quinzena Teórica" baseada na data de corte.
                 
-                const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                // Exemplo: Corte em 27/09 (Q2-Set). Próxima teórica é Q1-Out (01/10 a 15/10).
+                // Mas como o corte foi dia 27, o início real é 27/09.
+                // O fim real é o fim da próxima quinzena teórica (15/10).
                 
-                return {
-                    start: this.iso(cutDateObj), // Começa no dia escolhido
-                    end: this.iso(lastDayOfMonth), // Vai até o fim do mês
-                    isExtraPeriod: true,
-                    label: `Nova Quinzena (Iniciada em ${this.iso(cutDateObj)})`,
-                    originalClosure: closure
-                };
+                let nextYear = cutDateObj.getFullYear();
+                let nextMonth = cutDateObj.getMonth(); // 0-indexed (8 = Setembro)
+                let nextDay = cutDateObj.getDate(); // 27
+                
+                // Lógica para achar a próxima quinzena
+                if (nextDay > 15) {
+                    // Estava na Q2, vai para Q1 do mês seguinte
+                    nextMonth += 1;
+                    if (nextMonth > 11) {
+                        nextMonth = 0;
+                        nextYear += 1;
+                    }
+                    // Q1 vai do dia 01 ao 15
+                    const endDateObj = new Date(nextYear, nextMonth, 15);
+                    
+                    return {
+                        start: this.iso(cutDateObj), // Começa no dia do corte
+                        end: this.iso(endDateObj),   // Termina dia 15 do próximo mês
+                        isExtraPeriod: true,
+                        label: `Nova Quinzena (Iniciada em ${this.iso(cutDateObj)})`,
+                        originalClosure: closure
+                    };
+
+                } else {
+                    // Estava na Q1, vai para Q2 do mesmo mês
+                    // Q2 vai do dia 16 ao fim do mês
+                    const lastDayOfMonth = new Date(nextYear, nextMonth + 1, 0).getDate();
+                    const endDateObj = new Date(nextYear, nextMonth, lastDayOfMonth);
+
+                    return {
+                        start: this.iso(cutDateObj),
+                        end: this.iso(endDateObj),
+                        isExtraPeriod: true,
+                        label: `Nova Quinzena (Iniciada em ${this.iso(cutDateObj)})`,
+                        originalClosure: closure
+                    };
+                }
+
             } else {
-                // Data de corte é futura? Mantém o padrão até lá.
+                // Data de corte futura? Mantém padrão.
                 return this.getStandardQuinzenaDates(currentQId);
             }
 
@@ -477,7 +501,6 @@ const Periods = {
         const cutDate = dateInput.value;
         const currentQ = U.getCurrentQuinzenaValue();
         
-        // Ajuste de mensagem
         const prevDay = new Date(cutDate);
         prevDay.setDate(prevDay.getDate() - 1);
         const prevDayStr = prevDay.toLocaleDateString('pt-BR');
@@ -485,7 +508,6 @@ const Periods = {
         UI.confirm(`Confirma o fechamento?<br><small>A quinzena atual será encerrada no dia <b>${prevDayStr}</b>.<br>O dia <b>${new Date(cutDate).toLocaleDateString('pt-BR')}</b> iniciará automaticamente a nova contagem.</small>`, async () => {
             UI.showLoading('Calculando totais e fechando...');
             try {
-                // 1. Calcular Totais DA QUINZENA ANTIGA (até o dia anterior ao corte)
                 const rangeOld = U.getStandardQuinzenaDates(currentQ);
                 
                 const endDateOld = new Date(cutDate);
@@ -506,7 +528,6 @@ const Periods = {
                 });
                 const lucroLiquido = totalIn - totalOut;
 
-                // 2. Salvar na tabela period_closures
                 const { data: existing } = await db.from('period_closures').select('id').eq('quinzena_id', currentQ).maybeSingle();
                 
                 const payload = {
@@ -1049,7 +1070,6 @@ const Render = {
     },
     async despesas() {
         try {
-            // Usa a lógica inteligente de datas
             const effRange = await U.getEffectiveRange();
             const startISO = effRange.start + 'T00:00:00Z';
             const endISO = effRange.end + 'T23:59:59Z';
@@ -2525,6 +2545,7 @@ const Actions = {
         };
         reader.readAsDataURL(file);
     },
+
     async deleteAvatar() {
         if(!App.avatars[App.user.id]) return UI.toast('Você já não possui foto.', 'warning');
         UI.confirm('Remover sua foto de perfil?', async () => {

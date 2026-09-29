@@ -361,19 +361,27 @@ const Tour = {
     }
 };
 
-// PERIODS MODULE
+// PERIODS MODULE (ATUALIZADO COM TRATAMENTO DE ERRO E REABERTURA)
 const Periods = {
     async getManualClosureInfo() {
         const currentQ = U.getCurrentQuinzenaValue();
         try {
             const { data, error } = await db.from('period_closures').select('*').eq('quinzena_id', currentQ).maybeSingle();
-            if (error) return null;
+            
+            // Se der erro de tabela inexistente (42P01) ou similar, ignora silenciosamente e assume modo automático
+            if (error && (error.code === '42P01' || error.message.includes('relation'))) {
+                console.warn("Tabela period_closures não encontrada. Modo automático ativado.");
+                return null; 
+            }
+            if (error) throw error; // Outros erros reais
+            
             return data;
         } catch (e) {
-            console.error("Erro ao verificar fechamento manual:", e);
+            console.error("Erro crítico ao verificar fechamento:", e);
             return null;
         }
     },
+
     async renderCurrentPeriodVisual() {
         const container = document.getElementById('period-visual');
         if(!container) return;
@@ -385,11 +393,17 @@ const Periods = {
         let statusClass = 'vigente';
         let statusText = 'EM ANDAMENTO (Automático)';
         let badgeColor = 'var(--primary)';
-        
+        let actionBtn = '';
+
         if (closure) {
             statusClass = 'fechada';
             statusText = 'FECHADO MANUALMENTE';
             badgeColor = '#2e7d32';
+            // BOTÃO DE REABRIR SE ESTIVER FECHADO
+            actionBtn = `<button class="btn-secondary" style="margin-top:10px; font-size:0.8rem; padding:5px 10px; background:#ffebee; color:#d32f2f; border:1px solid #d32f2f;" onclick="Periods.reopenQuinzena('${currentQ}')"><i class="ph ph-arrow-u-turn-left"></i> Reabrir / Desfazer Fechamento</button>`;
+        } else {
+             // OPÇÃO DE FECHAR MANUALMENTE SE NÃO ESTIVER FECHADO
+             actionBtn = `<button class="btn-secondary" style="margin-top:10px; font-size:0.8rem; padding:5px 10px; background:#fff3e0; color:#e65100; border:1px solid #ffb74d;" onclick="Modals.open('period_summary')"><i class="ph ph-lock-key"></i> Fechar Antecipadamente</button>`;
         }
 
         container.innerHTML = `
@@ -398,14 +412,17 @@ const Periods = {
                 <span class="period-badge" style="background:${badgeColor}; color:white">${statusText}</span>
                 <div class="period-label">${currentQ.replace('Q1', '1ª Quinzena').replace('Q2', '2ª Quinzena')}</div>
                 <div class="period-dates">De ${range.start.slice(0,10)} até ${range.end.slice(0,10)}</div>
+                ${actionBtn}
             </div>
             ${closure ? `<div style="font-size:0.8rem; color:var(--muted)">Fechado em: ${U.date(closure.closed_at)}</div>` : ''}
         </div>
         `;
     },
+
     openSummary() {
         Modals.open('period_summary');
     },
+
     async executeManualClose() {
         const dateInput = document.getElementById('manual-close-date');
         if(!dateInput || !dateInput.value) return UI.toast('Selecione uma data válida.', 'error');
@@ -413,8 +430,8 @@ const Periods = {
         const cutDate = dateInput.value;
         const currentQ = U.getCurrentQuinzenaValue();
         
-        UI.confirm(`Tem certeza que deseja fechar a quinzena ${currentQ} na data ${cutDate}? Isso iniciará uma nova quinzena imediatamente e impedirá o fechamento automático futuro deste período.`, async () => {
-            UI.showLoading('Efetuando fechamento manual...');
+        UI.confirm(`Tem certeza que deseja fechar a quinzena ${currentQ} na data ${cutDate}?`, async () => {
+            UI.showLoading('Efetuando fechamento...');
             try {
                 const { error } = await db.from('period_closures').insert({
                     quinzena_id: currentQ,
@@ -423,11 +440,13 @@ const Periods = {
                     cut_date: cutDate
                 });
 
-                if (error) throw new Error("Não foi possível salvar. Verifique a tabela period_closures.");
+                if (error) {
+                    if(error.code === '42P01') throw new Error("ERRO CRÍTICO: A tabela 'period_closures' não existe no banco de dados. Execute o script SQL fornecido anteriormente.");
+                    throw error;
+                }
                 
                 UI.toast('Quinzena fechada com sucesso!', 'success');
                 Modals.close();
-                
                 if(App.view === 'resumo-financeiro') Render['resumo-financeiro']();
                 
             } catch(e) {
@@ -436,9 +455,26 @@ const Periods = {
                 UI.hideLoading();
             }
         });
+    },
+
+    // NOVA FUNÇÃO PARA DESFAZER O FECHAMENTO
+    async reopenQuinzena(quinzenaId) {
+        UI.confirm(`Deseja realmente reabrir a quinzena ${quinzenaId}? Isso permitirá novas edições automáticas nesse período.`, async () => {
+            UI.showLoading('Reabrindo...');
+            try {
+                const { error } = await db.from('period_closures').delete().eq('quinzena_id', quinzenaId);
+                if (error) throw error;
+                
+                UI.toast('Quinzena reaberta com sucesso! Voltou ao modo automático.');
+                if(App.view === 'resumo-financeiro') Render['resumo-financeiro']();
+            } catch(e) {
+                UI.toast('Erro ao reabrir: ' + e.message, 'error');
+            } finally {
+                UI.hideLoading();
+            }
+        });
     }
 };
-
 // AUTH
 const Auth = {
     init() { 

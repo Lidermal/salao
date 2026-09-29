@@ -55,53 +55,79 @@ const U = {
      * Calcula o intervalo REAL vigente considerando fechamentos manuais.
      * Isso é crucial para saber o que mostrar no Fluxo de Caixa.
      */
+    /**
+     * Calcula o intervalo REAL vigente considerando fechamentos manuais.
+     * CORRIGIDO PARA EVITAR ERROS DE DATA E RETORNAR VALEZES CORRETOS
+     */
     async getEffectiveRange() {
         const now = new Date();
-        const todayStr = this.iso(now);
-        const theoreticalQ = this.getCurrentQuinzenaValue();
+        const todayStr = this.iso(now); // Data de hoje em YYYY-MM-DD
+        
+        // Identifica qual é a quinzena teórica baseada APENAS no dia de hoje
+        // Se dia <= 15, é Q1. Se dia > 15, é Q2.
+        const dayOfMonth = now.getDate();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const year = now.getFullYear();
+        const theoreticalQ = dayOfMonth <= 15 ? 'Q1' : 'Q2';
+        const currentQId = `${year}-${month}-${theoreticalQ}`;
         
         try {
-            // Busca se a quinzena teórica atual foi fechada manualmente
-            const { data: closure } = await db.from('period_closures')
+            // Tenta buscar se ESSA quinzena específica foi fechada manualmente
+            // Usamos maybeSingle() para não dar erro se não achar nada
+            const { data: closure, error } = await db.from('period_closures')
                 .select('*')
-                .eq('quinzena_id', theoreticalQ)
+                .eq('quinzena_id', currentQId)
                 .maybeSingle();
 
-            if (closure && closure.cut_date) {
-                // CASO 1: Foi fechado manualmente antes de hoje?
-                const cutDateObj = new Date(closure.cut_date);
-                const todayObj = new Date(todayStr);
-                
-                if (cutDateObj < todayObj) {
-                    // Sim, fechou dia X e hoje é Y > X.
-                    // Então estamos num "Período Extra" que vai do dia seguinte ao corte até o fim do mês natural.
-                    const nextDay = new Date(cutDateObj);
-                    nextDay.setDate(nextDay.getDate() + 1);
-                    
-                    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-                    
-                    return {
-                        start: this.iso(nextDay),
-                        end: this.iso(lastDayOfMonth),
-                        isExtraPeriod: true,
-                        label: `Pós-Fechamento (${theoreticalQ})`,
-                        originalClosure: closure
-                    };
-                } else {
-                    // Fechou hoje ou no futuro? Considera normal até lá.
-                     const range = this.getStandardQuinzenaDates(theoreticalQ);
-                     return { ...range, isClosedManually: true, label: 'FECHADO MANUALMENTE' };
-                }
-            } else {
-                // CASO 2: Não há fechamento manual. Usa a regra padrão (1-15 ou 16-fim).
-                const range = this.getStandardQuinzenaDates(theoreticalQ);
-                return { ...range, isClosedManually: false, label: 'EM ANDAMENTO' };
+            // Se houver erro de consulta (ex: tabela não existe ainda) OU não encontrar registro:
+            // Volta para o modo AUTOMÁTICO PADRÃO imediatamente.
+            if (error || !closure) {
+                return this.getStandardQuinzenaDates(currentQId); 
             }
+
+            // SE EXISTIR UM FECHAMENTO MANUAL:
+            // Verificamos se a data de corte já passou.
+            const cutDateObj = new Date(closure.cut_date);
+            const todayObj = new Date(todayStr);
+            
+            // Normaliza horas para comparação justa (apenas datas)
+            cutDateObj.setHours(0,0,0,0);
+            todayObj.setHours(0,0,0,0);
+
+            if (cutDateObj < todayObj) {
+                // O fechamento aconteceu ANTES de hoje.
+                // Exemplo: Fechou dia 20, hoje é 28.
+                // Então estamos num "Período Extra" que vai do dia seguinte (21) até o fim do mês natural (30).
+                
+                const nextDay = new Date(cutDateObj);
+                nextDay.setDate(nextDay.getDate() + 1);
+                
+                // Fim do mês corrente
+                const lastDayOfMonth = new Date(year, parseInt(month), 0); 
+
+                return {
+                    start: this.iso(nextDay),       // Início: Dia seguinte ao corte
+                    end: this.iso(lastDayOfMonth),   // Fim: Último dia do mês
+                    isExtraPeriod: true,             // Flag para avisar que é extra
+                    label: `Pós-Fechamento (${currentQId})`,
+                    originalClosure: closure
+                };
+            } else {
+                // O fechamento é HOJE ou FUTURO? 
+                // Considera o período normal até a data de corte.
+                const standardRange = this.getStandardQuinzenaDates(currentQId);
+                return {
+                    ...standardRange,
+                    isClosedManually: true,
+                    label: 'FECHADO MANUALMENTE'
+                };
+            }
+
         } catch(e) {
-            console.error("Erro ao calcular vigência:", e);
-            // Fallback seguro
-            const range = this.getStandardQuinzenaDates(theoreticalQ);
-            return { ...range, isClosedManually: false, label: 'ERRO AO CARREGAR STATUS' };
+            console.error("Erro crítico ao calcular vigência:", e);
+            // Fallback absoluto: Se der qualquer erro inesperado, usa a regra padrão simples.
+            // Isso garante que NUNCA fique zerado por bug de lógica complexa.
+            return this.getStandardQuinzenaDates(currentQId);
         }
     },
 

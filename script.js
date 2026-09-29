@@ -425,46 +425,69 @@ const Tour = {
     }
 };
 
-// PERIODS MODULE (COMPLETO E CORRIGIDO)
+// PERIODS MODULE - VERSÃO À PROVA DE FALHAS
 const Periods = {
+    async getManualClosureInfo() {
+        try {
+            const currentQ = U.getCurrentQuinzenaValue();
+            // Tenta buscar. Se falhar por QUALQUER motivo, retorna null imediatamente.
+            const { data, error } = await db.from('period_closures')
+                .select('*')
+                .eq('quinzena_id', currentQ)
+                .maybeSingle();
+            
+            if (error) {
+                console.warn("Tabela period_closures indisponível ou erro. Usando modo automático.");
+                return null;
+            }
+            return data;
+        } catch (e) {
+            console.error("Erro crítico no Periods:", e);
+            return null; // Garante que nunca quebre o fluxo
+        }
+    },
+
     async renderCurrentPeriodVisual() {
         const container = document.getElementById('period-visual');
         if(!container) return;
-        
-        const effectiveData = await U.getEffectiveRange();
-        
-        let statusText = '';
-        let badgeColor = '';
-        let actionBtn = '';
-        let datesDisplay = '';
 
-        if (effectiveData.isClosedManually) {
-            statusText = 'QUINZENA ENCERRADA';
-            badgeColor = '#d32f2f';
-            datesDisplay = `Cortado em: ${new Date(effectiveData.originalClosure?.cut_date || effectiveData.end).toLocaleDateString('pt-BR')}`;
-            actionBtn = `<button class="btn-secondary" style="margin-top:10px; font-size:0.8rem; padding:5px 10px; background:#ffebee; color:#d32f2f; border:1px solid #d32f2f;" onclick="Periods.reopenLast()"><i class="ph ph-arrow-u-turn-left"></i> Reabrir / Desfazer</button>`;
-        } else if (effectiveData.isExtraPeriod) {
-             statusText = 'PERÍODO EXTRA (PÓS-CORTE)';
-             badgeColor = '#e65100';
-             datesDisplay = `De ${new Date(effectiveData.start).toLocaleDateString('pt-BR')} até ${new Date(effectiveData.end).toLocaleDateString('pt-BR')}`;
-             actionBtn = `<button class="btn-primary" style="width:auto; margin-top:10px; padding:5px 15px; font-size:0.8rem;" onclick="Modals.open('period_summary')"><i class="ph ph-lock-key"></i> Fechar Este Ciclo Extra</button>`;
-        } else {
-            statusText = 'EM ANDAMENTO';
-            badgeColor = 'var(--primary)';
-            datesDisplay = `Vigência: ${new Date(effectiveData.start).toLocaleDateString('pt-BR')} até ${new Date(effectiveData.end).toLocaleDateString('pt-BR')}`;
-            actionBtn = `<button class="btn-primary" style="width:auto; margin-top:10px; padding:5px 15px; font-size:0.8rem;" onclick="Modals.open('period_summary')"><i class="ph ph-lock-key"></i> Fechar Antecipadamente</button>`;
-        }
+        try {
+            const currentQ = U.getCurrentQuinzenaValue();
+            const closure = await this.getManualClosureInfo();
+            
+            // Pega as datas padrão (Automático)
+            let range = U.getQuinzenaDates(currentQ);
+            let statusClass = 'vigente';
+            let statusText = 'EM ANDAMENTO';
+            let badgeColor = 'var(--primary)';
+            let actionBtn = '';
 
-        container.innerHTML = `
-        <div class="card" style="border-left: 5px solid ${badgeColor}; background:#fff;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                    <span style="font-weight:bold; color:${badgeColor}; text-transform:uppercase;">${statusText}</span>
-                    <p style="font-size:0.9rem; color:var(--muted); margin-top:5px;">${datesDisplay}</p>
+            if (closure) {
+                // Só muda visual se realmente encontrou um fechamento válido
+                statusClass = 'fechada';
+                statusText = 'FECHADO MANUALMENTE';
+                badgeColor = '#2e7d32';
+                actionBtn = `<button class="btn-secondary" style="margin-top:10px; font-size:0.8rem; padding:5px 10px; background:#ffebee; color:#d32f2f; border:1px solid #d32f2f;" onclick="Periods.reopenQuinzena('${currentQ}')"><i class="ph ph-arrow-u-turn-left"></i> Reabrir Quinzena</button>`;
+            } else {
+                // Botão padrão para fechar
+                actionBtn = `<button class="btn-primary" style="width:auto; margin-top:10px; padding:5px 15px; font-size:0.8rem;" onclick="Modals.open('period_summary')"><i class="ph ph-lock-key"></i> Fechar Antecipadamente</button>`;
+            }
+
+            container.innerHTML = `
+            <div class="card" style="border-left: 5px solid ${badgeColor}; background:#fff;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <span style="font-weight:bold; color:${badgeColor}; text-transform:uppercase;">${statusText}</span>
+                        <p style="font-size:0.9rem; color:var(--muted); margin-top:5px;">Vigência: ${new Date(range.start).toLocaleDateString('pt-BR')} até ${new Date(range.end).toLocaleDateString('pt-BR')}</p>
+                    </div>
+                    <div>${actionBtn}</div>
                 </div>
-                <div>${actionBtn}</div>
-            </div>
-        </div>`;
+            </div>`;
+        } catch (e) {
+            console.error("Erro ao renderizar visual do período:", e);
+            // Se der erro aqui, esconde o card para não quebrar a tela inteira
+            container.innerHTML = ''; 
+        }
     },
 
     openSummary() {
@@ -476,48 +499,36 @@ const Periods = {
         if(!dateInput || !dateInput.value) return UI.toast('Selecione uma data válida.', 'error');
         
         const cutDate = dateInput.value;
-        const currentQ = U.getCurrentQuinzenaValue(); // Teórica
+        const currentQ = U.getCurrentQuinzenaValue();
         
-        UI.confirm(`Tem certeza que deseja fechar a quinzena ${currentQ} na data ${cutDate}?<br><small>Os valores atuais serão congelados e arquivados.</small>`, async () => {
-            UI.showLoading('Calculando totais e fechando...');
+        UI.confirm(`Tem certeza que deseja fechar a quinzena ${currentQ} na data ${cutDate}?`, async () => {
+            UI.showLoading('Processando...');
             try {
-                // 1. Calcular Totais ANTES de fechar
-                const effRange = await U.getEffectiveRange();
-                const { data: desp } = await db.from('despesas').select('*').gte('date', effRange.start + 'T00:00:00Z').lte(effRange.end + 'T23:59:59Z');
+                // Calcula totais antes de salvar
+                const range = U.getQuinzenaDates(currentQ);
+                const { data: desp } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
                 
-                let totalIn = 0;
-                let totalOut = 0;
+                let totalIn = 0, totalOut = 0;
                 (desp || []).forEach(d => {
                     const isIncome = App.inflowCategories.includes(d.category);
                     const valNum = Number(d.amount) || 0;
                     if(isIncome) totalIn += valNum; else totalOut += valNum;
                 });
-                const lucroLiquido = totalIn - totalOut;
 
-                // 2. Salvar na tabela period_closures
-                // Nota: Se já existir um registro para essa quinzena, fazemos UPDATE, senão INSERT
-                const { data: existing } = await db.from('period_closures').select('id').eq('quinzena_id', currentQ).maybeSingle();
-                
-                const payload = {
+                const { error } = await db.from('period_closures').insert({
                     quinzena_id: currentQ,
                     closed_at: new Date().toISOString(),
                     closed_by: App.user.id,
                     cut_date: cutDate,
                     total_in: totalIn,
                     total_out: totalOut,
-                    net_profit: lucroLiquido
-                };
+                    net_profit: totalIn - totalOut
+                });
 
-                if(existing) {
-                    await db.from('period_closures').update(payload).eq('id', existing.id);
-                } else {
-                    await db.from('period_closures').insert(payload);
-                }
+                if (error) throw error;
                 
-                UI.toast(`Quinzena ${currentQ} fechada! Lucro Arquivado: ${U.money(lucroLiquido)}`, 'success');
+                UI.toast('Quinzena fechada com sucesso!', 'success');
                 Modals.close();
-                
-                // 3. Forçar recarga para zerar a visualização atual
                 Render['resumo-financeiro']();
                 
             } catch(e) {
@@ -529,20 +540,19 @@ const Periods = {
         });
     },
     
-    async reopenLast() {
-         const currentQ = U.getCurrentQuinzenaValue();
-         UI.confirm('Deseja reabrir este período? Os totais voltarão a ser acumulativos.', async () => {
-             UI.showLoading('Reabrindo...');
-             try {
-                 await db.from('period_closures').delete().eq('quinzena_id', currentQ);
-                 UI.toast('Período Reaberto.');
-                 Render['resumo-financeiro']();
-             } catch(e) {
-                 UI.toast('Erro ao reabrir: ' + e.message, 'error');
-             } finally {
-                 UI.hideLoading();
-             }
-         });
+    async reopenQuinzena(quinzenaId) {
+        UI.confirm('Deseja reabrir esta quinzena?', async () => {
+            UI.showLoading('Reabrindo...');
+            try {
+                await db.from('period_closures').delete().eq('quinzena_id', quinzenaId);
+                UI.toast('Quinzena reaberta.');
+                Render['resumo-financeiro']();
+            } catch(e) {
+                UI.toast('Erro ao reabrir.', 'error');
+            } finally {
+                UI.hideLoading();
+            }
+        });
     }
 };
 
@@ -1203,8 +1213,12 @@ const Render = {
         if(dashContainer) dashContainer.innerHTML = finalHtml;
     },
     async 'resumo-financeiro'() {
-        // 1. Renderiza o Card Visual (Status/Botões) usando a nova lógica inteligente
-        await Periods.renderCurrentPeriodVisual(); 
+        // 1. Tenta renderizar o card de status (se falhar, não impede o resto)
+        try {
+            await Periods.renderCurrentPeriodVisual();
+        } catch(e) {
+            console.warn("Falha ao carregar status do período, continuando com dados financeiros...");
+        }
 
         const rc = document.getElementById('resumo-cards');
         if(rc && !document.getElementById('btn-add-receita-wrapper')) {
@@ -1214,30 +1228,73 @@ const Render = {
             rc.parentNode.insertBefore(w, rc);
         }
 
-        // 2. Obtém o Intervalo REAL vigente (considerando cortes manuais)
-        const effRange = await U.getEffectiveRange();
+        // 2. Lógica de Dados Financeiros (SEMPRE USA O AUTOMÁTICO SE NÃO HOUVER FECHAMENTO VÁLIDO)
+        // Isso garante que os valores apareçam mesmo se a tabela period_closures estiver com problema
+        const currentQ = U.getCurrentQuinzenaValue();
+        const range = U.getQuinzenaDates(currentQ);
         
-        // 3. Consulta os dados filtrados por essas novas datas calculadas
-        const { data: desp } = await db.from('despesas')
-            .select('*')
-            .gte('date', effRange.start + 'T00:00:00Z')
-            .lte(effRange.end + 'T23:59:59Z');
+        try {
+            const { data: desp, error } = await db.from('despesas')
+                .select('*')
+                .gte('date', range.start)
+                .lte('date', range.end);
 
-        const { extrato, totalIn, totalOut } = U.buildExtrato(desp);
-        const lucro = totalIn - totalOut;
-        
-        if(rc) rc.innerHTML = `<div class="card" style="border-bottom:4px solid #2e7d32"><h4>Faturamento (Pago)</h4><div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(totalIn)}</div></div><div class="card" style="border-bottom:4px solid #d32f2f"><h4>Custos & Comissões (Saídas)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(totalOut)}</div></div><div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}"><h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4><div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div></div>`;
-        
-        let subDash = { 'Pix':0, 'Dinheiro':0, 'Cartão Crédito':0, 'Cartão Débito':0 };
-        desp.forEach(d => { if(subDash[d.category] !== undefined) subDash[d.category] += Number(d.amount)||0; });
-        
-        const payCards = document.getElementById('resumo-pagamentos-cards');
-        if(payCards) payCards.innerHTML = `<div class="card" style="text-align:center"><i class="ph ph-qr-code" style="font-size:2rem; color:#00695c"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Pix</p><div class="val" style="font-size:1.2rem; color:#00695c">${U.money(subDash['Pix'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-money" style="font-size:2rem; color:#2e7d32"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Dinheiro</p><div class="val" style="font-size:1.2rem; color:#2e7d32">${U.money(subDash['Dinheiro'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#e65100"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Crédito</p><div class="val" style="font-size:1.2rem; color:#e65100">${U.money(subDash['Cartão Crédito'])}</div></div><div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#1565c0"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Débito</p><div class="val" style="font-size:1.2rem; color:#1565c0">${U.money(subDash['Cartão Débito'])}</div></div>`;
-        
-        const extratoList = document.getElementById('extrato-list');
-        if(extratoList) extratoList.innerHTML = extrato.length === 0 ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações neste período vigente.</p>' :
-        extrato.map(i => `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;"><div style="flex:1"><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Saída'} - ${i.category}</b><p style="margin-top:5px; font-weight:600; font-size:1.1rem">${U.formatDesc(i.desc)}</p><span style="font-size:0.8rem; color:var(--muted); display:inline-block; margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(i.date)}</span></div><div style="text-align:right"><span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.3rem; display:block">${i.type==='in'?'+':'-'} ${U.money(i.val)}</span><span style="font-size:0.85rem; color:var(--muted); font-weight:bold">Caixa: ${U.money(i.saldo)}</span></div></div>`).join('');
-    },
+            if (error) throw error;
+
+            const { extrato, totalIn, totalOut } = U.buildExtrato(desp || []);
+            const lucro = totalIn - totalOut;
+            
+            if(rc) {
+                rc.innerHTML = `
+                <div class="card" style="border-bottom:4px solid #2e7d32">
+                    <h4>Faturamento (Pago)</h4>
+                    <div class="val" style="color:#2e7d32; font-size:1.8rem; margin-top:10px">${U.money(totalIn)}</div>
+                </div>
+                <div class="card" style="border-bottom:4px solid #d32f2f">
+                    <h4>Custos & Comissões (Saídas)</h4>
+                    <div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">-${U.money(totalOut)}</div>
+                </div>
+                <div class="card" style="background:${lucro>=0?'#e8f5e9':'#ffebee'}; border:1px solid ${lucro>=0?'#c8e6c9':'#ffcdd2'}">
+                    <h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4>
+                    <div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div>
+                </div>`;
+            }
+
+            let subDash = { 'Pix':0, 'Dinheiro':0, 'Cartão Crédito':0, 'Cartão Débito':0 };
+            (desp || []).forEach(d => { if(subDash[d.category] !== undefined) subDash[d.category] += Number(d.amount)||0; });
+            
+            const payCards = document.getElementById('resumo-pagamentos-cards');
+            if(payCards) {
+                payCards.innerHTML = `
+                <div class="card" style="text-align:center"><i class="ph ph-qr-code" style="font-size:2rem; color:#00695c"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Pix</p><div class="val" style="font-size:1.2rem; color:#00695c">${U.money(subDash['Pix'])}</div></div>
+                <div class="card" style="text-align:center"><i class="ph ph-money" style="font-size:2rem; color:#2e7d32"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Dinheiro</p><div class="val" style="font-size:1.2rem; color:#2e7d32">${U.money(subDash['Dinheiro'])}</div></div>
+                <div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#e65100"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Crédito</p><div class="val" style="font-size:1.2rem; color:#e65100">${U.money(subDash['Cartão Crédito'])}</div></div>
+                <div class="card" style="text-align:center"><i class="ph ph-credit-card" style="font-size:2rem; color:#1565c0"></i><p style="margin-top:5px; font-weight:bold; color:var(--muted)">Débito</p><div class="val" style="font-size:1.2rem; color:#1565c0">${U.money(subDash['Cartão Débito'])}</div></div>`;
+            }
+
+            const extratoList = document.getElementById('extrato-list');
+            if(extratoList) {
+                extratoList.innerHTML = extrato.length === 0 
+                    ? '<p style="text-align:center; padding:1rem; color:var(--muted)">Sem movimentações nesta quinzena.</p>' 
+                    : extrato.map(i => `
+                        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding:15px 0;">
+                            <div style="flex:1">
+                                <b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-size:0.75rem; text-transform:uppercase; letter-spacing:1px">${i.type==='in'?'Recebimento':'Saída'} - ${i.category}</b>
+                                <p style="margin-top:5px; font-weight:600; font-size:1.1rem">${U.formatDesc(i.desc)}</p>
+                                <span style="font-size:0.8rem; color:var(--muted); display:inline-block; margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(i.date)}</span>
+                            </div>
+                            <div style="text-align:right">
+                                <span style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}; font-weight:bold; font-size:1.3rem; display:block">${i.type==='in'?'+':'-'} ${U.money(i.val)}</span>
+                                <span style="font-size:0.85rem; color:var(--muted); font-weight:bold">Caixa: ${U.money(i.saldo)}</span>
+                            </div>
+                        </div>`).join('');
+            }
+        } catch (e) {
+            console.error("Erro crítico ao carregar financeiro:", e);
+            UI.toast("Erro ao carregar dados financeiros: " + e.message, "error");
+            if(rc) rc.innerHTML = '<p style="color:red; padding:20px;">Erro ao carregar dados. Verifique sua conexão ou tente novamente.</p>';
+        }
+    },  
     async relatorios() {
         const relContainer = document.getElementById('relatorio-despesas-conteudo');
         if(relContainer) {

@@ -1,4 +1,4 @@
-/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO FINAL COM CORTE NO DIA ANTERIOR */
+/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO FINAL ESTÁVEL */
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const DB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
 const db = window.supabase.createClient(DB_URL, DB_KEY, {
@@ -22,11 +22,15 @@ const App = {
 // UTILITÁRIOS
 const U = {
     money: v => new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'}).format(v||0),
-    iso: d => { const tzOffset = d.getTimezoneOffset() * 60000; return (new Date(d.getTime() - tzOffset)).toISOString().split('T')[0]; },
+    iso: d => { 
+        if(!d) return '';
+        const tzOffset = d.getTimezoneOffset() * 60000; 
+        return (new Date(d.getTime() - tzOffset)).toISOString().split('T')[0]; 
+    },
     date: d => {
         if(!d) return '';
         let dateObj = new Date(d);
-        if(d.length === 10) dateObj = new Date(d + 'T12:00:00');
+        if(typeof d === 'string' && d.length === 10) dateObj = new Date(d + 'T12:00:00');
         return dateObj.toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit'});
     },
     fillTemplate(text, vars) {
@@ -38,6 +42,7 @@ const U = {
         return out;
     },
     
+    // Retorna ID da quinzena teórica (ex: 2023-09-Q2)
     getCurrentQuinzenaValue() {
         let curr = new Date();
         let m = String(curr.getMonth() + 1).padStart(2, '0');
@@ -46,76 +51,71 @@ const U = {
         return `${y}-${m}-${q}`;
     },
 
-    /**
-     * LÓGICA ATUALIZADA: 
-     * Se fechou dia 28, a quinzena antiga vai até dia 27.
-     * A nova quinzena começa dia 28.
-     */
-    async getEffectiveRange() {
-        const now = new Date();
-        const todayStr = this.iso(now);
-        
-        // Identifica a quinzena teórica baseada na data de HOJE
-        // Ex: Hoje é 28/09 -> Teoricamente seria Q2-Setembro
-        const dayOfMonth = now.getDate();
-        const month = String(now.getMonth() + 1).padStart(2, '0');
-        const year = now.getFullYear();
-        const theoreticalQ = dayOfMonth <= 15 ? 'Q1' : 'Q2';
-        const currentQId = `${year}-${month}-${theoreticalQ}`;
-
-        try {
-            // Busca se ESTA quinzena teórica foi fechada manualmente
-            const { data: closure, error } = await db.from('period_closures')
-                .select('*')
-                .eq('quinzena_id', currentQId)
-                .maybeSingle();
-
-            // Se não houver fechamento manual, usa regra padrão automática
-            if (error || !closure) {
-                return this.getStandardQuinzenaDates(currentQId);
-            }
-
-            // SE HOUVER FECHAMENTO MANUAL:
-            const cutDateObj = new Date(closure.cut_date);
-            const todayObj = new Date(todayStr);
-            
-            // Normaliza horas para comparação
-            cutDateObj.setHours(0,0,0,0);
-            todayObj.setHours(0,0,0,0);
-
-            if (cutDateObj <= todayObj) {
-                // O corte foi hoje ou antes.
-                // Significa que estamos NA NOVA QUINZENA gerada pelo fechamento.
-                // Início: Data do Corte (hoje ou data passada)
-                // Fim: Final do mês natural atual
-                
-                const lastDayOfMonth = new Date(year, parseInt(month), 0);
-
-                return {
-                    start: this.iso(cutDateObj),       // Começa no dia do corte
-                    end: this.iso(lastDayOfMonth),     // Vai até fim do mês
-                    isExtraPeriod: true,               // É um período pós-corte
-                    label: `Nova Quinzena (Iniciada em ${this.iso(cutDateObj)})`,
-                    originalClosure: closure
-                };
-            } else {
-                // Fechamento futuro? Usa padrão até lá.
-                const standardRange = this.getStandardQuinzenaDates(currentQId);
-                return { ...standardRange, isClosedManually: true, label: 'FECHADO MANUALMENTE' };
-            }
-
-        } catch (e) {
-            console.error("Erro ao calcular vigência:", e);
-            return this.getStandardQuinzenaDates(currentQId);
-        }
-    },
-
+    // Retorna datas padrão (Início e Fim) de uma quinzena teórica
     getStandardQuinzenaDates(val) {
         if(!val) return { start: '1970-01-01', end: '2099-12-31' };
         const [y, m, q] = val.split('-');
         const lastDay = new Date(y, parseInt(m), 0).getDate();
         if (q === 'Q1') return { start: `${y}-${m}-01`, end: `${y}-${m}-15` };
         return { start: `${y}-${m}-16`, end: `${y}-${m}-${lastDay}` };
+    },
+
+    // LÓGICA INTELIGENTE: Calcula o range real considerando fechamentos manuais
+    async getEffectiveRange() {
+        const now = new Date();
+        const todayStr = this.iso(now);
+        const currentQId = this.getCurrentQuinzenaValue();
+
+        try {
+            // Busca se há fechamento manual para esta quinzena
+            const { data: closure, error } = await db.from('period_closures')
+                .select('*')
+                .eq('quinzena_id', currentQId)
+                .maybeSingle();
+
+            // Se não houver fechamento ou der erro, usa o padrão automático
+            if (error || !closure) {
+                return this.getStandardQuinzenaDates(currentQId);
+            }
+
+            // SE HOUVER FECHAMENTO MANUAL:
+            // O usuário escolheu uma data de corte (cut_date).
+            // Regra: O período antigo vai até o dia ANTERIOR ao corte.
+            // O novo período começa no dia do corte.
+            
+            const cutDateObj = new Date(closure.cut_date);
+            const todayObj = new Date(todayStr);
+            
+            // Normaliza para meia-noite
+            cutDateObj.setHours(0,0,0,0);
+            todayObj.setHours(0,0,0,0);
+
+            // Se a data de corte já passou ou é hoje, estamos no "Novo Período"
+            if (cutDateObj <= todayObj) {
+                // Início: Data do Corte
+                // Fim: Último dia do mês atual (ou fim da quinzena teórica, o que vier primeiro? 
+                // Vamos usar o fim do mês natural para simplificar visualmente, ou o fim da quinzena teórica)
+                // Para manter consistência com o pedido "dia 28 começa 1Q de Outubro", vamos assumir que
+                // o novo período vai do dia do corte até o fim do mês atual.
+                
+                const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+                
+                return {
+                    start: this.iso(cutDateObj), // Começa no dia escolhido
+                    end: this.iso(lastDayOfMonth), // Vai até o fim do mês
+                    isExtraPeriod: true,
+                    label: `Nova Quinzena (Iniciada em ${this.iso(cutDateObj)})`,
+                    originalClosure: closure
+                };
+            } else {
+                // Data de corte é futura? Mantém o padrão até lá.
+                return this.getStandardQuinzenaDates(currentQId);
+            }
+
+        } catch (e) {
+            console.error("Erro ao calcular vigência:", e);
+            return this.getStandardQuinzenaDates(currentQId);
+        }
     },
 
     generateQuinzenasOptions() {
@@ -403,7 +403,7 @@ const Tour = {
     }
 };
 
-// PERIODS MODULE (ATUALIZADO COM LÓGICA DE CORTE NO DIA ANTERIOR)
+// PERIODS MODULE
 const Periods = {
     async getManualClosureInfo() {
         try {
@@ -434,9 +434,8 @@ const Periods = {
             let datesDisplay = '';
 
             if (effectiveData.isExtraPeriod) {
-                 // Estamos na NOVA quinzena gerada pelo fechamento manual
                  statusText = 'NOVA QUINZENA (PÓS-FECHAMENTO)';
-                 badgeColor = '#2e7d32'; // Verde indicando novo ciclo
+                 badgeColor = '#2e7d32';
                  datesDisplay = `Iniciada em: ${new Date(effectiveData.start).toLocaleDateString('pt-BR')} • Vigente até: ${new Date(effectiveData.end).toLocaleDateString('pt-BR')}`;
                  actionBtn = `<button class="btn-secondary" style="margin-top:10px; font-size:0.8rem; padding:5px 10px; background:#fff3e0; color:#e65100; border:1px solid #ffb74d;" onclick="Periods.reopenLast()"><i class="ph ph-arrow-u-turn-left"></i> Desfazer Último Fechamento</button>`;
             } else if (effectiveData.isClosedManually) {
@@ -475,10 +474,10 @@ const Periods = {
         const dateInput = document.getElementById('manual-close-date');
         if(!dateInput || !dateInput.value) return UI.toast('Selecione uma data válida.', 'error');
         
-        const cutDate = dateInput.value; // Data escolhida pelo usuário (ex: 28)
-        const currentQ = U.getCurrentQuinzenaValue(); // Quinzena que está sendo fechada
+        const cutDate = dateInput.value;
+        const currentQ = U.getCurrentQuinzenaValue();
         
-        // Ajuste de mensagem para deixar claro
+        // Ajuste de mensagem
         const prevDay = new Date(cutDate);
         prevDay.setDate(prevDay.getDate() - 1);
         const prevDayStr = prevDay.toLocaleDateString('pt-BR');
@@ -489,7 +488,6 @@ const Periods = {
                 // 1. Calcular Totais DA QUINZENA ANTIGA (até o dia anterior ao corte)
                 const rangeOld = U.getStandardQuinzenaDates(currentQ);
                 
-                // O fim da quinzena antiga é o dia anterior ao corte
                 const endDateOld = new Date(cutDate);
                 endDateOld.setDate(endDateOld.getDate() - 1);
                 const endDateOldStr = U.iso(endDateOld);
@@ -509,14 +507,13 @@ const Periods = {
                 const lucroLiquido = totalIn - totalOut;
 
                 // 2. Salvar na tabela period_closures
-                // IMPORTANTE: cut_date salva é a data ESCOLHIDA (início da nova), não o fim da antiga
                 const { data: existing } = await db.from('period_closures').select('id').eq('quinzena_id', currentQ).maybeSingle();
                 
                 const payload = {
                     quinzena_id: currentQ,
                     closed_at: new Date().toISOString(),
                     closed_by: App.user.id,
-                    cut_date: cutDate, // Dia 28 (início da nova)
+                    cut_date: cutDate,
                     total_in: totalIn,
                     total_out: totalOut,
                     net_profit: lucroLiquido
@@ -531,7 +528,6 @@ const Periods = {
                 UI.toast(`Quinzena fechada! Nova contagem iniciou em ${new Date(cutDate).toLocaleDateString('pt-BR')}`, 'success');
                 Modals.close();
                 
-                // 3. Forçar recarga
                 Render['resumo-financeiro']();
                 
             } catch(e) {
@@ -1052,19 +1048,68 @@ const Render = {
         }).join('');
     },
     async despesas() {
-        const range = U.getStandardQuinzenaDates(U.getCurrentQuinzenaValue()); 
-        const { data } = await db.from('despesas').select('*').gte('date', range.start + 'T00:00:00Z').lte(range.end + 'T23:59:59Z');
-        let totais = { 'Custos Fixos': 0, 'Comissões': 0, 'Pessoal/Pagamentos': 0, 'Custos Variáveis': 0 }; let despesasOnly = [];
-        data.forEach(d => { if(!App.inflowCategories.includes(d.category)) { despesasOnly.push(d); if(totais[d.category] !== undefined) totais[d.category] += d.amount; else totais['Custos Variáveis'] += d.amount; } });
-        despesasOnly.sort((a,b) => new Date(b.date) - new Date(a.date));
-        const list = document.getElementById('despesas-list');
-        if(list) list.innerHTML = `<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:20px"><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #d32f2f"><p style="font-size:0.8rem">Custos Fixos (Retido)</p><div class="val" style="color:#d32f2f; font-size:1.2rem">-${U.money(totais['Custos Fixos'])}</div></div><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #cd7f32"><p style="font-size:0.8rem">Comissões Autom.</p><div class="val" style="color:#cd7f32; font-size:1.2rem">-${U.money(totais['Comissões'])}</div></div><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #8e24aa"><p style="font-size:0.8rem">Pessoal/Equipe</p><div class="val" style="color:#8e24aa; font-size:1.2rem">-${U.money(totais['Pessoal/Pagamentos'])}</div></div><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #e65100"><p style="font-size:0.8rem">Variáveis/Insumos</p><div class="val" style="color:#e65100; font-size:1.2rem">-${U.money(totais['Custos Variáveis'])}</div></div></div>` +
-        despesasOnly.map(d => { let color = '#d32f2f'; if(d.category === 'Comissões') color = '#cd7f32'; else if(d.category === 'Pessoal/Pagamentos') color = '#8e24aa'; else if(d.category === 'Custos Variáveis') color = '#e65100'; return `<div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${color}"><div><h4>${d.description}</h4><p style="font-size:0.8rem; color:var(--muted)">${d.category} • ${U.date(d.date)}</p></div><div class="val" style="color:${color}">-${U.money(d.amount)}</div></div>`; }).join('');
-        
-        const chartCanvas = document.getElementById('chart-despesas');
-        if(chartCanvas) {
-            if(App.charts.despesas) App.charts.despesas.destroy(); 
-            App.charts.despesas = new Chart(chartCanvas, { type: 'pie', data: { labels: Object.keys(totais), datasets: [{ data: Object.values(totais), backgroundColor: ['#d32f2f', '#cd7f32', '#8e24aa', '#e65100'] }] }});
+        try {
+            // Usa a lógica inteligente de datas
+            const effRange = await U.getEffectiveRange();
+            const startISO = effRange.start + 'T00:00:00Z';
+            const endISO = effRange.end + 'T23:59:59Z';
+
+            const { data, error } = await db.from('despesas')
+                .select('*')
+                .gte('date', startISO)
+                .lte('date', endISO);
+
+            if (error) throw error;
+
+            let totais = { 'Custos Fixos': 0, 'Comissões': 0, 'Pessoal/Pagamentos': 0, 'Custos Variáveis': 0 }; 
+            let despesasOnly = [];
+            
+            (data || []).forEach(d => { 
+                if(!App.inflowCategories.includes(d.category)) { 
+                    despesasOnly.push(d); 
+                    if(totais[d.category] !== undefined) totais[d.category] += d.amount; 
+                    else totais['Custos Variáveis'] += d.amount; 
+                } 
+            });
+            
+            despesasOnly.sort((a,b) => new Date(b.date) - new Date(a.date));
+            
+            const list = document.getElementById('despesas-list');
+            if(list) {
+                list.innerHTML = `<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(130px, 1fr)); gap:10px; margin-bottom:20px"><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #d32f2f"><p style="font-size:0.8rem">Custos Fixos (Retido)</p><div class="val" style="color:#d32f2f; font-size:1.2rem">-${U.money(totais['Custos Fixos'])}</div></div><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #cd7f32"><p style="font-size:0.8rem">Comissões Autom.</p><div class="val" style="color:#cd7f32; font-size:1.2rem">-${U.money(totais['Comissões'])}</div></div><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #8e24aa"><p style="font-size:0.8rem">Pessoal/Equipe</p><div class="val" style="color:#8e24aa; font-size:1.2rem">-${U.money(totais['Pessoal/Pagamentos'])}</div></div><div class="card" style="padding:1rem; text-align:center; border-bottom:3px solid #e65100"><p style="font-size:0.8rem">Variáveis/Insumos</p><div class="val" style="color:#e65100; font-size:1.2rem">-${U.money(totais['Custos Variáveis'])}</div></div></div>` +
+                despesasOnly.map(d => { 
+                    let color = '#d32f2f'; 
+                    if(d.category === 'Comissões') color = '#cd7f32'; 
+                    else if(d.category === 'Pessoal/Pagamentos') color = '#8e24aa'; 
+                    else if(d.category === 'Custos Variáveis') color = '#e65100'; 
+                    
+                    return `
+                    <div class="card" style="display:flex; justify-content:space-between; align-items:center; border-left:4px solid ${color}">
+                        <div>
+                            <h4>${d.description}</h4>
+                            <p style="font-size:0.8rem; color:var(--muted)">${d.category} • ${U.date(d.date)}</p>
+                        </div>
+                        <div class="val" style="color:${color}">-${U.money(d.amount)}</div>
+                    </div>`; 
+                }).join('');
+            }
+            
+            const chartCanvas = document.getElementById('chart-despesas');
+            if(chartCanvas) {
+                if(App.charts.despesas) App.charts.despesas.destroy(); 
+                App.charts.despesas = new Chart(chartCanvas, { 
+                    type: 'pie', 
+                    data: { 
+                        labels: Object.keys(totais), 
+                        datasets: [{ data: Object.values(totais), backgroundColor: ['#d32f2f', '#cd7f32', '#8e24aa', '#e65100'] }] 
+                    }
+                });
+            }
+        } catch (e) {
+            console.error("Erro ao carregar despesas:", e);
+            UI.toast("Erro ao carregar despesas: " + e.message, "error");
+            const list = document.getElementById('despesas-list');
+            if(list) list.innerHTML = '<p style="color:red; padding:20px;">Erro ao carregar dados.</p>';
         }
     },
     async comissao() {
@@ -1218,7 +1263,6 @@ const Render = {
         if(dashContainer) dashContainer.innerHTML = finalHtml;
     },
     async 'resumo-financeiro'() {
-        // 1. Renderiza o Card Visual (Status/Botões)
         try {
             await Periods.renderCurrentPeriodVisual();
         } catch(e) {
@@ -1233,12 +1277,8 @@ const Render = {
             rc.parentNode.insertBefore(w, rc);
         }
 
-        // 2. Lógica de Dados Financeiros (CORRIGIDA COM NOVA DATA DE INÍCIO)
         try {
-            // Pega o range efetivo (considerando fechamento manual ou automático)
             const effRange = await U.getEffectiveRange();
-            
-            // Formata datas para ISO completo exigido pelo Supabase
             const startISO = effRange.start + 'T00:00:00Z';
             const endISO = effRange.end + 'T23:59:59Z';
 
@@ -2524,7 +2564,6 @@ const initCSS = () => {
 document.addEventListener('DOMContentLoaded', () => {
     initCSS();
     
-    // CORREÇÃO DEFINITIVA DA SPLASH SCREEN
     setTimeout(() => { 
         const splash = document.getElementById('splash-screen'); 
         if(splash) { 

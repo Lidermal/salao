@@ -423,6 +423,7 @@ const Periods = {
         Modals.open('period_summary');
     },
 
+    // Executa o fechamento manual COM CONGELAMENTO DE DADOS
     async executeManualClose() {
         const dateInput = document.getElementById('manual-close-date');
         if(!dateInput || !dateInput.value) return UI.toast('Selecione uma data válida.', 'error');
@@ -430,33 +431,60 @@ const Periods = {
         const cutDate = dateInput.value;
         const currentQ = U.getCurrentQuinzenaValue();
         
-        UI.confirm(`Tem certeza que deseja fechar a quinzena ${currentQ} na data ${cutDate}?`, async () => {
-            UI.showLoading('Efetuando fechamento...');
+        // Confirmação avisando que os dados serão congelados
+        UI.confirm(`Tem certeza que deseja fechar a quinzena ${currentQ} na data ${cutDate}?<br><br>⚠️ ATENÇÃO: Os valores atuais do Fluxo de Caixa desta quinzena serão congelados e arquivados. A tela será reiniciada para o próximo período.`, async () => {
+            UI.showLoading('Calculando totais e fechando...');
             try {
+                // 1. Calcular os Totais Finais ANTES de fechar
+                const range = U.getQuinzenaDates(currentQ);
+                const { data: desp } = await db.from('despesas').select('*').gte('date', range.start).lte('date', range.end);
+                
+                let totalIn = 0;
+                let totalOut = 0;
+                
+                (desp || []).forEach(d => {
+                    const isIncome = App.inflowCategories.includes(d.category);
+                    const valNum = Number(d.amount) || 0;
+                    if(isIncome) totalIn += valNum; else totalOut += valNum;
+                });
+                
+                const lucroLiquido = totalIn - totalOut;
+
+                // 2. Salvar o Fechamento com os Totais Congelados
                 const { error } = await db.from('period_closures').insert({
                     quinzena_id: currentQ,
                     closed_at: new Date().toISOString(),
                     closed_by: App.user.id,
-                    cut_date: cutDate
+                    cut_date: cutDate,
+                    total_in: totalIn,      // Novo campo
+                    total_out: totalOut,    // Novo campo
+                    net_profit: lucroLiquido // Novo campo
                 });
 
-                if (error) {
-                    if(error.code === '42P01') throw new Error("ERRO CRÍTICO: A tabela 'period_closures' não existe no banco de dados. Execute o script SQL fornecido anteriormente.");
-                    throw error;
+                if (error) throw error;
+                
+                UI.toast(`Quinzena ${currentQ} fechada! Lucro Líquido Arquivado: ${U.money(lucroLiquido)}`, 'success');
+                Modals.close();
+                
+                // 3. Forçar recarga da tela de Resumo Financeiro
+                // Isso fará com que o Range mude automaticamente para a próxima quinzena vigente
+                // E como não há lançamentos novos nela ainda, ela aparecerá ZERADA/LIMPA
+                if(App.view === 'resumo-financeiro') {
+                    Render['resumo-financeiro']();
+                } else {
+                    // Se estiver em outra tela, avisa para voltar ao financeiro
+                    UI.toast('Volte ao Fluxo de Caixa para ver o novo período iniciado.', 'warning');
                 }
                 
-                UI.toast('Quinzena fechada com sucesso!', 'success');
-                Modals.close();
-                if(App.view === 'resumo-financeiro') Render['resumo-financeiro']();
-                
             } catch(e) {
-                UI.toast('Erro: ' + e.message, 'error');
+                console.error(e);
+                UI.toast('Erro ao fechar quinzena: ' + e.message, 'error');
             } finally {
                 UI.hideLoading();
             }
         });
     },
-
+    
     // NOVA FUNÇÃO PARA DESFAZER O FECHAMENTO
     async reopenQuinzena(quinzenaId) {
         UI.confirm(`Deseja realmente reabrir a quinzena ${quinzenaId}? Isso permitirá novas edições automáticas nesse período.`, async () => {

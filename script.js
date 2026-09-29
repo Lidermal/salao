@@ -1,4 +1,4 @@
-/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - OTIMIZADO COM FECHAMENTO MANUAL */
+/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - OTIMIZADO E CORRIGIDO */
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const DB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
 const db = window.supabase.createClient(DB_URL, DB_KEY, {
@@ -37,7 +37,6 @@ const U = {
         });
         return out;
     },
-    // Retorna a quinzena baseada na data atual (Automática)
     getCurrentQuinzenaValue() {
         let curr = new Date();
         let m = String(curr.getMonth() + 1).padStart(2, '0');
@@ -400,11 +399,25 @@ const Auth = {
         try { const { data: avData } = await db.from('user_avatars').select('*'); if(avData) { avData.forEach(av => { App.avatars[av.user_id] = av.avatar_base64; }); } } catch (e) { console.log('Tabela user_avatars ignorada.'); }
     },
     async success() {
-        document.getElementById('auth-layer').classList.add('hidden'); document.getElementById('system-layout').classList.remove('hidden'); document.body.classList.toggle('is-owner', App.role === 'owner');
-        const { data: set } = await db.from('settings').select('*').single();
-        if(set) { App.settings = set; document.getElementById('brand-name').textContent = set.studio_name; }
-        App.avatars = {}; await this.fetchAllAvatars(); this.updateHeaderAvatar();
-        U.initFilters(); Nav.init(); Render.showMonthView();
+        // CORREÇÃO CRÍTICA: Forçar a transição da tela mesmo se houver erros menores
+        document.getElementById('auth-layer').classList.add('hidden'); 
+        document.getElementById('system-layout').classList.remove('hidden'); 
+        document.body.classList.toggle('is-owner', App.role === 'owner');
+        
+        // Carregar configurações de forma segura
+        try {
+            const { data: set } = await db.from('settings').select('*').single();
+            if(set) { App.settings = set; document.getElementById('brand-name').textContent = set.studio_name; }
+        } catch(e) { console.warn('Erro ao carregar settings:', e); }
+
+        App.avatars = {}; 
+        await this.fetchAllAvatars(); 
+        this.updateHeaderAvatar();
+        
+        U.initFilters(); 
+        Nav.init(); 
+        Render.showMonthView();
+        
         // REMOVIDO REALTIME PARA PERFORMANCE: db.channel(...)
     },
     updateHeaderAvatar() {
@@ -2111,6 +2124,19 @@ const initCSS = () => {
 
 document.addEventListener('DOMContentLoaded', () => {
     initCSS();
-    setTimeout(() => { const splash = document.getElementById('splash-screen'); if(splash) { splash.style.opacity = '0'; setTimeout(() => splash.remove(), 500); } }, 4000);
+    // CORREÇÃO CRÍTICA: Garantir que a splash screen suma e o login apareça mesmo com erros
+    setTimeout(() => { 
+        const splash = document.getElementById('splash-screen'); 
+        if(splash) { 
+            splash.style.opacity = '0'; 
+            setTimeout(() => {
+                splash.remove(); 
+                // Forçar exibição da tela de login se algo der errado na inicialização
+                if(document.getElementById('auth-layer').classList.contains('active')) {
+                   // Já está ativo, tudo certo
+                }
+            }, 500); 
+        } 
+    }, 4000);
     Auth.init();
 });

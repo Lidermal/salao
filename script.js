@@ -1,4 +1,4 @@
-/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO FINAL ESTÁVEL */
+/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO FINAL ESTÁVEL E CORRIGIDA */
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const DB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
 const db = window.supabase.createClient(DB_URL, DB_KEY, {
@@ -19,7 +19,7 @@ const App = {
     comandasState: { status: 'aberta', date: new Date().toISOString().split('T')[0] }
 };
 
-// UTILITÁRIOS
+// UTILITÁRIOS E MOTOR DE DATAS
 const U = {
     money: v => new Intl.NumberFormat('pt-BR', {style:'currency', currency:'BRL'}).format(v||0),
     iso: d => { 
@@ -42,7 +42,7 @@ const U = {
         return out;
     },
     
-    // Retorna ID teórico (ex: 2023-09-Q2)
+    // Retorna ID teórico (ex: 2026-09-Q2)
     getCurrentQuinzenaValue() {
         let curr = new Date();
         let m = String(curr.getMonth() + 1).padStart(2, '0');
@@ -51,7 +51,23 @@ const U = {
         return `${y}-${m}-${q}`;
     },
 
-    // Retorna datas padrão (Início e Fim) de uma quinzena teórica
+    getPreviousQuinzenaValue(qId) {
+        let [y, m, q] = qId.split('-');
+        y = parseInt(y); m = parseInt(m);
+        if (q === 'Q2') return `${y}-${String(m).padStart(2, '0')}-Q1`;
+        if (m === 1) return `${y - 1}-12-Q2`;
+        return `${y}-${String(m - 1).padStart(2, '0')}-Q2`;
+    },
+
+    getNextQuinzenaValue(qId) {
+        let [y, m, q] = qId.split('-');
+        y = parseInt(y); m = parseInt(m);
+        if (q === 'Q1') return `${y}-${String(m).padStart(2, '0')}-Q2`;
+        if (m === 12) return `${y + 1}-01-Q1`;
+        return `${y}-${String(m + 1).padStart(2, '0')}-Q1`;
+    },
+
+    // Retorna datas padrão Automáticas (Início e Fim)
     getStandardQuinzenaDates(val) {
         if(!val) return { start: '1970-01-01', end: '2099-12-31' };
         const [y, m, q] = val.split('-');
@@ -60,94 +76,60 @@ const U = {
         return { start: `${y}-${m}-16`, end: `${y}-${m}-${lastDay}` };
     },
 
-    /**
-     * LÓGICA INTELIGENTE DE VIGÊNCIA
-     * Calcula o range real considerando fechamentos manuais.
-     * Regra: Se fechou dia 27/09 (Q2), o novo período é 27/09 até 15/10 (Q1 Out).
-     */
+    // Retorna as datas REAIS de uma quinzena (respeitando fechamentos manuais)
+    async getQuinzenaRealDates(qId) {
+        const defaultDates = this.getStandardQuinzenaDates(qId);
+        let realStart = defaultDates.start;
+        let realEnd = defaultDates.end;
+
+        // Se a quinzena atual foi fechada manualmente, o fim muda
+        const { data: currClosure } = await db.from('period_closures').select('*').eq('quinzena_id', qId).maybeSingle();
+        if (currClosure) {
+            let d = new Date(currClosure.cut_date);
+            d.setDate(d.getDate() - 1);
+            realEnd = this.iso(d);
+        }
+
+        // Se a quinzena ANTERIOR foi fechada manualmente, o início DESTA muda
+        const prevQid = this.getPreviousQuinzenaValue(qId);
+        const { data: prevClosure } = await db.from('period_closures').select('*').eq('quinzena_id', prevQid).maybeSingle();
+        if (prevClosure) {
+            realStart = prevClosure.cut_date;
+        }
+
+        return { start: realStart, end: realEnd, closure: currClosure, defaultStart: defaultDates.start, defaultEnd: defaultDates.end };
+    },
+
+    // Define qual é a quinzena operante HOJE
     async getEffectiveRange() {
         try {
-            const now = new Date();
-            const todayStr = this.iso(now);
-            const currentQId = this.getCurrentQuinzenaValue();
+            const todayStr = this.iso(new Date());
+            let qId = this.getCurrentQuinzenaValue();
+            let real = await this.getQuinzenaRealDates(qId);
 
-            // Busca fechamento manual
-            const { data: closure, error } = await db.from('period_closures')
-                .select('*')
-                .eq('quinzena_id', currentQId)
-                .maybeSingle();
-
-            // Se não houver fechamento ou der erro, usa o padrão automático
-            if (error || !closure) {
-                return this.getStandardQuinzenaDates(currentQId);
+            // Se a quinzena de hoje já foi fechada E a data atual é >= data de corte, pula para a próxima
+            if (real.closure && todayStr >= real.closure.cut_date) {
+                let nextQId = this.getNextQuinzenaValue(qId);
+                let nextReal = await this.getQuinzenaRealDates(nextQId);
+                return { ...nextReal, qId: nextQId, isExtraPeriod: true, originalClosure: real.closure };
             }
-
-            // SE HOUVER FECHAMENTO MANUAL:
-            const cutDateObj = new Date(closure.cut_date);
-            const todayObj = new Date(todayStr);
-            
-            // Normaliza para meia-noite
-            cutDateObj.setHours(0,0,0,0);
-            todayObj.setHours(0,0,0,0);
-
-            // Se a data de corte já passou ou é hoje, estamos no "Novo Período"
-            if (cutDateObj <= todayObj) {
-                let nextYear = cutDateObj.getFullYear();
-                let nextMonth = cutDateObj.getMonth(); 
-                let nextDay = cutDateObj.getDate(); 
-                
-                // Lógica para achar o fim da próxima quinzena teórica
-                if (nextDay > 15) {
-                    // Estava na Q2 (16-30), vai para Q1 do mês seguinte (01-15)
-                    nextMonth += 1;
-                    if (nextMonth > 11) {
-                        nextMonth = 0;
-                        nextYear += 1;
-                    }
-                    const endDateObj = new Date(nextYear, nextMonth, 15);
-                    
-                    return {
-                        start: this.iso(cutDateObj), // Começa no dia do corte
-                        end: this.iso(endDateObj),   // Termina dia 15 do próximo mês
-                        isExtraPeriod: true,
-                        label: `Nova Quinzena (Iniciada em ${this.iso(cutDateObj)})`,
-                        originalClosure: closure
-                    };
-
-                } else {
-                    // Estava na Q1 (01-15), vai para Q2 do mesmo mês (16-Fim)
-                    const lastDayOfMonth = new Date(nextYear, nextMonth + 1, 0).getDate();
-                    const endDateObj = new Date(nextYear, nextMonth, lastDayOfMonth);
-
-                    return {
-                        start: this.iso(cutDateObj),
-                        end: this.iso(endDateObj),
-                        isExtraPeriod: true,
-                        label: `Nova Quinzena (Iniciada em ${this.iso(cutDateObj)})`,
-                        originalClosure: closure
-                    };
-                }
-            } else {
-                // Data de corte futura? Mantém padrão.
-                return this.getStandardQuinzenaDates(currentQId);
-            }
-
+            return { ...real, qId: qId, isExtraPeriod: false };
         } catch (e) {
-            console.error("Erro ao calcular vigência (usando fallback):", e);
-            // FALLBACK ABSOLUTO: Nunca deixar a tela quebrar
-            return this.getStandardQuinzenaDates(this.getCurrentQuinzenaValue());
+            console.error("Erro ao calcular vigência:", e);
+            const fallbackQid = this.getCurrentQuinzenaValue();
+            return { ...this.getStandardQuinzenaDates(fallbackQid), qId: fallbackQid, isExtraPeriod: false };
         }
     },
 
     generateQuinzenasOptions() {
         let html = ''; let curr = new Date();
-        for(let i=0; i<8; i++) {
+        for(let i=0; i<12; i++) {
             let d = new Date(curr.getFullYear(), curr.getMonth() - Math.floor(i/2), 1);
             let m = String(d.getMonth() + 1).padStart(2, '0');
             let y = d.getFullYear();
             let mName = d.toLocaleString('pt-BR', {month:'long'});
             let q = (i % 2 === 0) ? 'Q2' : 'Q1';
-            if(i === 0 && curr.getDate() <= 15) continue;
+            if(i === 0 && curr.getDate() <= 15) continue; // Pula Q2 se ainda estamos na Q1 do mês atual
             html += `<option value="${y}-${m}-${q}">${q === 'Q1' ? '1ª' : '2ª'} Quinzena (${mName}/${y})</option>`;
         }
         return html;
@@ -182,7 +164,17 @@ const U = {
         const opts = this.generateQuinzenasOptions();
         ['filter-comissao-quinzena', 'filter-relatorios'].forEach(id => {
             const el = document.getElementById(id);
-            if(el) { el.innerHTML = opts; el.value = this.getCurrentQuinzenaValue(); }
+            if(el) { 
+                el.innerHTML = opts; 
+                el.value = this.getCurrentQuinzenaValue(); 
+                
+                // Evento para atualizar a tela ao trocar a quinzena no select
+                el.onchange = (e) => {
+                    const val = e.target.value;
+                    if(id === 'filter-comissao-quinzena') Render.comissao(val);
+                    if(id === 'filter-relatorios') Render.relatorios(val);
+                };
+            }
         });
     }
 };
@@ -426,22 +418,6 @@ const Tour = {
 
 // PERIODS MODULE
 const Periods = {
-    async getManualClosureInfo() {
-        try {
-            const currentQ = U.getCurrentQuinzenaValue();
-            const { data, error } = await db.from('period_closures')
-                .select('*')
-                .eq('quinzena_id', currentQ)
-                .maybeSingle();
-            
-            if (error) return null;
-            return data;
-        } catch (e) {
-            console.error("Erro crítico no Periods:", e);
-            return null;
-        }
-    },
-
     async renderCurrentPeriodVisual() {
         const container = document.getElementById('period-visual');
         if(!container) return;
@@ -458,13 +434,12 @@ const Periods = {
                  statusText = 'NOVA QUINZENA (PÓS-FECHAMENTO)';
                  badgeColor = '#2e7d32';
                  datesDisplay = `Iniciada em: ${new Date(effectiveData.start).toLocaleDateString('pt-BR')} • Vigente até: ${new Date(effectiveData.end).toLocaleDateString('pt-BR')}`;
-                 actionBtn = `<button class="btn-secondary" style="margin-top:10px; font-size:0.8rem; padding:5px 10px; background:#fff3e0; color:#e65100; border:1px solid #ffb74d;" onclick="Periods.reopenLast()"><i class="ph ph-arrow-u-turn-left"></i> Desfazer Último Fechamento</button>`;
-            } else if (effectiveData.originalClosure) {
-                // Caso especial: Fechou mas a data de corte é futura (não deveria acontecer normalmente, mas por segurança)
+                 actionBtn = `<button class="btn-secondary" style="margin-top:10px; font-size:0.8rem; padding:5px 10px; background:#fff3e0; color:#e65100; border:1px solid #ffb74d;" onclick="Periods.reopenLast('${effectiveData.originalClosure.quinzena_id}')"><i class="ph ph-arrow-u-turn-left"></i> Desfazer Último Fechamento</button>`;
+            } else if (effectiveData.closure) {
                 statusText = 'QUINZENA ENCERRADA';
                 badgeColor = '#d32f2f';
-                datesDisplay = `Encerrada em: ${new Date(effectiveData.originalClosure.cut_date).toLocaleDateString('pt-BR')}`;
-                actionBtn = `<button class="btn-secondary" style="margin-top:10px; font-size:0.8rem; padding:5px 10px; background:#ffebee; color:#d32f2f; border:1px solid #d32f2f;" onclick="Periods.reopenLast()"><i class="ph ph-arrow-u-turn-left"></i> Reabrir / Desfazer</button>`;
+                datesDisplay = `Encerrada em: ${new Date(effectiveData.closure.cut_date).toLocaleDateString('pt-BR')}`;
+                actionBtn = `<button class="btn-secondary" style="margin-top:10px; font-size:0.8rem; padding:5px 10px; background:#ffebee; color:#d32f2f; border:1px solid #d32f2f;" onclick="Periods.reopenLast('${effectiveData.qId}')"><i class="ph ph-arrow-u-turn-left"></i> Reabrir / Desfazer</button>`;
             } else {
                 statusText = 'EM ANDAMENTO';
                 badgeColor = 'var(--primary)';
@@ -497,7 +472,8 @@ const Periods = {
         if(!dateInput || !dateInput.value) return UI.toast('Selecione uma data válida.', 'error');
         
         const cutDate = dateInput.value;
-        const currentQ = U.getCurrentQuinzenaValue();
+        const eff = await U.getEffectiveRange();
+        const targetQId = eff.qId;
         
         const prevDay = new Date(cutDate);
         prevDay.setDate(prevDay.getDate() - 1);
@@ -506,7 +482,8 @@ const Periods = {
         UI.confirm(`Confirma o fechamento?<br><small>A quinzena atual será encerrada no dia <b>${prevDayStr}</b>.<br>O dia <b>${new Date(cutDate).toLocaleDateString('pt-BR')}</b> iniciará automaticamente a nova contagem.</small>`, async () => {
             UI.showLoading('Calculando totais e fechando...');
             try {
-                const rangeOld = U.getStandardQuinzenaDates(currentQ);
+                // Pega as datas REAIS desta quinzena que estamos fechando
+                const realDates = await U.getQuinzenaRealDates(targetQId);
                 
                 const endDateOld = new Date(cutDate);
                 endDateOld.setDate(endDateOld.getDate() - 1);
@@ -514,7 +491,7 @@ const Periods = {
 
                 const { data: desp } = await db.from('despesas')
                     .select('*')
-                    .gte('date', rangeOld.start + 'T00:00:00Z')
+                    .gte('date', realDates.start + 'T00:00:00Z')
                     .lte('date', endDateOldStr + 'T23:59:59Z');
                 
                 let totalIn = 0;
@@ -526,10 +503,10 @@ const Periods = {
                 });
                 const lucroLiquido = totalIn - totalOut;
 
-                const { data: existing } = await db.from('period_closures').select('id').eq('quinzena_id', currentQ).maybeSingle();
+                const { data: existing } = await db.from('period_closures').select('id').eq('quinzena_id', targetQId).maybeSingle();
                 
                 const payload = {
-                    quinzena_id: currentQ,
+                    quinzena_id: targetQId,
                     closed_at: new Date().toISOString(),
                     closed_by: App.user.id,
                     cut_date: cutDate,
@@ -558,12 +535,11 @@ const Periods = {
         });
     },
     
-    async reopenLast() {
-         const currentQ = U.getCurrentQuinzenaValue();
+    async reopenLast(qId) {
          UI.confirm('Deseja desfazer o último fechamento? Os valores voltarão a ser acumulados na quinzena original.', async () => {
              UI.showLoading('Reabrindo...');
              try {
-                 await db.from('period_closures').delete().eq('quinzena_id', currentQ);
+                 await db.from('period_closures').delete().eq('quinzena_id', qId);
                  UI.toast('Fechamento desfeito. Voltou ao modo automático.');
                  Render['resumo-financeiro']();
              } catch(e) {
@@ -1130,7 +1106,7 @@ const Render = {
             if(list) list.innerHTML = '<p style="color:red; padding:20px;">Erro ao carregar dados.</p>';
         }
     },
-    async comissao() {
+    async comissao(quinzenaId = null) {
         const isOwner = App.role === 'owner';
         const dashContainer = document.getElementById('comissao-dashboard-tour');
         if(dashContainer) {
@@ -1139,34 +1115,61 @@ const Render = {
                 fDiv = document.createElement('div'); fDiv.id = 'custom-filter-com-div';
                 fDiv.style = "margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;";
                 fDiv.innerHTML = `<button class="btn-secondary" style="width:auto; border:1px solid var(--primary); color:var(--primary)" onclick="Modals.open('filtro_comissoes')"><i class="ph ph-funnel"></i> Período Personalizado</button>
-                <button id="btn-clear-com" class="btn-secondary hidden" style="width:auto; color:#d32f2f; border:1px solid #d32f2f;" onclick="Actions.clearFilterComissoes()"><i class="ph ph-x"></i> Limpar Filtro</button>
+                <button id="btn-clear-com" class="btn-secondary hidden" style="width:auto; color:#d32f2f; border:1px solid #d32f2f;" onclick="Actions.clearFilterComissoes()"><i class="ph ph-x"></i> Limpar Filtro Personalizado</button>
                 <div id="com-filter-info" style="font-size:0.9rem; color:var(--primary-dark); font-weight:bold; width: 100%;"></div>`;
                 dashContainer.parentNode.insertBefore(fDiv, dashContainer);
             }
-            const btnClear = document.getElementById('btn-clear-com'); const infoDiv = document.getElementById('com-filter-info'); const defaultSel = document.getElementById('filter-comissao-quinzena');
-            if(App.filters.comissoes) {
-                if(btnClear) btnClear.classList.remove('hidden'); if(defaultSel) defaultSel.style.display = 'none';
+            const btnClear = document.getElementById('btn-clear-com'); 
+            const infoDiv = document.getElementById('com-filter-info'); 
+            const defaultSel = document.getElementById('filter-comissao-quinzena');
+            
+            if(App.filters.comissoes && App.filters.comissoes.start) {
+                // Modo: Filtro Avançado Customizado Ativo
+                if(btnClear) btnClear.classList.remove('hidden'); 
+                if(defaultSel) defaultSel.style.display = 'none';
                 let f = App.filters.comissoes;
-                if(infoDiv) infoDiv.innerHTML = `<i class="ph ph-funnel"></i> Filtrando de: ${U.date(f.start + 'T00:00:00').slice(0,10)} até ${U.date(f.end + 'T00:00:00').slice(0,10)} ${f.prof_name ? `| Colaborador(a): ${f.prof_name}` : ''}`;
+                if(infoDiv) infoDiv.innerHTML = `<i class="ph ph-funnel"></i> Busca Personalizada: ${U.date(f.start + 'T00:00:00').slice(0,10)} até ${U.date(f.end + 'T00:00:00').slice(0,10)} ${f.prof_name ? `| Colaborador(a): ${f.prof_name}` : ''}`;
             } else {
-                if(btnClear) btnClear.classList.add('hidden'); if(infoDiv) infoDiv.innerHTML = ''; if(defaultSel) defaultSel.style.display = 'block';
+                // Modo: Select Padrão
+                if(btnClear) btnClear.classList.add('hidden'); 
+                if(infoDiv) infoDiv.innerHTML = ''; 
+                if(defaultSel) defaultSel.style.display = 'block';
             }
         }
-        let query = db.from('comandas').select('*, clients(name)').order('created_at', {ascending: false});
         
-        if (App.filters.comissoes) {
+        let query = db.from('comandas').select('*, clients(name)').order('created_at', {ascending: false});
+        let profFilterActive = null;
+        
+        if (App.filters.comissoes && App.filters.comissoes.start) {
+            // Filtro Personalizado por Data
             let f = App.filters.comissoes;
+            profFilterActive = f.prof_id ? f : null;
             query = query.gte('created_at', f.start + 'T00:00:00Z').lte('created_at', f.end + 'T23:59:59Z').eq('status', 'fechada');
         } else {
-            const effRange = await U.getEffectiveRange();
-            query = query.gte('created_at', effRange.start + 'T00:00:00Z').lte('created_at', effRange.end + 'T23:59:59Z').eq('status', 'fechada');
+            // Filtro por Quinzena (Default ou Select)
+            let range;
+            const selectEl = document.getElementById('filter-comissao-quinzena');
+            if (quinzenaId) {
+                range = await U.getQuinzenaRealDates(quinzenaId);
+                if (selectEl) selectEl.value = quinzenaId; // Atualiza o select se foi chamado direto
+            } else if (selectEl && selectEl.value) {
+                range = await U.getQuinzenaRealDates(selectEl.value);
+            } else {
+                range = await U.getEffectiveRange();
+            }
+            query = query.gte('created_at', range.start + 'T00:00:00Z').lte('created_at', range.end + 'T23:59:59Z').eq('status', 'fechada');
+            
+            // Verifica se tem só filtro de profissional clicado pelo dono no ranking
+            if(App.filters.comissoes && App.filters.comissoes.prof_id) {
+                 profFilterActive = App.filters.comissoes;
+            }
         }
 
         const { data } = await query;
         let totalComissao = 0;
         let rank = {};
         let details = [];
-        let profFilterActive = (App.filters.comissoes && App.filters.comissoes.prof_id);
+        
         data.forEach(c => {
             if(!c.items) return;
             const clientName = c.clients?.name || 'Cliente';
@@ -1178,7 +1181,7 @@ const Render = {
                 let showCard = false;
                 if (isOwner) {
                     if (profFilterActive) {
-                        if (i.prof_id !== App.filters.comissoes.prof_id) return;
+                        if (i.prof_id !== profFilterActive.prof_id) return;
                     }
                     showCard = true;
                 } else {
@@ -1210,6 +1213,7 @@ const Render = {
                 }
             });
         });
+        
         const groupedDetails = {};
         details.forEach(d => {
             if(!groupedDetails[d.date]) groupedDetails[d.date] = [];
@@ -1242,16 +1246,18 @@ const Render = {
                 htmlCards += `</div></div>`;
             }
         }
+        
         let finalHtml = '';
         if(isOwner) {
             const sortedRank = Object.entries(rank).sort((a,b)=>b[1].total-a[1].total);
-            let titleTotal = profFilterActive ? `Total de Comissão de ${App.filters.comissoes.prof_name}` : `Total de Comissões Geradas (Todos)`;
+            let titleTotal = profFilterActive ? `Total de Comissão de ${profFilterActive.prof_name}` : `Total de Comissões Geradas (Todos)`;
             finalHtml = `<div class="card" style="margin-bottom:20px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); color:white; padding:2rem; box-shadow:0 10px 20px rgba(183, 110, 121, 0.3)">
             <h3 style="color:white; font-weight:400; opacity:0.9">${titleTotal}</h3>
             <div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div>
             </div>`;
             if (profFilterActive) {
-                finalHtml += `<h3 style="margin:20px 0 15px 0">Detalhamento por Dia</h3>${htmlCards}`;
+                finalHtml += `<button class="btn-secondary" style="margin-bottom:20px; width:auto; border:1px solid var(--primary); color:var(--primary)" onclick="Actions.clearProfFilterOnly()"><i class="ph ph-arrow-left"></i> Voltar para Ranking Geral</button>
+                <h3 style="margin:20px 0 15px 0">Detalhamento por Dia</h3>${htmlCards}`;
             } else {
                 finalHtml += `<h3 style="margin:20px 0 15px 0">Ranking de Comissionamento</h3>
                 <p style="font-size:0.85rem; color:var(--muted); margin-bottom:15px;"><i class="ph ph-info"></i> Clique no card do profissional para ver seus ganhos detalhados em lista.</p>
@@ -1362,27 +1368,34 @@ const Render = {
             if(rc) rc.innerHTML = '<p style="color:red; padding:20px;">Erro ao carregar dados. Verifique sua conexão ou tente novamente.</p>';
         }
     },
-    async relatorios() {
+    async relatorios(quinzenaId = null) {
         const relContainer = document.getElementById('relatorio-despesas-conteudo');
         if(relContainer) {
             let fDiv = document.getElementById('custom-filter-rel-div');
             if(!fDiv) {
                 fDiv = document.createElement('div'); fDiv.id = 'custom-filter-rel-div';
                 fDiv.style = "margin-bottom:15px; display:flex; gap:10px; flex-wrap:wrap; align-items:center;";
-                fDiv.innerHTML = `<button class="btn-secondary" style="width:auto; border:1px solid var(--primary); color:var(--primary)" onclick="Modals.open('filtro_relatorios')"><i class="ph ph-funnel"></i> Filtro Avançado (Período)</button>
-                <button id="btn-clear-rel" class="btn-secondary hidden" style="width:auto; color:#d32f2f; border:1px solid #d32f2f;" onclick="Actions.clearFilterRelatorios()"><i class="ph ph-x"></i> Limpar Filtro</button>
+                fDiv.innerHTML = `<button class="btn-secondary" style="width:auto; border:1px solid var(--primary); color:var(--primary)" onclick="Modals.open('filtro_relatorios')"><i class="ph ph-funnel"></i> Filtro Avançado (Data)</button>
+                <button id="btn-clear-rel" class="btn-secondary hidden" style="width:auto; color:#d32f2f; border:1px solid #d32f2f;" onclick="Actions.clearFilterRelatorios()"><i class="ph ph-x"></i> Limpar Filtro Customizado</button>
                 <div id="rel-filter-info" style="font-size:0.9rem; color:var(--primary-dark); font-weight:bold; width:100%;"></div>`;
                 relContainer.parentNode.insertBefore(fDiv, relContainer);
             }
-            const btnClear = document.getElementById('btn-clear-rel'); const infoDiv = document.getElementById('rel-filter-info'); const defaultSel = document.getElementById('filter-relatorios');
+            const btnClear = document.getElementById('btn-clear-rel'); 
+            const infoDiv = document.getElementById('rel-filter-info'); 
+            const defaultSel = document.getElementById('filter-relatorios');
+            
             if(App.filters.relatorios) {
-                if(btnClear) btnClear.classList.remove('hidden'); if(defaultSel) defaultSel.style.display = 'none';
+                if(btnClear) btnClear.classList.remove('hidden'); 
+                if(defaultSel) defaultSel.style.display = 'none';
                 let f = App.filters.relatorios;
-                if(infoDiv) infoDiv.innerHTML = `<i class="ph ph-funnel"></i> Filtrando de: ${U.date(f.start + 'T00:00:00').slice(0,10)} até ${U.date(f.end + 'T00:00:00').slice(0,10)} | Exibindo: ${f.tipo} ${f.prof_name ? `(${f.prof_name})` : ''}`;
+                if(infoDiv) infoDiv.innerHTML = `<i class="ph ph-funnel"></i> Busca: ${U.date(f.start + 'T00:00:00').slice(0,10)} até ${U.date(f.end + 'T00:00:00').slice(0,10)} | Exibindo: ${f.tipo} ${f.prof_name ? `(${f.prof_name})` : ''}`;
             } else {
-                if(btnClear) btnClear.classList.add('hidden'); if(infoDiv) infoDiv.innerHTML = ''; if(defaultSel) defaultSel.style.display = 'block';
+                if(btnClear) btnClear.classList.add('hidden'); 
+                if(infoDiv) infoDiv.innerHTML = ''; 
+                if(defaultSel) defaultSel.style.display = 'block';
             }
         }
+        
         let desp = [];
         
         if (App.filters.relatorios) {
@@ -1397,8 +1410,18 @@ const Render = {
                 desp = desp.filter(d => d.description.includes(`Comissão ${f.prof_name}:`));
             }
         } else {
-            const effRange = await U.getEffectiveRange();
-            const { data } = await db.from('despesas').select('*').gte('date', effRange.start + 'T00:00:00Z').lte('date', effRange.end + 'T23:59:59Z').order('date', {ascending: false});
+            let range;
+            const selectEl = document.getElementById('filter-relatorios');
+            if (quinzenaId) {
+                range = await U.getQuinzenaRealDates(quinzenaId);
+                if (selectEl) selectEl.value = quinzenaId;
+            } else if (selectEl && selectEl.value) {
+                range = await U.getQuinzenaRealDates(selectEl.value);
+            } else {
+                range = await U.getEffectiveRange();
+            }
+            
+            const { data } = await db.from('despesas').select('*').gte('date', range.start + 'T00:00:00Z').lte('date', range.end + 'T23:59:59Z').order('date', {ascending: false});
             desp = data || [];
         }
 
@@ -1407,18 +1430,21 @@ const Render = {
         let targetList = isReceitaFilter
         ? desp.filter(d => App.inflowCategories.includes(d.category))
         : desp.filter(d => !App.inflowCategories.includes(d.category));
+        
         let htmlDesp = '';
         if(targetList.length === 0) {
-            let msgText = isReceitaFilter ? 'Nenhuma entrada/receita encontrada nesse período.' : 'Sem gastos registrados para este filtro.';
-            htmlDesp = `<p style="color:var(--muted); text-align:center;">${msgText}</p>`;
+            let msgText = isReceitaFilter ? 'Nenhuma entrada/receita encontrada nesse período.' : 'Sem gastos registrados para este filtro/quinzena.';
+            htmlDesp = `<p style="color:var(--muted); text-align:center; padding: 2rem 0;">${msgText}</p>`;
         } else {
             htmlDesp = targetList.map(d => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b>${U.formatDesc(d.description)}</b><br><span style="font-size:0.8rem; color:#888"><i class="ph ph-clock"></i> ${U.date(d.date)}</span></div><div style="color:${isReceitaFilter ? '#2e7d32' : '#d32f2f'}; font-weight:bold">${isReceitaFilter ? '+' : '-'}${U.money(d.amount)}</div></div>`).join('');
         }
+        
         if(relContainer) relContainer.innerHTML = htmlDesp;
         window.currentDespesasData = targetList;
         window.currentRelatorioTipo = isReceitaFilter ? 'Receitas' : 'Despesas';
+        
         let htmlFluxo = '';
-        if(extrato.length === 0) { htmlFluxo = '<p style="color:var(--muted); text-align:center;">Nenhuma movimentação para este filtro.</p>'; }
+        if(extrato.length === 0) { htmlFluxo = '<p style="color:var(--muted); text-align:center; padding: 2rem 0;">Nenhuma movimentação para este filtro.</p>'; }
         else {
             htmlFluxo += `<div style="background:#f9f9f9; padding:15px; border-radius:8px; display:flex; justify-content:space-around; margin-bottom:15px;"><div>Entradas: <b style="color:#2e7d32">${U.money(totalIn)}</b></div><div>Saídas: <b style="color:#d32f2f">-${U.money(totalOut)}</b></div><div>Líquido: <b style="color:${(totalIn-totalOut)>=0?'#2e7d32':'#d32f2f'}">${U.money(totalIn-totalOut)}</b></div></div>`;
             htmlFluxo += extrato.map(i => `<div style="display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px dashed #eee;"><div><b style="color:${i.type==='in'?'#2e7d32':'#d32f2f'}">${i.type==='in'?'[+]':'[-]'}</b> ${U.formatDesc(i.desc)}<br><span style="font-size:0.8rem; color:#888; display:inline-block; margin-top:5px;"><i class="ph ph-clock"></i> ${U.date(i.date)}</span></div><div style="text-align:right"><b>${U.money(i.val)}</b><br><span style="font-size:0.75rem; color:#666">Caixa: ${U.money(i.saldo)}</span></div></div>`).join('');
@@ -1472,8 +1498,9 @@ const Modals = {
         let html = `<div class="modal"><button class="modal-close" onclick="Modals.close()"><i class="ph ph-x"></i></button>`;
         
         if(type === 'period_summary') {
-            const currentQ = U.getCurrentQuinzenaValue();
-            const range = U.getStandardQuinzenaDates(currentQ);
+            const effRange = await U.getEffectiveRange();
+            const currentQ = effRange.qId;
+            const range = await U.getQuinzenaRealDates(currentQ);
             let totalFaturado = 0;
             let totalAgendamentos = 0;
             try {
@@ -1485,7 +1512,7 @@ const Modals = {
 
             html += `
             <h3 style="text-align:center; color:var(--primary-dark)">Resumo da Quinzena Atual</h3>
-            <p style="text-align:center; color:var(--muted); margin-bottom:20px;">Período: ${currentQ}</p>
+            <p style="text-align:center; color:var(--muted); margin-bottom:20px;">ID do Período: ${currentQ}</p>
             
             <div class="summary-highlight" style="background: #f9f9f9; padding: 15px; border-radius: 12px; margin-bottom: 15px; border-left: 4px solid var(--primary);">
                 <div class="summary-row" style="display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem;"><span>Total Agendamentos:</span> <b style="color: var(--primary-dark);">${totalAgendamentos}</b></div>
@@ -1987,17 +2014,18 @@ const Actions = {
     },
     clearFilterComissoes() { App.filters.comissoes = null; Render.comissao(); },
     filterComissaoByProf(profId, profName) {
-        let s, e;
-        if(App.filters.comissoes) {
-            s = App.filters.comissoes.start;
-            e = App.filters.comissoes.end;
-        } else {
-            const qFilter = document.getElementById('filter-comissao-quinzena')?.value || U.getCurrentQuinzenaValue();
-            const range = U.getStandardQuinzenaDates(qFilter);
-            s = range.start;
-            e = range.end;
+        if (!App.filters.comissoes) App.filters.comissoes = {};
+        App.filters.comissoes.prof_id = profId;
+        App.filters.comissoes.prof_name = profName;
+        Render.comissao();
+    },
+    clearProfFilterOnly() {
+        if (App.filters.comissoes) {
+            delete App.filters.comissoes.prof_id;
+            delete App.filters.comissoes.prof_name;
+            // Se restou sem 'start', zera o filtro inteiro
+            if(!App.filters.comissoes.start) App.filters.comissoes = null;
         }
-        App.filters.comissoes = { start: s, end: e, prof_id: profId, prof_name: profName };
         Render.comissao();
     },
     async createReceita(e) {

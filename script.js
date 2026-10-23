@@ -337,8 +337,14 @@ const Perm = {
     },
 
     // Sincroniza com o banco (conta ativa, função e permissões) e atualiza a interface
+    _last: 0,
+    async refreshIfStale() {
+        if (Date.now() - this._last < 30000) { this.apply(); return; }
+        await this.refresh();
+    },
     async refresh() {
         if (!App.user) return;
+        this._last = Date.now();
         try {
             const { data: u } = await db.from('users').select('role, active, is_deleted').eq('id', App.user.id).maybeSingle();
             if (u) {
@@ -852,29 +858,36 @@ const Auth = {
     async success() {
         const authLayer = document.getElementById('auth-layer');
         const sysLayout = document.getElementById('system-layout');
-        
-        if(authLayer) authLayer.classList.add('hidden'); 
-        if(sysLayout) sysLayout.classList.remove('hidden'); 
+        if(authLayer) authLayer.classList.add('hidden');
+        if(sysLayout) sysLayout.classList.remove('hidden');
         document.body.classList.toggle('is-owner', App.role === 'owner');
-        
-        try {
-            const { data: set } = await db.from('settings').select('*').single();
-            if(set) { 
-                App.settings = set; 
-                const brand = document.getElementById('brand-name');
-                if(brand) brand.textContent = set.studio_name; 
-            }
-        } catch(e) { console.warn('Erro ao carregar settings:', e); }
 
-        App.avatars = {}; 
-        await this.fetchAllAvatars(); 
-        this.updateHeaderAvatar();
-        
-        await Perm.load();
-        Perm.apply();
-        U.initFilters(); 
-        Nav.init(); 
-        Render.showMonthView();
+        // 1) Mostra o sistema IMEDIATAMENTE (nada aqui depende da rede)
+        App.avatars = {};
+        try {
+            this.updateHeaderAvatar();
+            Perm.apply();
+            U.initFilters();
+            Nav.init();
+            Render.showMonthView();
+        } catch(e) { console.error('Erro ao iniciar interface:', e); }
+
+        // 2) Carrega o restante em paralelo, com limite de tempo, sem travar a tela
+        const safe = (p, ms = 8000) => Promise.race([Promise.resolve(p).catch(() => null), new Promise(r => setTimeout(() => r(null), ms))]);
+        safe(db.from('settings').select('*').limit(1).maybeSingle()).then(res => {
+            const set = res && res.data;
+            if(set) {
+                App.settings = set;
+                const brand = document.getElementById('brand-name');
+                if(brand && set.studio_name) brand.textContent = set.studio_name;
+            }
+        });
+        safe(Perm.load()).then(() => Perm.apply());
+        safe(this.fetchAllAvatars(), 15000).then(() => {
+            this.updateHeaderAvatar();
+            const dv = document.getElementById('agenda-day-view');
+            if(App.view === 'agenda' && dv && !dv.classList.contains('hidden')) Render.agendaDay();
+        });
     },
     updateHeaderAvatar() {
         const userEl = document.getElementById('header-user');
@@ -912,9 +925,9 @@ const Nav = {
         });
     },
     async showView(id) {
-        UI.showLoading('Carregando módulo...');
+        const _loadTimer = setTimeout(() => UI.showLoading('Carregando módulo...'), 300);
         try {
-            await Perm.refresh(); // sincroniza permissões com o banco
+            await Perm.refreshIfStale(); // sincroniza permissões com o banco (no máx. a cada 30s)
             if(!Perm.canView(id)) {
                 UI.toast('Você não tem acesso a esta área.', 'error');
                 id = 'agenda';
@@ -963,6 +976,7 @@ const Nav = {
             console.error("Erro na navegação:", e);
             UI.toast('Erro ao carregar a tela.', 'error');
         } finally {
+            clearTimeout(_loadTimer);
             UI.hideLoading();
         }
     },
@@ -1045,11 +1059,12 @@ const Render = {
             const dateStr = U.iso(App.currentDate);
             let query = db.from('appointments').select('*, clients(name, phone), services(name, duration), users!user_id(name)').eq('date', dateStr).neq('status', 'cancelado').order('time', {ascending: true});
             if (!Perm.can('agenda_ver_todos')) query = query.eq('user_id', App.user.id);
-            const { data: agData, error: errAg } = await query; if(errAg) throw errAg;
-            
+                        
             let uQuery = db.from('users').select('id, name, schedule, phone').neq('username', 'admin.teste').eq('active', true).neq('is_deleted', true).order('name');
             if(!Perm.can('agenda_ver_todos')) uQuery = uQuery.eq('id', App.user.id);
-            let { data: usersData } = await uQuery;
+            const [agRes, uRes] = await Promise.all([query, uQuery]);
+            const agData = agRes.data, errAg = agRes.error; if(errAg) throw errAg;
+            let usersData = uRes.data;
             
             if(usersData) {
                 const currentDayOfWeek = App.currentDate.getDay();
@@ -1184,10 +1199,13 @@ const Render = {
         if(error) return cont.innerHTML = `<p style='color:#d32f2f'><i class="ph ph-warning-circle"></i> Erro: ${error.message}</p>`; 
         if (!debts || debts.length === 0) return cont.innerHTML = `<p style='color:var(--muted)'>Nenhum registro ${tab === 'pendentes'?'em aberto':'pago'}.</p>`;
         
+        const allTickets = [...new Set(debts.flatMap(d => d.comanda_ticket ? d.comanda_ticket.split(', ').map(t => t.trim()) : []))];
+        const { data: allRelatedData } = allTickets.length ? await db.from('comandas').select('items, created_at, ticket').in('ticket', allTickets) : { data: [] };
+        const allRelated = allRelatedData || [];
         let htmlFinal = '';
         for (let d of debts) {
             const fTkt = `FAT-${d.id.substring(0,5).toUpperCase()}`; const ticketsArr = d.comanda_ticket ? d.comanda_ticket.split(', ').map(t => t.trim()) : [];
-            const { data: relatedComandas } = await db.from('comandas').select('items, created_at, ticket').in('ticket', ticketsArr);
+            const relatedComandas = allRelated.filter(rc => ticketsArr.includes(rc.ticket));
             let htmlList = ''; let profsEnvolvidos = [];
             if(relatedComandas) {
                 relatedComandas.forEach(rc => {
@@ -3025,7 +3043,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 splash.remove(); 
             }, 500); 
         } 
-    }, 4000);
+    }, 1200);
     
     Auth.init();
     Perm.init();

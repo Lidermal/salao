@@ -18,7 +18,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
     
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="style.css?v=20"> <!-- Versão atualizada -->
+    <link rel="stylesheet" href="style.css?v=21"> <!-- Versão atualizada -->
 </head>
 <body>
     <!-- SPLASH SCREEN -->
@@ -83,27 +83,28 @@
                 <a href="#" class="nav-link" data-view="perfil"><i class="ph ph-user-circle"></i> Meu Perfil</a>
                 <div class="nav-section">ATENDIMENTO</div>
                 <a href="#" class="nav-link active" data-view="agenda"><i class="ph ph-calendar"></i> Agenda</a>
-                <a href="#" class="nav-link" data-view="comandas"><i class="ph ph-receipt"></i> Comandas</a>
-                <a href="#" class="nav-link role-restricted" data-view="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
-                <a href="#" class="nav-link role-restricted" data-view="clientes"><i class="ph ph-users"></i> Clientes</a>
+                <a href="#" class="nav-link" data-view="comandas" data-perm="comandas"><i class="ph ph-receipt"></i> Comandas</a>
+                <a href="#" class="nav-link" data-view="cobrancas" data-perm="cobrancas"><i class="ph ph-credit-card"></i> Cobranças</a>
+                <a href="#" class="nav-link" data-view="clientes" data-perm="clientes"><i class="ph ph-users"></i> Clientes</a>
                 
-                <div class="nav-section owner-only">GESTÃO DE ESTOQUE</div>
-                <a href="#" class="nav-link owner-only" data-view="servicos"><i class="ph ph-sparkle"></i> Catálogo de Serviços</a>
-                <a href="#" class="nav-link owner-only" data-view="produtos"><i class="ph ph-package"></i> Controle de Produtos</a>
+                <div class="nav-section">GESTÃO DE ESTOQUE</div>
+                <a href="#" class="nav-link" data-view="servicos" data-perm="servicos"><i class="ph ph-sparkle"></i> Catálogo de Serviços</a>
+                <a href="#" class="nav-link" data-view="produtos" data-perm="produtos"><i class="ph ph-package"></i> Controle de Produtos</a>
                 
-                <div class="nav-section owner-only">GESTÃO FINANCEIRA</div>
-                <a href="#" class="nav-link owner-only" data-view="despesas"><i class="ph ph-trend-down"></i> Controle de Despesas</a>
-                <a href="#" class="nav-link" data-view="comissao"><i class="ph ph-money"></i> Comissionamento</a>
-                <a href="#" class="nav-link owner-only" data-view="resumo-financeiro"><i class="ph ph-bank"></i> Fluxo de Caixa</a>
-                <a href="#" class="nav-link owner-only" data-view="relatorios"><i class="ph ph-folder-open"></i> Relatórios & Arquivos</a>
+                <div class="nav-section">GESTÃO FINANCEIRA</div>
+                <a href="#" class="nav-link" data-view="despesas" data-perm="despesas"><i class="ph ph-trend-down"></i> Controle de Despesas</a>
+                <a href="#" class="nav-link" data-view="comissao" data-perm="comissao"><i class="ph ph-money"></i> Comissionamento</a>
+                <a href="#" class="nav-link" data-view="resumo-financeiro" data-perm="resumo-financeiro"><i class="ph ph-bank"></i> Fluxo de Caixa</a>
+                <a href="#" class="nav-link" data-view="relatorios" data-perm="relatorios"><i class="ph ph-folder-open"></i> Relatórios & Arquivos</a>
                 
-                <div class="nav-section owner-only">INTELIGÊNCIA & ADMIN</div>
-                <a href="#" class="nav-link owner-only" data-view="performance"><i class="ph ph-chart-line-up"></i> Painel de Performance</a>
-                <a href="#" class="nav-link owner-only" data-view="mensagens"><i class="ph ph-chat-circle-text"></i> Mensagens Prontas</a>
-                <a href="#" class="nav-link owner-only" data-view="funcionarios"><i class="ph ph-identification-badge"></i> Equipe / Colaboradores</a>
+                <div class="nav-section">INTELIGÊNCIA & ADMIN</div>
+                <a href="#" class="nav-link" data-view="performance" data-perm="performance"><i class="ph ph-chart-line-up"></i> Painel de Performance</a>
+                <a href="#" class="nav-link" data-view="mensagens" data-perm="mensagens"><i class="ph ph-chat-circle-text"></i> Mensagens Prontas</a>
+                <a href="#" class="nav-link" data-view="funcionarios" data-perm="admin"><i class="ph ph-identification-badge"></i> Equipe / Colaboradores</a>
+                <a href="#" class="nav-link nav-sub" data-view="controle-acesso" data-perm="admin"><i class="ph ph-shield-check"></i> Controle de Acesso</a>
                 
                 <div class="spacer" style="margin-top: 2rem;"></div>
-                <a href="#" class="nav-link owner-only" data-view="configuracoes"><i class="ph ph-gear"></i> Configurações</a>
+                <a href="#" class="nav-link" data-view="configuracoes" data-perm="configuracoes"><i class="ph ph-gear"></i> Configurações</a>
                 <a href="#" class="nav-link logout" onclick="Auth.logout()"><i class="ph ph-sign-out"></i> Sair</a>
             </nav>
         </aside>
@@ -142,8 +143,8 @@
                     <div style="display:flex; justify-content:space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 10px;">
                         <h2 id="day-view-title" class="hidden" style="color: var(--primary-dark); font-size: 1.3rem;">...</h2>
                         <div style="display: flex; gap: 10px; margin-left: auto;">
-                            <button id="btn-novo-agendamento-tour" class="btn-primary desktop-only" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem;" onclick="Modals.open('agendamento')"><i class="ph ph-plus"></i> Novo Agendamento</button>
-                            <button class="btn-secondary desktop-only" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem; border: 1px solid #d32f2f; color: #d32f2f;" onclick="Modals.open('bloquear_agenda')"><i class="ph ph-prohibit"></i> Bloquear</button>
+                            <button id="btn-novo-agendamento-tour" data-perm="agenda_criar" class="btn-primary desktop-only" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem;" onclick="Modals.open('agendamento')"><i class="ph ph-plus"></i> Novo Agendamento</button>
+                            <button class="btn-secondary desktop-only" data-perm="agenda_bloquear" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem; border: 1px solid #d32f2f; color: #d32f2f;" onclick="Modals.open('bloquear_agenda')"><i class="ph ph-prohibit"></i> Bloquear</button>
                             <button class="btn-secondary hidden" id="btn-voltar-mes" style="width:auto; padding: 0.6rem 1.2rem; font-size: 0.9rem;" onclick="Render.showMonthView()"><i class="ph ph-arrow-left"></i> Voltar ao Mês</button>
                         </div>
                     </div>
@@ -262,6 +263,15 @@
                     <div id="funcionarios-list" class="data-grid"></div>
                 </section>
                 
+                <!-- CONTROLE DE ACESSO (somente admin) -->
+                <section id="view-controle-acesso" class="view">
+                    <div class="card access-intro">
+                        <h3><i class="ph ph-shield-check"></i> Controle de Acesso</h3>
+                        <p>Escolha o que cada colaborador/freelancer pode ver e fazer no sistema. Toque no nome para abrir as permissões. Cada alteração é salva na hora e aplicada ao colaborador automaticamente.</p>
+                    </div>
+                    <div id="controle-acesso-list" class="data-list"></div>
+                </section>
+
                 <!-- DESPESAS -->
                 <section id="view-despesas" class="view">
                     <div style="display:flex; justify-content:space-between; margin-bottom:1rem; align-items:center; flex-wrap:wrap; gap:10px;">
@@ -349,9 +359,9 @@
         
         <nav class="bottom-nav">
             <a href="#" class="b-item active" data-view="agenda"><i class="ph ph-calendar"></i><span>Agenda</span></a>
-            <a href="#" class="b-item" data-view="comandas"><i class="ph ph-receipt"></i><span>Comandas</span></a>
+            <a href="#" class="b-item" data-view="comandas" data-perm="comandas"><i class="ph ph-receipt"></i><span>Comandas</span></a>
             <div class="fab-wrapper"><button class="fab-button" onclick="UI.handleFabClick()"><i class="ph ph-plus"></i></button></div>
-            <a href="#" class="b-item role-restricted" data-view="clientes"><i class="ph ph-users"></i><span>Clientes</span></a>
+            <a href="#" class="b-item" data-view="clientes" data-perm="clientes"><i class="ph ph-users"></i><span>Clientes</span></a>
             <a href="#" class="b-item" onclick="Nav.toggleMenu()"><i class="ph ph-list"></i><span>Menu</span></a>
         </nav>
     </div>
@@ -359,6 +369,6 @@
     <!-- MODAL CONTAINER (Dinâmico) -->
     <div id="modal-container" class="overlay hidden" style="z-index: 100000;"></div>
     
-    <script src="script.js?v=20"></script>
+    <script src="script.js?v=21"></script>
 </body>
 </html>

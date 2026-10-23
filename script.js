@@ -233,11 +233,263 @@ const UI = {
     },
     handleFabClick() {
         const v = App.view;
-        if(v === 'agenda') Modals.open('agendamento'); else if(v === 'comandas') Modals.open('comanda');
-        else if(v === 'clientes') Modals.open('cliente'); else if(v === 'funcionarios' && App.role === 'owner') Modals.open('funcionario');
-        else if(v === 'servicos' && App.role === 'owner') Modals.open('servico'); else if(v === 'produtos' && App.role === 'owner') Modals.open('produto');
-        else if(v === 'mensagens' && App.role === 'owner') Modals.open('mensagem'); else if(v === 'despesas' && App.role === 'owner') Modals.open('despesa');
+        if(v === 'agenda') {
+            if(Perm.can('agenda_criar')) Modals.open('agendamento'); else this.toast('Você não tem permissão para criar agendamentos.', 'error');
+        }
+        else if(v === 'comandas' && Perm.canView('comandas')) Modals.open('comanda');
+        else if(v === 'clientes' && Perm.canView('clientes')) Modals.open('cliente');
+        else if(v === 'funcionarios' && App.role === 'owner') Modals.open('funcionario');
+        else if(v === 'servicos' && Perm.canView('servicos')) Modals.open('servico');
+        else if(v === 'produtos' && Perm.canView('produtos')) Modals.open('produto');
+        else if(v === 'mensagens' && Perm.canView('mensagens')) Modals.open('mensagem');
+        else if(v === 'despesas' && Perm.canView('despesas')) Modals.open('despesa');
         else this.toast('Utilize os botões na tela para cadastros rápidos.', 'error');
+    }
+};
+
+// ============================================
+// CONTROLE DE ACESSO (PERMISSÕES POR COLABORADOR)
+// Tabela Supabase: access_permissions (user_id, permissions jsonb)
+// Proprietário (owner) sempre tem acesso total.
+// ============================================
+const Perm = {
+    // Páginas que podem ser liberadas/bloqueadas
+    pages: [
+        { key: 'clientes',          icon: 'ph-users',            label: 'Clientes',                desc: 'Cadastro, perfil e observações dos clientes.' },
+        { key: 'cobrancas',         icon: 'ph-credit-card',      label: 'Cobranças',               desc: 'Ver faturas e receber pagamentos pendentes.' },
+        { key: 'comandas',          icon: 'ph-receipt',          label: 'Comandas',                desc: 'Abrir comandas e lançar itens.' },
+        { key: 'comissao',          icon: 'ph-money',            label: 'Comissionamento',         desc: 'Ver os próprios ganhos e comissões.' },
+        { key: 'servicos',          icon: 'ph-sparkle',          label: 'Catálogo de Serviços',    desc: 'Ver, criar e editar serviços e preços.', sensitive: true },
+        { key: 'produtos',          icon: 'ph-package',          label: 'Controle de Produtos',    desc: 'Ver estoque e repor produtos.' },
+        { key: 'despesas',          icon: 'ph-trend-down',       label: 'Controle de Despesas',    desc: 'Ver e lançar despesas.', sensitive: true },
+        { key: 'resumo-financeiro', icon: 'ph-bank',             label: 'Fluxo de Caixa',          desc: 'Ver caixa, extrato e fechar quinzena.', sensitive: true },
+        { key: 'relatorios',        icon: 'ph-folder-open',      label: 'Relatórios & Arquivos',   desc: 'Ver e exportar relatórios em PDF.', sensitive: true },
+        { key: 'performance',       icon: 'ph-chart-line-up',    label: 'Painel de Performance',   desc: 'KPIs e rankings do estúdio.', sensitive: true },
+        { key: 'mensagens',         icon: 'ph-chat-circle-text', label: 'Mensagens Prontas',       desc: 'Templates de mensagens de WhatsApp.' },
+        { key: 'configuracoes',     icon: 'ph-gear',             label: 'Configurações',           desc: 'Alterar nome e WhatsApp oficial do estúdio.', sensitive: true }
+    ],
+    // Ações dentro da Agenda
+    actions: [
+        { key: 'agenda_ver_todos', icon: 'ph-eye',            label: 'Ver agenda de todos os profissionais', desc: 'Desligado: vê apenas os próprios atendimentos.' },
+        { key: 'agenda_criar',     icon: 'ph-calendar-plus',  label: 'Criar agendamentos',                   desc: 'Botões "Novo Agendamento" e "+" da agenda.' },
+        { key: 'agenda_editar',    icon: 'ph-pencil-simple',  label: 'Editar agendamentos',                  desc: 'Alterar cliente, serviço, profissional, data e hora.' },
+        { key: 'agenda_chegada',   icon: 'ph-check-circle',   label: 'Marcar "Cliente chegou"',              desc: 'Confirmar a chegada do cliente.' },
+        { key: 'agenda_cancelar',  icon: 'ph-x-circle',       label: 'Cancelar agendamentos',                desc: 'Cancelar horários já marcados.' },
+        { key: 'agenda_bloquear',  icon: 'ph-prohibit',       label: 'Bloquear horários',                    desc: 'Criar bloqueios de horário na agenda.' }
+    ],
+    // Padrão = comportamento original do sistema para colaboradores
+    defaults: {
+        clientes: false, cobrancas: false, comandas: true, comissao: true,
+        servicos: false, produtos: false, despesas: false, 'resumo-financeiro': false,
+        relatorios: false, performance: false, mensagens: false, configuracoes: false,
+        agenda_ver_todos: false, agenda_criar: true, agenda_editar: true,
+        agenda_chegada: true, agenda_cancelar: true, agenda_bloquear: true
+    },
+    // Qual permissão libera cada tela (agenda e perfil são sempre liberadas)
+    viewMap: {
+        clientes: 'clientes', observacoes: 'clientes', 'perfil-cliente': 'clientes',
+        cobrancas: 'cobrancas', comandas: 'comandas', comissao: 'comissao',
+        servicos: 'servicos', produtos: 'produtos', despesas: 'despesas',
+        'resumo-financeiro': 'resumo-financeiro', relatorios: 'relatorios',
+        performance: 'performance', mensagens: 'mensagens', configuracoes: 'configuracoes'
+    },
+    adminViews: ['funcionarios', 'controle-acesso'],
+    cache: null,
+    adminData: {},
+    _timer: null,
+
+    esc(t) { return String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); },
+
+    resolve(stored) {
+        const out = { ...this.defaults };
+        if (stored && typeof stored === 'object') {
+            Object.keys(this.defaults).forEach(k => { if (typeof stored[k] === 'boolean') out[k] = stored[k]; });
+        }
+        return out;
+    },
+
+    can(key) {
+        if (key === 'admin') return App.role === 'owner';
+        if (App.role === 'owner') return true;
+        const p = this.cache || this.defaults;
+        return p[key] === true;
+    },
+
+    canView(view) {
+        if (this.adminViews.includes(view)) return App.role === 'owner';
+        const key = this.viewMap[view];
+        if (!key) return true;
+        return this.can(key);
+    },
+
+    // Lê do banco as permissões do usuário logado
+    async load() {
+        if (!App.user) return;
+        if (App.role === 'owner') { this.cache = null; return; }
+        try {
+            const { data, error } = await db.from('access_permissions').select('permissions').eq('user_id', App.user.id).maybeSingle();
+            if (error) throw error;
+            this.cache = this.resolve(data ? data.permissions : null);
+        } catch (e) {
+            console.warn('Permissões: usando padrão (' + (e.message || e) + ')');
+            this.cache = this.cache || this.resolve(null);
+        }
+    },
+
+    // Sincroniza com o banco (conta ativa, função e permissões) e atualiza a interface
+    async refresh() {
+        if (!App.user) return;
+        try {
+            const { data: u } = await db.from('users').select('role, active, is_deleted').eq('id', App.user.id).maybeSingle();
+            if (u) {
+                if (u.active === false || u.is_deleted === true) {
+                    UI.toast('Sua conta foi desativada. Saindo...', 'error');
+                    setTimeout(() => window.location.reload(true), 1500);
+                    return;
+                }
+                const newRole = (u.role === 'freelancer' || u.role === 'colaborador') ? 'colaborador' : 'owner';
+                if (newRole !== App.role) {
+                    App.role = newRole;
+                    document.body.classList.toggle('is-owner', newRole === 'owner');
+                }
+            }
+        } catch (e) { /* mantém estado atual */ }
+        await this.load();
+        this.apply();
+    },
+
+    // Refresh + redireciona se a tela atual deixou de ser permitida (usado em segundo plano)
+    async sync() {
+        if (!App.user) return;
+        await this.refresh();
+        if (!this.canView(App.view)) {
+            UI.toast('Seu acesso a esta área foi alterado pelo administrador.', 'error');
+            Nav.showView('agenda');
+        }
+    },
+
+    // Mostra/esconde menus e botões conforme as permissões
+    apply() {
+        document.querySelectorAll('[data-perm]').forEach(el => {
+            el.classList.toggle('perm-hidden', !this.can(el.dataset.perm));
+        });
+        document.querySelectorAll('#main-sidebar .nav-section').forEach(sec => {
+            let n = sec.nextElementSibling, any = false;
+            while (n && !n.classList.contains('nav-section') && !n.classList.contains('spacer')) {
+                if (n.matches('.nav-link') && !n.classList.contains('perm-hidden')) any = true;
+                n = n.nextElementSibling;
+            }
+            sec.classList.toggle('perm-hidden', !any);
+        });
+    },
+
+    init() {
+        document.addEventListener('visibilitychange', () => { if (!document.hidden) this.sync(); });
+        if (this._timer) clearInterval(this._timer);
+        this._timer = setInterval(() => { if (App.user && !document.hidden) this.sync(); }, 30000);
+    },
+
+    // ---------- TELA ADMIN: CONTROLE DE ACESSO ----------
+    count(p) { return [...this.pages, ...this.actions].filter(i => p[i.key]).length; },
+
+    renderCard(entry) {
+        const u = entry.user, p = entry.perms;
+        const total = this.pages.length + this.actions.length;
+        const av = App.avatars && App.avatars[u.id];
+        const avStyle = av ? `background-image:url(${av}); background-size:cover; background-position:center; color:transparent;` : '';
+        const row = it => `
+            <label class="perm-row">
+                <div class="perm-info">
+                    <span class="perm-label"><i class="ph ${it.icon}"></i> ${it.label}${it.sensitive ? '<em class="perm-tag">Sensível</em>' : ''}</span>
+                    <span class="perm-desc">${it.desc}</span>
+                </div>
+                <span class="switch">
+                    <input type="checkbox" data-uid="${u.id}" data-key="${it.key}" ${p[it.key] ? 'checked' : ''} onchange="Perm.toggle('${u.id}', '${it.key}', this)">
+                    <span class="slider"></span>
+                </span>
+            </label>`;
+        return `
+        <details class="card perm-card" id="perm-card-${u.id}">
+            <summary>
+                <div class="perm-avatar" style="${avStyle}">${av ? '' : this.esc(u.name).substring(0, 2).toUpperCase()}</div>
+                <div class="perm-summary-info">
+                    <h4>${this.esc(u.name)}</h4>
+                    <span>Login: ${this.esc(u.username)}</span>
+                </div>
+                <span class="perm-count" id="perm-count-${u.id}">${this.count(p)}/${total}</span>
+                <i class="ph ph-caret-down perm-caret"></i>
+            </summary>
+            <div class="perm-body">
+                <div class="perm-bulk">
+                    <button type="button" class="btn-secondary" onclick="Perm.setAll('${u.id}', 'default')"><i class="ph ph-arrow-counter-clockwise"></i> Restaurar padrão</button>
+                    <button type="button" class="btn-secondary" onclick="Perm.setAll('${u.id}', 'all')"><i class="ph ph-lock-key-open"></i> Liberar tudo</button>
+                    <button type="button" class="btn-secondary" style="color:#d32f2f" onclick="Perm.setAll('${u.id}', 'none')"><i class="ph ph-lock-key"></i> Bloquear tudo</button>
+                </div>
+                <h4 class="perm-group-title"><i class="ph ph-browsers"></i> Páginas do sistema</h4>
+                ${this.pages.map(row).join('')}
+                <h4 class="perm-group-title"><i class="ph ph-calendar"></i> Ações na Agenda</h4>
+                ${this.actions.map(row).join('')}
+                <p class="perm-note"><i class="ph ph-info"></i> Agenda e Meu Perfil estão sempre disponíveis. As alterações são salvas na hora e aplicadas ao colaborador em até 30 segundos (ou ao trocar de tela).</p>
+            </div>
+        </details>`;
+    },
+
+    updateCount(uid) {
+        const el = document.getElementById(`perm-count-${uid}`);
+        const entry = this.adminData[uid];
+        if (el && entry) el.textContent = `${this.count(entry.perms)}/${this.pages.length + this.actions.length}`;
+    },
+
+    // Grava o estado atual do colaborador no Supabase (fila: evita gravações fora de ordem)
+    save(uid) {
+        const entry = this.adminData[uid];
+        entry.queue = (entry.queue || Promise.resolve()).catch(() => {}).then(async () => {
+            const { error } = await db.from('access_permissions').upsert({
+                user_id: uid,
+                permissions: entry.perms,
+                updated_at: new Date().toISOString(),
+                updated_by: App.user.id
+            }, { onConflict: 'user_id' });
+            if (error) throw error;
+        });
+        return entry.queue;
+    },
+
+    async toggle(uid, key, el) {
+        if (App.role !== 'owner') { el.checked = !el.checked; return UI.toast('Apenas o administrador pode alterar permissões.', 'error'); }
+        const entry = this.adminData[uid];
+        if (!entry) return;
+        const prev = !el.checked;
+        entry.perms[key] = el.checked;
+        this.updateCount(uid);
+        try {
+            await this.save(uid);
+            UI.toast(`${el.checked ? 'Liberado' : 'Bloqueado'} para ${entry.user.name.split(' ')[0]}.`);
+        } catch (e) {
+            entry.perms[key] = prev; el.checked = prev; this.updateCount(uid);
+            UI.toast('Erro ao salvar: ' + (e.message || e), 'error');
+        }
+    },
+
+    async setAll(uid, mode) {
+        if (App.role !== 'owner') return UI.toast('Apenas o administrador pode alterar permissões.', 'error');
+        const entry = this.adminData[uid];
+        if (!entry) return;
+        const backup = { ...entry.perms };
+        const next = {};
+        Object.keys(this.defaults).forEach(k => { next[k] = mode === 'default' ? this.defaults[k] : (mode === 'all'); });
+        entry.perms = next;
+        document.querySelectorAll(`#perm-card-${uid} input[data-key]`).forEach(inp => { inp.checked = !!next[inp.dataset.key]; });
+        this.updateCount(uid);
+        try {
+            await this.save(uid);
+            UI.toast(mode === 'default' ? 'Permissões restauradas ao padrão.' : (mode === 'all' ? 'Todas as permissões liberadas.' : 'Todas as permissões bloqueadas.'));
+        } catch (e) {
+            entry.perms = backup;
+            document.querySelectorAll(`#perm-card-${uid} input[data-key]`).forEach(inp => { inp.checked = !!backup[inp.dataset.key]; });
+            this.updateCount(uid);
+            UI.toast('Erro ao salvar: ' + (e.message || e), 'error');
+        }
     }
 };
 
@@ -340,12 +592,13 @@ const Tour = {
         { role: 'owner', view: 'resumo-financeiro', center: true, title: '10. Fluxo de Caixa', text: 'Lucro líquido e extrato.' },
         { role: 'owner', view: 'performance', center: true, title: '11. Performance', text: 'KPIs e rankings.' },
         { role: 'owner', view: 'funcionarios', center: true, title: '12. Equipe', text: 'Usuários e acessos.' },
+        { role: 'owner', view: 'controle-acesso', center: true, title: '12. Controle de Acesso', text: 'Defina o que cada colaborador pode ver e fazer.' },
         { role: 'owner', view: 'relatorios', target: '#filter-relatorios', mobileTarget: '#filter-relatorios', title: '13. Relatórios', text: 'Exportação PDF.' },
         { role: 'owner', view: 'configuracoes', target: '#cfg-name', mobileTarget: '#cfg-name', title: '14. Configurações', text: 'Dados do estúdio.' }
     ],
     steps: [], current: 0,
     start() {
-        if (App.role === 'owner') { this.steps = [...this.allSteps]; } else { this.steps = this.allSteps.filter(s => s.role === 'all'); }
+        this.steps = this.allSteps.filter(s => Perm.canView(s.view));
         this.steps.forEach((s, index) => { s.title = s.title.replace(/^\d+\./, `${index + 1}.`); });
         this.current = 0; 
         const overlay = document.getElementById('tour-overlay');
@@ -617,6 +870,8 @@ const Auth = {
         await this.fetchAllAvatars(); 
         this.updateHeaderAvatar();
         
+        await Perm.load();
+        Perm.apply();
         U.initFilters(); 
         Nav.init(); 
         Render.showMonthView();
@@ -659,6 +914,11 @@ const Nav = {
     async showView(id) {
         UI.showLoading('Carregando módulo...');
         try {
+            await Perm.refresh(); // sincroniza permissões com o banco
+            if(!Perm.canView(id)) {
+                UI.toast('Você não tem acesso a esta área.', 'error');
+                id = 'agenda';
+            }
             App.view = id;
             document.querySelectorAll('.view').forEach(v => v.classList.remove('active')); 
             const viewEl = document.getElementById(`view-${id}`);
@@ -667,7 +927,7 @@ const Nav = {
             document.querySelectorAll('.nav-link, .b-item').forEach(el => el.classList.remove('active')); 
             document.querySelectorAll(`[data-view="${id}"]`).forEach(el => el.classList.add('active'));
             
-            const titles = { perfil: 'Meu Perfil', agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', observacoes:'Histórico de Observações', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', relatorios:'Relatórios & Arquivos' };
+            const titles = { perfil: 'Meu Perfil', agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', observacoes:'Histórico de Observações', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', 'controle-acesso':'Controle de Acesso', relatorios:'Relatórios & Arquivos' };
             const pageTitle = document.getElementById('page-title');
             if(pageTitle) pageTitle.textContent = titles[id] || 'Amor que Cuida';
             
@@ -745,7 +1005,7 @@ const Render = {
         let monthApps = [];
         try {
             let query = db.from('appointments').select('date, status').gte('date', startDate).lte('date', endDate).neq('status', 'cancelado');
-            if(App.role !== 'owner') query = query.eq('user_id', App.user.id);
+            if(!Perm.can('agenda_ver_todos')) query = query.eq('user_id', App.user.id);
             const { data } = await query; if(data) monthApps = data;
         } catch(e) {}
         
@@ -784,11 +1044,11 @@ const Render = {
         try {
             const dateStr = U.iso(App.currentDate);
             let query = db.from('appointments').select('*, clients(name, phone), services(name, duration), users!user_id(name)').eq('date', dateStr).neq('status', 'cancelado').order('time', {ascending: true});
-            if (App.role !== 'owner') query = query.eq('user_id', App.user.id);
+            if (!Perm.can('agenda_ver_todos')) query = query.eq('user_id', App.user.id);
             const { data: agData, error: errAg } = await query; if(errAg) throw errAg;
             
             let uQuery = db.from('users').select('id, name, schedule, phone').neq('username', 'admin.teste').eq('active', true).neq('is_deleted', true).order('name');
-            if(App.role !== 'owner') uQuery = uQuery.eq('id', App.user.id);
+            if(!Perm.can('agenda_ver_todos')) uQuery = uQuery.eq('id', App.user.id);
             let { data: usersData } = await uQuery;
             
             if(usersData) {
@@ -838,7 +1098,7 @@ const Render = {
                     const top = startMins * pixelsPerMin; const height = blockDuration * pixelsPerMin; const isBlocked = a.status === 'bloqueado'; const isEncaixe = a.is_encaixe; const isCompact = blockDuration <= 45;
                     let bg = isBlocked ? '#f0f0f0' : '#ffe3e8'; let color = isBlocked ? '#616161' : '#880e4f'; let border = isBlocked ? '#9e9e9e' : '#d81b60'; if(a.status === 'chegou') { bg = '#dcedc8'; border = '#689f38'; color = '#33691e'; }
                     const wppBtn = (!isBlocked && a.status === 'agendado') ? `<button onclick="event.stopPropagation(); Actions.sendConfirmacao('${a.id}')"><i class="ph ph-whatsapp-logo"></i></button>` : '';
-                    const chkBtn = (!isBlocked && a.status === 'agendado') ? `<button onclick="event.stopPropagation(); Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i></button>` : '';
+                    const chkBtn = (!isBlocked && a.status === 'agendado' && Perm.can('agenda_chegada')) ? `<button onclick="event.stopPropagation(); Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i></button>` : '';
                     let extraStyle = isEncaixe ? 'width: 80%; left: 10%; z-index: 10; box-shadow: -4px 4px 15px rgba(0,0,0,0.15); border-left-width: 6px;' : 'width: 96%; left: 2%;';
                     html += `<div class="agenda-card ${isCompact ? 'compact' : ''}" style="position: absolute; top:${top}px; height:${height}px; background:${bg}; border-left:4px solid ${border}; color:${color}; border-radius: 6px; padding: 6px; overflow: hidden; font-size: 0.85rem; cursor: pointer; transition: 0.2s; ${extraStyle}" onclick="Modals.open('detalhes_agendamento', '${a.id}')">
                     <div class="ac-time" style="font-size: 0.75rem; opacity: 0.8; margin-bottom: 2px;">${a.time.slice(0,5)} - ${endStr.slice(0,5)}</div><div class="ac-title" style="font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"><i class="ph ${isBlocked ? 'ph-prohibit' : 'ph-user'}"></i> ${isBlocked ? 'Bloqueado' : (a.clients?.name || 'Cliente')}</div><div class="ac-sub" style="font-size: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${!isBlocked ? (a.services?.name || '') : (a.notes || '')}</div><div class="ac-actions" style="position: absolute; right: 5px; top: 5px; display: flex; gap: 5px;">${chkBtn} ${wppBtn}</div></div>`;
@@ -1041,6 +1301,34 @@ const Render = {
         list.innerHTML = data.map(u => {
             const isActive = u.active !== false; return `<div class="card" style="border-left: 4px solid ${isActive ? 'var(--primary)' : '#999'}; opacity: ${isActive ? '1' : '0.6'}"><h4 style="font-size:1.2rem; margin-bottom:5px">${u.name}</h4><p style="font-size:0.9rem; color:var(--muted)"><i class="ph ph-user"></i> Login: <b>${u.username}</b></p><p style="font-size:0.8rem; margin-top:5px; padding:3px 8px; border-radius:10px; display:inline-block; background:${u.role==='owner'?'#ffebee':'#e8f5e9'}; color:${u.role==='owner'?'#d32f2f':'#2e7d32'}">${u.role.toUpperCase()}</p>${!isActive ? `<p style="font-size:0.8rem; color:#d32f2f; margin-top:5px; font-weight:bold">CONTA DESATIVADA</p>` : ''}<div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap"><button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Modals.open('edit_funcionario', '${u.id}')"><i class="ph ph-pencil"></i> Editar Perfil</button><button class="btn-secondary" style="flex:1; min-width:120px; ${isActive ? 'color:#d32f2f;' : 'color:#2e7d32;'}" onclick="Actions.toggleFuncionarioStatus('${u.id}', ${isActive})"><i class="ph ${isActive ? 'ph-prohibit' : 'ph-check-circle'}"></i> ${isActive ? 'Desativar' : 'Ativar'}</button><button class="btn-secondary" style="flex:1; min-width:120px; color:#d32f2f;" onclick="Actions.deleteFuncionario('${u.id}')"><i class="ph ph-trash"></i> Excluir</button></div></div>`;
         }).join('');
+    },
+    async 'controle-acesso'() {
+        const cont = document.getElementById('controle-acesso-list');
+        if(!cont) return;
+        if(App.role !== 'owner') {
+            cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem 1rem"><i class="ph ph-lock" style="font-size:3rem; color:var(--muted)"></i><p style="color:var(--muted); margin-top:10px">Acesso restrito ao administrador.</p></div>`;
+            return;
+        }
+        cont.innerHTML = `<p style="color:var(--muted); padding:1rem">Carregando colaboradores...</p>`;
+        const [uRes, pRes] = await Promise.all([
+            db.from('users').select('id, name, username, role').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true).order('name'),
+            db.from('access_permissions').select('user_id, permissions')
+        ]);
+        if(uRes.error) { cont.innerHTML = `<p style="color:#d32f2f; padding:1rem"><i class="ph ph-warning-circle"></i> Erro ao carregar usuários: ${Perm.esc(uRes.error.message)}</p>`; return; }
+        if(pRes.error) {
+            cont.innerHTML = `<div class="card" style="border-left:5px solid #d32f2f"><h4 style="color:#d32f2f; margin-bottom:8px"><i class="ph ph-warning-circle"></i> Tabela de permissões não encontrada</h4><p style="color:var(--muted); font-size:0.9rem">Execute o script <b>supabase_controle_acesso.sql</b> no SQL Editor do Supabase e recarregue esta tela.<br><small>Detalhe: ${Perm.esc(pRes.error.message)}</small></p></div>`;
+            return;
+        }
+        const stored = {};
+        (pRes.data || []).forEach(r => { stored[r.user_id] = r.permissions; });
+        const colabs = (uRes.data || []).filter(u => u.role !== 'owner');
+        Perm.adminData = {};
+        colabs.forEach(u => { Perm.adminData[u.id] = { user: u, perms: Perm.resolve(stored[u.id]) }; });
+        if(colabs.length === 0) {
+            cont.innerHTML = `<div class="card" style="text-align:center; padding:3rem 1rem"><i class="ph ph-users" style="font-size:3rem; color:var(--muted)"></i><p style="color:var(--muted); margin-top:10px">Nenhum colaborador ativo para configurar.<br>Cadastre em <b>Equipe / Colaboradores</b>.</p></div>`;
+            return;
+        }
+        cont.innerHTML = colabs.map(u => Perm.renderCard(Perm.adminData[u.id])).join('');
     },
     async despesas() {
         try {
@@ -1495,6 +1783,8 @@ const Modals = {
     async open(type, param1=null, param2=null, param3=null) {
         const cont = document.getElementById('modal-container');
         if(!cont) return;
+        const modalGuards = { agendamento: 'agenda_criar', bloquear_agenda: 'agenda_bloquear', edit_agendamento: 'agenda_editar' };
+        if(modalGuards[type] && !Perm.can(modalGuards[type])) return UI.toast('Você não tem permissão para esta ação.', 'error');
         let html = `<div class="modal"><button class="modal-close" onclick="Modals.close()"><i class="ph ph-x"></i></button>`;
         
         if(type === 'period_summary') {
@@ -1574,15 +1864,18 @@ const Modals = {
                  </div>
                  ${a.is_encaixe ? `<p style="color:#e65100; font-weight:bold; background:#fff3e0; padding:10px; border-radius:8px; text-align:center;"><i class="ph ph-warning"></i> Encaixe Forçado</p>` : ''}
                  </div><div style="display:flex; flex-direction:column; gap:10px;">
-                 ${a.status === 'agendado' ? `<button class="btn-primary" style="background:#2e7d32; padding:1.2rem; width:100%" onclick="Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i> Cliente Chegou</button>` : ''}
-                 <button class="btn-secondary" style="color:#d32f2f; border:1px solid #d32f2f; padding:1.2rem; width:100%" onclick="Actions.cancelAppointment('${a.id}')"><i class="ph ph-x"></i> Cancelar</button>
+                 ${(a.status === 'agendado' && Perm.can('agenda_chegada')) ? `<button class="btn-primary" style="background:#2e7d32; padding:1.2rem; width:100%" onclick="Actions.markAsArrived('${a.id}')"><i class="ph ph-check"></i> Cliente Chegou</button>` : ''}
+                 <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                 ${Perm.can('agenda_editar') ? `<button class="btn-secondary" style="flex:1 1 140px; width:auto; color:var(--primary-dark); border:1px solid var(--primary); background:var(--primary-light); padding:1.2rem;" onclick="Modals.open('edit_agendamento', '${a.id}')"><i class="ph ph-pencil-simple"></i> Editar</button>` : ''}
+                 ${Perm.can('agenda_cancelar') ? `<button class="btn-secondary" style="flex:1 1 140px; width:auto; color:#d32f2f; border:1px solid #d32f2f; padding:1.2rem;" onclick="Actions.cancelAppointment('${a.id}')"><i class="ph ph-x"></i> Cancelar</button>` : ''}
+                 </div>
                  </div>`;
              }
         }
         else if(type === 'menu_agenda_mobile') {
             html += `<div style="text-align: center; margin-bottom: 20px;"><h3 style="margin: 0; color: var(--primary-dark);">O que deseja fazer?</h3></div><div style="display:flex; flex-direction:column; gap:10px;">
-            <button class="btn-primary" style="padding:1.2rem; font-size:1.1rem; justify-content:flex-start" onclick="Modals.open('agendamento', '${param1}', '${param2}', '${param3}')"><i class="ph ph-calendar-plus" style="font-size:1.5rem; margin-right:10px;"></i> Agendar Cliente</button>
-            <button class="btn-secondary" style="padding:1.2rem; font-size:1.1rem; border: 1px solid #d32f2f; color: #d32f2f; background: #ffebee; justify-content:flex-start" onclick="Modals.open('bloquear_agenda', '${param1}', '${param2}', '${param3}')"><i class="ph ph-prohibit" style="font-size:1.5rem; margin-right:10px;"></i> Bloquear Horário</button>
+            ${Perm.can('agenda_criar') ? `<button class="btn-primary" style="padding:1.2rem; font-size:1.1rem; justify-content:flex-start" onclick="Modals.open('agendamento', '${param1}', '${param2}', '${param3}')"><i class="ph ph-calendar-plus" style="font-size:1.5rem; margin-right:10px;"></i> Agendar Cliente</button>` : ''}
+            ${Perm.can('agenda_bloquear') ? `<button class="btn-secondary" style="padding:1.2rem; font-size:1.1rem; border: 1px solid #d32f2f; color: #d32f2f; background: #ffebee; justify-content:flex-start" onclick="Modals.open('bloquear_agenda', '${param1}', '${param2}', '${param3}')"><i class="ph ph-prohibit" style="font-size:1.5rem; margin-right:10px;"></i> Bloquear Horário</button>` : ''}
             </div>`;
         }
         else if(type === 'menu_indisponivel') {
@@ -1728,6 +2021,47 @@ const Modals = {
             <div class="input-group" style="background:#fff3e0; padding:10px; border-radius:8px; border:1px solid #ffb74d;"><label style="margin:0; color:#e65100; cursor:pointer;"><input type="checkbox" id="fa-encaixe"> Forçar Encaixe (Ignora conflitos)</label></div>
             <div style="display:flex; gap:10px;"><div class="input-group"><label>Data</label><input type="date" id="fa-date" value="${param3||''}" required></div><div class="input-group"><label>Hora</label><input type="time" id="fa-time" value="${param2||''}" required></div></div>
             <button type="submit" class="btn-primary" style="padding:1.2rem;">Confirmar Horário</button></form>`;
+        }
+        else if(type === 'edit_agendamento') {
+            const { data: a, error: aErr } = await db.from('appointments').select('*, clients(name), services(name, duration), users!user_id(name)').eq('id', param1).single();
+            if(aErr || !a) return UI.toast('Erro ao carregar o agendamento.', 'error');
+            if(!['agendado', 'chegou'].includes(a.status)) return UI.toast('Este agendamento não pode mais ser editado.', 'error');
+            const [c, s, u] = await Promise.all([
+                db.from('clients').select('id,name').order('name'),
+                db.from('services').select('id,name,duration').order('name'),
+                db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true).order('name')
+            ]);
+            const q = t => String(t ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+            const clients = c.data || [], services = s.data || [], users = u.data || [];
+            if(a.user_id && !users.find(x => x.id === a.user_id)) users.push({ id: a.user_id, name: a.users?.name || 'Profissional' });
+            const cliOpts = clients.map(x => `<li onclick="CustomSelect.select('fe-cli', '${x.id}', '${q(x.name)}')">${Perm.esc(x.name)}</li>`).join('');
+            const servOpts = services.map(x => `<li onclick="CustomSelect.select('fe-serv', '${x.id}|${x.duration||60}', '${q(x.name)} (${x.duration||60}min)')">${Perm.esc(x.name)} (${x.duration||60}min)</li>`).join('');
+            const userOpts = users.map(x => `<li onclick="CustomSelect.select('fe-user', '${x.id}', '${q(x.name)}')">${Perm.esc(x.name)}</li>`).join('');
+            const curServ = services.find(x => x.id === a.service_id);
+            const curDur = curServ?.duration || a.services?.duration || 60;
+            const curServName = curServ?.name || a.services?.name || 'Serviço';
+            const curUser = users.find(x => x.id === a.user_id);
+            html += `<h3 style="text-align:center; margin-bottom:5px; color:var(--primary-dark)">Editar Agendamento</h3>
+            <p style="text-align:center; color:var(--muted); font-size:0.85rem; margin-bottom:20px; padding:0 30px;">As alterações são salvas direto no sistema.</p>
+            <form onsubmit="Actions.updateAppointment(event, '${a.id}')">
+            <div class="input-group"><label>Cliente</label>
+            ${CustomSelect.render('fe-cli', Perm.esc(a.clients?.name || '-- Buscar Cliente --'), cliOpts, '', a.client_id || '')}
+            </div>
+            <div class="input-group"><label>Serviço</label>
+            ${CustomSelect.render('fe-serv', Perm.esc(curServName) + ` (${curDur}min)`, servOpts, '', `${a.service_id}|${curDur}`)}
+            </div>
+            <div class="input-group"><label>Profissional</label>
+            ${CustomSelect.render('fe-user', Perm.esc(curUser?.name || '-- Atendente --'), userOpts, '', a.user_id || '')}
+            </div>
+            <div class="input-group" style="background:#fff3e0; padding:10px; border-radius:8px; border:1px solid #ffb74d;"><label style="margin:0; color:#e65100; cursor:pointer;"><input type="checkbox" id="fe-encaixe" ${a.is_encaixe ? 'checked' : ''}> Forçar Encaixe (Ignora conflitos)</label></div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <div class="input-group" style="flex:1; min-width:140px;"><label>Data</label><input type="date" id="fe-date" value="${a.date || ''}" required></div>
+            <div class="input-group" style="flex:1; min-width:120px;"><label>Hora</label><input type="time" id="fe-time" value="${(a.time || '').slice(0,5)}" required></div>
+            </div>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top:5px;">
+            <button type="button" class="btn-secondary" style="flex:1 1 120px; padding:1.2rem;" onclick="Modals.open('detalhes_agendamento', '${a.id}')"><i class="ph ph-arrow-left"></i> Voltar</button>
+            <button type="submit" class="btn-primary" style="flex:2 1 180px; padding:1.2rem;"><i class="ph ph-floppy-disk"></i> Salvar Alterações</button>
+            </div></form>`;
         }
         else if(type === 'bloquear_agenda') {
             let profSelectHtml = '';
@@ -2293,9 +2627,78 @@ const Actions = {
         UI.toast('Horário bloqueado com sucesso!');
         Render.agendaDay();
     },
-    async markAsArrived(id) { await db.from('appointments').update({ status: 'chegou' }).eq('id', id); Render.agendaDay(); Modals.close(); },
+    async markAsArrived(id) {
+        if(!Perm.can('agenda_chegada')) return UI.toast('Você não tem permissão para esta ação.', 'error');
+        const { data, error } = await db.from('appointments').update({ status: 'chegou' }).eq('id', id).select('id');
+        if(error || !data || data.length === 0) UI.toast('Não foi possível atualizar: ' + (error ? error.message : 'agendamento não encontrado.'), 'error');
+        else UI.toast('Cliente marcado como "chegou".');
+        Modals.close(); Render.agendaDay();
+    },
     async deleteAppointment(id) { UI.confirm('Remover bloqueio?', async () => { await db.from('appointments').delete().eq('id', id); Modals.close(); Render.agendaDay(); }); },
-    async cancelAppointment(id) { UI.confirm('Cancelar agendamento?', async () => { await db.from('appointments').update({ status: 'cancelado' }).eq('id', id); Modals.close(); Render.agendaDay(); }); },
+    async cancelAppointment(id) {
+        if(!Perm.can('agenda_cancelar')) return UI.toast('Você não tem permissão para cancelar agendamentos.', 'error');
+        UI.confirm('Cancelar agendamento?', async () => {
+            const { data, error } = await db.from('appointments').update({ status: 'cancelado' }).eq('id', id).select('id');
+            if(error || !data || data.length === 0) UI.toast('Não foi possível cancelar: ' + (error ? error.message : 'agendamento não encontrado.'), 'error');
+            else UI.toast('Agendamento cancelado.');
+            Modals.close(); Render.agendaDay();
+        });
+    },
+    async updateAppointment(e, id) {
+        e.preventDefault();
+        if(!Perm.can('agenda_editar')) return UI.toast('Você não tem permissão para editar agendamentos.', 'error');
+        const btn = e.target.querySelector('button[type="submit"]');
+        const originalText = btn ? btn.innerHTML : '';
+        if(btn) { btn.innerHTML = 'Salvando...'; btn.disabled = true; }
+        try {
+            const client_id = document.getElementById('fe-cli').value;
+            if(!client_id) throw new Error('Selecione o cliente!');
+            const servVal = document.getElementById('fe-serv').value;
+            if(!servVal) throw new Error('Selecione o serviço!');
+            const [service_id, durStr] = servVal.split('|');
+            const dur = parseInt(durStr || 60);
+            const user_id = document.getElementById('fe-user').value;
+            if(!user_id) throw new Error('Selecione o Profissional!');
+            const date = document.getElementById('fe-date').value;
+            const time = document.getElementById('fe-time').value;
+            if(!date || !time) throw new Error('Informe data e hora.');
+            const encaixe = document.getElementById('fe-encaixe').checked;
+
+            // Verifica conflitos de horário (ignora o próprio agendamento)
+            const { data: over, error: ovErr } = await db.from('appointments').select('id, time, status, notes, services(duration)').eq('date', date).eq('user_id', user_id).neq('status', 'cancelado').neq('id', id);
+            if(ovErr) throw new Error('Erro ao verificar conflitos: ' + ovErr.message);
+            let conflitoNormal = false, conflitoAdmin = false;
+            const sM = (Number(time.split(':')[0]) * 60) + Number(time.split(':')[1]); const eM = sM + dur;
+            (over || []).forEach(a => {
+                const [ash, asm] = (a.time || '00:00').split(':').map(Number);
+                const aSM = ash * 60 + asm; let aEM;
+                if(a.status === 'bloqueado' && a.notes?.includes('BLOQUEIO_ATE:')) {
+                    const endBlk = a.notes.split('|')[0].replace('BLOQUEIO_ATE:', '').trim().split(':');
+                    aEM = (Number(endBlk[0]) * 60) + Number(endBlk[1]);
+                } else { aEM = aSM + (a.services?.duration || 60); }
+                if(sM < aEM && eM > aSM) {
+                    if(a.status === 'bloqueado' && a.notes?.includes('ADMIN_BLOCK')) conflitoAdmin = true; else conflitoNormal = true;
+                }
+            });
+            if(conflitoAdmin && App.role !== 'owner') throw new Error('Horário bloqueado pelo Gestor. O Encaixe não é permitido neste caso.');
+            if((conflitoNormal || conflitoAdmin) && !encaixe) throw new Error('Horário ocupado! Marque a opção "Forçar Encaixe" se for estritamente necessário.');
+
+            // Grava no Supabase e confirma que a linha realmente foi alterada
+            const { data: updated, error: upErr } = await db.from('appointments')
+                .update({ client_id, service_id, user_id, date, time, is_encaixe: encaixe })
+                .eq('id', id).neq('status', 'cancelado').select('id');
+            if(upErr) throw new Error('Falha ao salvar no banco: ' + upErr.message);
+            if(!updated || updated.length === 0) throw new Error('Este agendamento não existe mais ou já foi cancelado.');
+
+            Modals.close();
+            UI.toast('Agendamento atualizado com sucesso!');
+            if(date !== U.iso(App.currentDate)) Render.selectDate(date); else Render.agendaDay();
+        } catch(err) {
+            UI.toast(err.message, 'error');
+        } finally {
+            if(btn) { btn.innerHTML = originalText; btn.disabled = false; }
+        }
+    },
     async createComanda(e) {
         e.preventDefault();
         const btn = document.getElementById('btn-gera-comanda');
@@ -2625,4 +3028,5 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 4000);
     
     Auth.init();
+    Perm.init();
 });

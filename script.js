@@ -1135,9 +1135,10 @@ const Render = {
     renderClientesList(data) {
         const list = document.getElementById('clientes-list');
         if(!list) return;
+        const isOwner = App.role === 'owner';
         list.innerHTML = data.map(c => {
             const safeName = c.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-            return `<div class="card cliente-card"><a href="#" class="wpp-btn" onclick="Modals.open('whatsapp', '${c.phone}', '${safeName}', JSON.stringify({cliente:'${safeName}', data_aniversario:'${c.birth_date ? new Date(c.birth_date).toLocaleDateString() : ''}'})); event.stopPropagation()"><i class="ph ph-whatsapp-logo"></i></a><h4 style="color:var(--primary); font-size:1.2rem; margin-bottom:10px">${c.name}</h4><p><i class="ph ph-phone"></i> ${c.phone}</p><p style="font-size:0.8rem; color:var(--muted); margin-top:5px"><i class="ph ph-cake"></i> ${c.birth_date ? new Date(c.birth_date).toLocaleDateString('pt-BR') : 'Não cadastrado'}</p><div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap"><button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Render.perfilCliente('${c.id}', '${safeName}')"><i class="ph ph-user"></i> Perfil</button><button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Render.observacoes('${c.id}', '${safeName}')"><i class="ph ph-file-text"></i> Observações</button><button class="btn-secondary" style="width:100%; border:1px solid #ccc" onclick="Modals.open('edit_cliente', '${c.id}')"><i class="ph ph-pencil"></i> Editar Dados</button></div></div>`;
+            return `<div class="card cliente-card"><a href="#" class="wpp-btn" onclick="Modals.open('whatsapp', '${c.phone}', '${safeName}', JSON.stringify({cliente:'${safeName}', data_aniversario:'${c.birth_date ? new Date(c.birth_date).toLocaleDateString() : ''}'})); event.stopPropagation()"><i class="ph ph-whatsapp-logo"></i></a><h4 style="color:var(--primary); font-size:1.2rem; margin-bottom:10px">${c.name}</h4><p><i class="ph ph-phone"></i> ${c.phone}</p><p style="font-size:0.8rem; color:var(--muted); margin-top:5px"><i class="ph ph-cake"></i> ${c.birth_date ? new Date(c.birth_date).toLocaleDateString('pt-BR') : 'Não cadastrado'}</p><div style="display:flex; gap:10px; margin-top:15px; flex-wrap:wrap"><button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Render.perfilCliente('${c.id}', '${safeName}')"><i class="ph ph-user"></i> Perfil</button><button class="btn-secondary" style="flex:1; min-width:120px;" onclick="Render.observacoes('${c.id}', '${safeName}')"><i class="ph ph-file-text"></i> Observações</button><button class="btn-secondary" style="width:100%; border:1px solid #ccc" onclick="Modals.open('edit_cliente', '${c.id}')"><i class="ph ph-pencil"></i> Editar Dados</button>${isOwner ? `<button class="btn-secondary" style="width:100%; border:1px solid #d32f2f; color:#d32f2f; background:#ffebee" onclick="Actions.deleteClient('${c.id}', '${safeName}')"><i class="ph ph-trash"></i> Excluir Cliente</button>` : ''}</div></div>`;
         }).join('');
     },
     filterClientes(term) { term = term.toLowerCase(); const filtered = (window.allClientes || []).filter(c => c.name.toLowerCase().includes(term) || (c.phone && c.phone.includes(term))); this.renderClientesList(filtered); },
@@ -2418,6 +2419,75 @@ const Actions = {
         e.preventDefault(); const payload = { name: document.getElementById('fc-nome').value, phone: document.getElementById('fc-fone').value, birth_date: document.getElementById('fc-nasc').value || null };
         if(id) await db.from('clients').update(payload).eq('id', id); else await db.from('clients').insert(payload);
         Modals.close(); UI.toast('Cliente salvo!'); Render.clientes();
+    },
+    async deleteClient(id, name) {
+        if(App.role !== 'owner') return UI.toast('Apenas o administrador pode excluir clientes.', 'error');
+        try {
+            UI.showLoading('Verificando cadastro...');
+            const [debtsRes, comandasRes, appsRes] = await Promise.all([
+                db.from('debts').select('id, remaining_amount').eq('client_id', id),
+                db.from('comandas').select('id, status').eq('client_id', id),
+                db.from('appointments').select('id', { count: 'exact', head: true }).eq('client_id', id)
+            ]);
+            UI.hideLoading();
+            const firstErr = debtsRes.error || comandasRes.error || appsRes.error;
+            if(firstErr) throw firstErr;
+
+            const debts = debtsRes.data || [];
+            const comandas = comandasRes.data || [];
+            const pendingDebts = debts.filter(d => Number(d.remaining_amount) > 0);
+            const openComandas = comandas.filter(c => c.status === 'aberta');
+
+            if(pendingDebts.length > 0) {
+                return UI.toast('Este cliente possui cobranças em aberto. Receba ou quite antes de excluir.', 'error');
+            }
+            if(openComandas.length > 0) {
+                return UI.toast('Este cliente possui comandas abertas. Feche ou delete as comandas antes de excluir.', 'error');
+            }
+
+            const closedCount = comandas.length;
+            const appCount = appsRes.count || 0;
+            let aviso = `Excluir <b>${name}</b> permanentemente?<br><small style="display:block; margin-top:10px; color:#d32f2f;">Esta ação não pode ser desfeita. Serão removidos do banco de dados o cadastro, as observações`;
+            if(appCount > 0) aviso += `, ${appCount} agendamento(s)`;
+            if(closedCount > 0) aviso += ` e ${closedCount} comanda(s) fechada(s) com o histórico de pagamentos`;
+            aviso += `.</small>`;
+
+            UI.confirm(aviso, async () => {
+                UI.showLoading('Excluindo cliente...');
+                try {
+                    // Remove primeiro os registros vinculados (evita erro de chave estrangeira)
+                    const steps = [
+                        ['anamnesis', 'observações'],
+                        ['appointments', 'agendamentos'],
+                        ['debts', 'cobranças quitadas'],
+                        ['comandas', 'comandas']
+                    ];
+                    for(const [table, label] of steps) {
+                        const { error } = await db.from(table).delete().eq('client_id', id);
+                        if(error) throw new Error(`Falha ao remover ${label}: ${error.message}`);
+                    }
+
+                    // Remove o cliente e confirma que a linha realmente foi apagada no banco
+                    const { data: deleted, error: delErr } = await db.from('clients').delete().eq('id', id).select('id');
+                    if(delErr) throw new Error(delErr.message);
+                    if(!deleted || deleted.length === 0) throw new Error('O banco de dados não permitiu a exclusão (verifique as permissões/RLS da tabela clients).');
+
+                    UI.toast('Cliente excluído com sucesso!');
+                    const searchEl = document.getElementById('search-cliente');
+                    if(searchEl) searchEl.value = '';
+                    await Render.clientes();
+                } catch(err) {
+                    console.error('Erro ao excluir cliente:', err);
+                    UI.toast('Erro ao excluir: ' + err.message, 'error');
+                } finally {
+                    UI.hideLoading();
+                }
+            });
+        } catch(err) {
+            UI.hideLoading();
+            console.error('Erro ao verificar cliente:', err);
+            UI.toast('Erro ao verificar cliente: ' + err.message, 'error');
+        }
     },
     async saveObservacao(e) {
         e.preventDefault();

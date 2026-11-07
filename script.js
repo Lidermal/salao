@@ -1,4 +1,4 @@
-/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO FINAL ESTÁVEL E CORRIGIDA */
+/** * SISTEMA ESTÚDIO AMOR QUE CUIDA - VERSÃO FINAL ESTÁVEL E CORRIGIDA (com módulo de Vales) */
 const DB_URL = 'https://bjppgfssceayiryeffcm.supabase.co';
 const DB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJqcHBnZnNzY2VheWlyeWVmZmNtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjM0MTMsImV4cCI6MjEwMjAzOTQxM30.jlHXRs87X2rTtjRQk5Uwptqlph0JePKBSMuIzuHIo18';
 const db = window.supabase.createClient(DB_URL, DB_KEY, {
@@ -239,6 +239,7 @@ const UI = {
         else if(v === 'comandas' && Perm.canView('comandas')) Modals.open('comanda');
         else if(v === 'clientes' && Perm.canView('clientes')) Modals.open('cliente');
         else if(v === 'funcionarios' && App.role === 'owner') Modals.open('funcionario');
+        else if(v === 'vales' && App.role === 'owner') Modals.open('vale');
         else if(v === 'servicos' && Perm.canView('servicos')) Modals.open('servico');
         else if(v === 'produtos' && Perm.canView('produtos')) Modals.open('produto');
         else if(v === 'mensagens' && Perm.canView('mensagens')) Modals.open('mensagem');
@@ -293,7 +294,7 @@ const Perm = {
         'resumo-financeiro': 'resumo-financeiro', relatorios: 'relatorios',
         performance: 'performance', mensagens: 'mensagens', configuracoes: 'configuracoes'
     },
-    adminViews: ['funcionarios', 'controle-acesso'],
+    adminViews: ['funcionarios', 'controle-acesso', 'vales'],
     cache: null,
     adminData: {},
     _timer: null,
@@ -599,6 +600,7 @@ const Tour = {
         { role: 'owner', view: 'performance', center: true, title: '11. Performance', text: 'KPIs e rankings.' },
         { role: 'owner', view: 'funcionarios', center: true, title: '12. Equipe', text: 'Usuários e acessos.' },
         { role: 'owner', view: 'controle-acesso', center: true, title: '12. Controle de Acesso', text: 'Defina o que cada colaborador pode ver e fazer.' },
+        { role: 'owner', view: 'vales', center: true, title: '12. Vales / Adiantamentos', text: 'Lance adiantamentos que são descontados da comissão.' },
         { role: 'owner', view: 'relatorios', target: '#filter-relatorios', mobileTarget: '#filter-relatorios', title: '13. Relatórios', text: 'Exportação PDF.' },
         { role: 'owner', view: 'configuracoes', target: '#cfg-name', mobileTarget: '#cfg-name', title: '14. Configurações', text: 'Dados do estúdio.' }
     ],
@@ -940,7 +942,7 @@ const Nav = {
             document.querySelectorAll('.nav-link, .b-item').forEach(el => el.classList.remove('active')); 
             document.querySelectorAll(`[data-view="${id}"]`).forEach(el => el.classList.add('active'));
             
-            const titles = { perfil: 'Meu Perfil', agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', observacoes:'Histórico de Observações', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', 'controle-acesso':'Controle de Acesso', relatorios:'Relatórios & Arquivos' };
+            const titles = { perfil: 'Meu Perfil', agenda:'Agenda', comandas:'Comandas', cobrancas:'Cobranças', clientes:'Clientes', observacoes:'Histórico de Observações', 'perfil-cliente':'Perfil do Cliente', servicos:'Catálogo de Serviços', produtos:'Estoque & Preços', comissao:'Dashboard de Comissões', mensagens:'Mensagens Automáticas', despesas:'Gestão de Despesas', 'resumo-financeiro':'Fluxo de Caixa', performance:'Métricas e Resultados', configuracoes:'Ajustes do Sistema', funcionarios:'Equipe do Salão', 'controle-acesso':'Controle de Acesso', vales:'Vales / Adiantamentos', relatorios:'Relatórios & Arquivos' };
             const pageTitle = document.getElementById('page-title');
             if(pageTitle) pageTitle.textContent = titles[id] || 'Amor que Cuida';
             
@@ -1349,6 +1351,57 @@ const Render = {
         }
         cont.innerHTML = colabs.map(u => Perm.renderCard(Perm.adminData[u.id])).join('');
     },
+
+    // ---------- VALES / ADIANTAMENTOS ----------
+    valesBlock(vales, showName = true) {
+        if (!vales || vales.length === 0) return '';
+        return `<h3 style="margin:20px 0 10px 0; color:#d32f2f"><i class="ph ph-hand-coins"></i> Vales descontados neste período</h3><div class="data-list">` +
+        vales.map(v => `<div class="card" style="border-left:4px solid #d32f2f; display:flex; justify-content:space-between; align-items:center; padding:1rem 1.2rem;">
+            <div>
+                <h4 style="font-size:1rem">${showName ? Perm.esc(v.users?.name || '') + ' • ' : ''}${new Date(v.vale_date + 'T12:00:00').toLocaleDateString('pt-BR')}</h4>
+                <p style="font-size:0.8rem; color:var(--muted)">${Perm.esc(v.reason || 'Sem observação')} • Lançado por ${Perm.esc(v.created_by_name || '-')}</p>
+            </div>
+            <div class="val" style="color:#d32f2f">-${U.money(v.amount)}</div>
+        </div>`).join('') + `</div>`;
+    },
+
+    async vales() {
+        const cont = document.getElementById('vales-list'); if (!cont) return;
+        const filtro = document.getElementById('filter-vales-prof');
+        if (filtro && !filtro.dataset.ok) {
+            const { data: us } = await db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).order('name');
+            filtro.innerHTML = '<option value="">Todos os colaboradores</option>' + (us || []).map(u => `<option value="${u.id}">${Perm.esc(u.name)}</option>`).join('');
+            filtro.dataset.ok = '1';
+        }
+        let q = db.from('vales').select('*, users!user_id(name)').order('vale_date', { ascending: false }).order('created_at', { ascending: false });
+        if (filtro && filtro.value) q = q.eq('user_id', filtro.value);
+        const { data, error } = await q;
+        if (error) { cont.innerHTML = `<div class="card" style="border-left:5px solid #d32f2f"><b style="color:#d32f2f">Tabela "vales" não encontrada.</b><p style="color:var(--muted); font-size:0.9rem">Execute o SQL de criação no Supabase. Detalhe: ${Perm.esc(error.message)}</p></div>`; return; }
+        const ativos = (data || []).filter(v => v.status === 'ativo');
+        const total = ativos.reduce((a, v) => a + Number(v.amount), 0);
+        document.getElementById('vales-resumo').innerHTML = `
+            <div class="card" style="border-bottom:4px solid #d32f2f"><h4>Total em Vales (ativos)</h4><div class="val" style="color:#d32f2f; font-size:1.8rem; margin-top:10px">${U.money(total)}</div></div>
+            <div class="card"><h4>Quantidade de vales ativos</h4><div class="val" style="font-size:1.8rem; margin-top:10px">${ativos.length}</div></div>`;
+        if (!data || data.length === 0) { cont.innerHTML = '<p style="color:var(--muted); text-align:center; padding:2rem">Nenhum vale lançado.</p>'; return; }
+        cont.innerHTML = data.map(v => {
+            const canc = v.status === 'cancelado';
+            return `<div class="card" style="border-left:5px solid ${canc ? '#999' : '#d32f2f'}; opacity:${canc ? 0.65 : 1}">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap">
+                    <div>
+                        <h4 style="font-size:1.15rem">${Perm.esc(v.users?.name || 'Colaborador')} ${canc ? '<span style="font-size:0.7rem; background:#eee; padding:3px 8px; border-radius:10px; color:#666">CANCELADO</span>' : ''}</h4>
+                        <p style="font-size:0.85rem; color:var(--muted); margin-top:4px"><i class="ph ph-calendar"></i> ${new Date(v.vale_date + 'T12:00:00').toLocaleDateString('pt-BR')} • Lançado por ${Perm.esc(v.created_by_name || '-')} em ${U.date(v.created_at)}</p>
+                        <p style="margin-top:6px">${Perm.esc(v.reason || 'Sem observação')}</p>
+                        ${canc ? `<p style="font-size:0.8rem; color:#d32f2f; margin-top:6px">Cancelado por ${Perm.esc(v.cancelled_by_name || '-')} em ${U.date(v.cancelled_at)}</p>` : ''}
+                    </div>
+                    <div class="val" style="font-size:1.5rem; color:${canc ? '#999' : '#d32f2f'}; ${canc ? 'text-decoration:line-through' : ''}">${U.money(v.amount)}</div>
+                </div>
+                <div style="display:flex; gap:10px; margin-top:12px; flex-wrap:wrap">
+                    <button class="btn-secondary" style="flex:1; min-width:140px" onclick="Actions.valePDF('${v.id}')"><i class="ph ph-file-pdf"></i> Comprovante</button>
+                    ${!canc ? `<button class="btn-secondary" style="flex:1; min-width:140px; color:#d32f2f" onclick="Actions.cancelVale('${v.id}')"><i class="ph ph-x-circle"></i> Cancelar Vale</button>` : ''}
+                </div>
+            </div>`;
+        }).join('');
+    },
     async despesas() {
         try {
             const effRange = await U.getEffectiveRange();
@@ -1444,6 +1497,7 @@ const Render = {
             }
         }
         
+        let pStart, pEnd; // período efetivo (usado também para buscar os vales)
         let query = db.from('comandas').select('*, clients(name)').order('created_at', {ascending: false});
         let profFilterActive = null;
         
@@ -1451,6 +1505,7 @@ const Render = {
             // Filtro Personalizado por Data
             let f = App.filters.comissoes;
             profFilterActive = f.prof_id ? f : null;
+            pStart = f.start; pEnd = f.end;
             query = query.gte('created_at', f.start + 'T00:00:00Z').lte('created_at', f.end + 'T23:59:59Z').eq('status', 'fechada');
         } else {
             // Filtro por Quinzena (Default ou Select)
@@ -1464,6 +1519,7 @@ const Render = {
             } else {
                 range = await U.getEffectiveRange();
             }
+            pStart = range.start; pEnd = range.end;
             query = query.gte('created_at', range.start + 'T00:00:00Z').lte('created_at', range.end + 'T23:59:59Z').eq('status', 'fechada');
             
             // Verifica se tem só filtro de profissional clicado pelo dono no ranking
@@ -1473,11 +1529,25 @@ const Render = {
         }
 
         const { data } = await query;
+
+        // ---- VALES DO PERÍODO (descontados da comissão) ----
+        let valesQ = db.from('vales').select('*, users!user_id(name)').eq('status', 'ativo').gte('vale_date', pStart).lte('vale_date', pEnd).order('vale_date');
+        if (!isOwner) valesQ = valesQ.eq('user_id', App.user.id);
+        else if (profFilterActive && profFilterActive.prof_id) valesQ = valesQ.eq('user_id', profFilterActive.prof_id);
+        const { data: valesData } = await valesQ;
+        const valesPeriodo = valesData || [];
+        const totalVales = valesPeriodo.reduce((a, v) => a + Number(v.amount), 0);
+        const valesByProf = {};
+        valesPeriodo.forEach(v => { valesByProf[v.user_id] = (valesByProf[v.user_id] || 0) + Number(v.amount); });
+        const resumoLiquido = (bruto) => `<div style="margin-top:12px; font-size:0.95rem; opacity:0.95; border-top:1px solid rgba(255,255,255,0.4); padding-top:10px">
+            Comissão bruta: ${U.money(bruto)}<br>Vales descontados: -${U.money(totalVales)}<br>
+            ${bruto - totalVales < 0 ? '<b>Saldo negativo: o excedente deve ser descontado no próximo período.</b>' : ''}</div>`;
+
         let totalComissao = 0;
         let rank = {};
         let details = [];
         
-        data.forEach(c => {
+        (data || []).forEach(c => {
             if(!c.items) return;
             const clientName = c.clients?.name || 'Cliente';
             const dateTimeStr = U.date(c.created_at);
@@ -1557,10 +1627,11 @@ const Render = {
         let finalHtml = '';
         if(isOwner) {
             const sortedRank = Object.entries(rank).sort((a,b)=>b[1].total-a[1].total);
-            let titleTotal = profFilterActive ? `Total de Comissão de ${profFilterActive.prof_name}` : `Total de Comissões Geradas (Todos)`;
+            let titleTotal = profFilterActive ? `Líquido a pagar a ${profFilterActive.prof_name}` : `Líquido a pagar em Comissões (Todos)`;
             finalHtml = `<div class="card" style="margin-bottom:20px; background:linear-gradient(135deg, var(--primary), var(--primary-dark)); color:white; padding:2rem; box-shadow:0 10px 20px rgba(183, 110, 121, 0.3)">
             <h3 style="color:white; font-weight:400; opacity:0.9">${titleTotal}</h3>
-            <div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div>
+            <div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao - totalVales)}</div>
+            ${resumoLiquido(totalComissao)}
             </div>`;
             if (profFilterActive) {
                 finalHtml += `<button class="btn-secondary" style="margin-bottom:20px; width:auto; border:1px solid var(--primary); color:var(--primary)" onclick="Actions.clearProfFilterOnly()"><i class="ph ph-arrow-left"></i> Voltar para Ranking Geral</button>
@@ -1574,12 +1645,14 @@ const Render = {
                     const profId = s[0];
                     const profName = s[1].name;
                     const val = s[1].total;
+                    const vl = valesByProf[profId] || 0;
                     return `<div class="card" style="cursor:pointer; transition:0.2s;" onclick="Actions.filterComissaoByProf('${profId}', '${profName.replace(/'/g, "\\'")}')" onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='var(--shadow-fab)';" onmouseout="this.style.transform='none'; this.style.boxShadow='var(--shadow)';">
                     <div style="display:flex; justify-content:space-between; align-items:center">
                     <h4 style="font-size:1.1rem">${i+1}º ${profName}</h4>
                     <i class="ph ph-medal" style="color:${color}; font-size:2rem"></i>
                     </div>
-                    <div class="val" style="margin-top:15px; font-size:1.8rem">${U.money(val)}</div>
+                    <div class="val" style="margin-top:15px; font-size:1.8rem">${U.money(val - vl)}</div>
+                    ${vl > 0 ? `<div style="font-size:0.8rem; color:#d32f2f">Bruta ${U.money(val)} • Vales -${U.money(vl)}</div>` : ''}
                     <div style="margin-top:10px; font-size:0.8rem; color:var(--primary); font-weight:bold; text-align:right;">Ver Detalhes <i class="ph ph-arrow-right"></i></div>
                     </div>`;
                 }).join('') + '</div>';
@@ -1587,11 +1660,13 @@ const Render = {
             }
         } else {
             finalHtml = `<div class="card" style="margin-bottom:20px; background:var(--primary); color:white; padding:2rem">
-            <h4 style="color:white; font-weight:400">Minha Comissão Total</h4>
-            <div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao)}</div>
+            <h4 style="color:white; font-weight:400">Minha Comissão (Líquida)</h4>
+            <div class="val" style="color:white; font-size:3rem; margin-top:10px">${U.money(totalComissao - totalVales)}</div>
+            ${resumoLiquido(totalComissao)}
             </div>
             <h3 style="margin:20px 0 15px 0">Meus Detalhamentos por Dia</h3>${htmlCards}`;
         }
+        finalHtml += Render.valesBlock(valesPeriodo, isOwner);
         if(dashContainer) dashContainer.innerHTML = finalHtml;
     },
     async 'resumo-financeiro'() {
@@ -1638,6 +1713,16 @@ const Render = {
                     <h4 style="color:${lucro>=0?'#2e7d32':'#d32f2f'}">Resultado Líquido</h4>
                     <div class="val" style="color:${lucro>=0?'#2e7d32':'#d32f2f'}; font-size:2.2rem; margin-top:10px">${U.money(lucro)}</div>
                 </div>`;
+
+                // Vales do período (informativo; já estão dentro de "Comissões", sem dupla contagem)
+                try {
+                    const { data: vl } = await db.from('vales').select('amount').eq('status', 'ativo').gte('vale_date', effRange.start).lte('vale_date', effRange.end);
+                    const totVales = (vl || []).reduce((a, v) => a + Number(v.amount), 0);
+                    if (totVales > 0) rc.innerHTML += `<div class="card" style="border-bottom:4px solid #8e24aa">
+                        <h4>Vales pagos no período</h4>
+                        <div class="val" style="color:#8e24aa; font-size:1.5rem; margin-top:10px">${U.money(totVales)}</div>
+                        <p style="font-size:0.75rem; color:var(--muted); margin-top:6px">Adiantamentos já incluídos em "Comissões" (sem dupla contagem).</p></div>`;
+                } catch (e) { console.warn('Vales no caixa:', e); }
             }
 
             let subDash = { 'Pix':0, 'Dinheiro':0, 'Cartão Crédito':0, 'Cartão Débito':0 };
@@ -1804,6 +1889,7 @@ const Modals = {
         if(!cont) return;
         const modalGuards = { agendamento: 'agenda_criar', bloquear_agenda: 'agenda_bloquear', edit_agendamento: 'agenda_editar' };
         if(modalGuards[type] && !Perm.can(modalGuards[type])) return UI.toast('Você não tem permissão para esta ação.', 'error');
+        if(type === 'vale' && App.role !== 'owner') return UI.toast('Apenas o administrador pode lançar vales.', 'error');
         let html = `<div class="modal"><button class="modal-close" onclick="Modals.close()"><i class="ph ph-x"></i></button>`;
         
         if(type === 'period_summary') {
@@ -2141,6 +2227,21 @@ const Modals = {
             html += `<h3>Repor Estoque</h3><form onsubmit="Actions.updateStock(event, '${param1}', ${param2})">
             <div class="input-group"><label>Estoque Atual: <b style="color:var(--primary)">${param2}</b></label><input type="number" id="fa-qtd" placeholder="Qtd. a somar" required min="1" style="padding:1.2rem;"></div><button type="submit" class="btn-primary" style="padding:1.2rem">Atualizar</button></form>`;
         }
+        else if(type === 'vale') {
+            const { data: us } = await db.from('users').select('id,name').neq('username', 'admin.teste').neq('is_deleted', true).eq('active', true).order('name');
+            html += `<h3>Lançar Vale / Adiantamento</h3>
+            <form onsubmit="Actions.saveVale(event)">
+                <div class="input-group"><label>Colaborador(a)</label>
+                    <select id="fv-user" required><option value="">-- Selecione --</option>${(us || []).map(u => `<option value="${u.id}">${Perm.esc(u.name)}</option>`).join('')}</select></div>
+                <div style="display:flex; gap:10px;">
+                    <div class="input-group"><label>Valor (R$)</label><input type="number" id="fv-val" step="0.01" min="0.01" required></div>
+                    <div class="input-group"><label>Data</label><input type="date" id="fv-date" value="${U.iso(new Date())}" required></div>
+                </div>
+                <div class="input-group"><label>Motivo / Observação</label><textarea id="fv-reason" rows="2" placeholder="Ex: adiantamento para despesa pessoal"></textarea></div>
+                <p style="font-size:0.8rem; color:var(--muted); margin-bottom:15px"><i class="ph ph-info"></i> Será descontado da comissão do período em que a data cair.</p>
+                <button type="submit" class="btn-primary" style="padding:1.2rem; background:#d32f2f">Registrar Vale</button>
+            </form>`;
+        }
         else if(type === 'despesa') {
             html += `<h3>Lançamento de Despesa Manual</h3><form onsubmit="Actions.createDespesa(event)">
             <div class="input-group"><label>Descrição da Saída</label><input type="text" id="fd-desc" required></div>
@@ -2298,6 +2399,57 @@ const Modals = {
 
 // ACTIONS
 const Actions = {
+    // ---------- VALES / ADIANTAMENTOS ----------
+    async saveVale(e) {
+        e.preventDefault();
+        if (App.role !== 'owner') return UI.toast('Apenas o administrador pode lançar vales.', 'error');
+        const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
+        try {
+            const amount = parseFloat(document.getElementById('fv-val').value);
+            if (!(amount > 0)) throw new Error('Valor inválido.');
+            const { error } = await db.from('vales').insert({
+                user_id: document.getElementById('fv-user').value,
+                amount, vale_date: document.getElementById('fv-date').value,
+                reason: document.getElementById('fv-reason').value.trim() || null,
+                created_by: App.user.id, created_by_name: App.user.name, status: 'ativo'
+            });
+            if (error) throw error;
+            Modals.close(); UI.toast('Vale registrado!'); Render.vales();
+        } catch (err) { UI.toast('Erro: ' + err.message, 'error'); btn.disabled = false; }
+    },
+    cancelVale(id) {
+        if (App.role !== 'owner') return;
+        UI.confirm('Cancelar este vale? Ele deixará de ser descontado da comissão, mas continuará no histórico.', async () => {
+            const { error } = await db.from('vales').update({ status: 'cancelado', cancelled_at: new Date().toISOString(), cancelled_by_name: App.user.name }).eq('id', id);
+            if (error) return UI.toast('Erro: ' + error.message, 'error');
+            UI.toast('Vale cancelado.'); Render.vales();
+        });
+    },
+    async valePDF(id) {
+        if (!window.jspdf) return UI.toast('Carregando PDF. Tente novamente.', 'warning');
+        const { data: v } = await db.from('vales').select('*, users!user_id(name)').eq('id', id).single();
+        if (!v) return UI.toast('Vale não encontrado.', 'error');
+        const { jsPDF } = window.jspdf; const doc = new jsPDF();
+        doc.setFont('helvetica', 'bold'); doc.setFontSize(18); doc.setTextColor(183, 110, 121);
+        doc.text('ESTÚDIO AMOR QUE CUIDA', 105, 20, null, null, 'center');
+        doc.setFontSize(14); doc.setTextColor(50, 50, 50);
+        doc.text('COMPROVANTE DE VALE / ADIANTAMENTO', 105, 32, null, null, 'center');
+        doc.setFont('helvetica', 'normal'); doc.setFontSize(12);
+        const linhas = [
+            `Colaborador(a): ${v.users?.name || ''}`,
+            `Valor: ${U.money(v.amount)}`,
+            `Data: ${new Date(v.vale_date + 'T12:00:00').toLocaleDateString('pt-BR')}`,
+            `Motivo: ${v.reason || '-'}`,
+            `Lançado por: ${v.created_by_name || '-'} em ${U.date(v.created_at)}`,
+            `Situação: ${v.status === 'cancelado' ? 'CANCELADO em ' + U.date(v.cancelled_at) : 'ATIVO (descontado da comissão)'}`,
+            `Código: ${v.id}`
+        ];
+        linhas.forEach((t, i) => doc.text(doc.splitTextToSize(t, 170), 20, 55 + i * 10));
+        doc.line(20, 160, 90, 160); doc.text('Colaborador(a)', 55, 167, null, null, 'center');
+        doc.line(120, 160, 190, 160); doc.text('Responsável', 155, 167, null, null, 'center');
+        doc.save(`AQC_Vale_${(v.users?.name || 'colab').replace(/ /g, '_')}_${v.vale_date}.pdf`);
+    },
+
     changeComandaDate(dir) {
         const dateInput = document.getElementById('filter-comanda-data');
         if(!dateInput || !dateInput.value) return;
